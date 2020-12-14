@@ -6,6 +6,10 @@
 #include <errno.h>
 #include <string.h>
 
+#include <cskburn_usb.h>
+
+#define MAX_IMAGE_SIZE (20 * 1024 * 1024)
+
 static struct option long_options[] = {
 		{"help", no_argument, NULL, 'h'},
 		{"version", no_argument, NULL, 'V'},
@@ -39,6 +43,9 @@ print_version(void)
 {
 	printf("0.0.0\n");
 }
+
+static void burn_usb(
+		char *device, bool wait, char *burner, uint32_t *addrs, char **images, int parts);
 
 int
 main(int argc, char **argv)
@@ -91,24 +98,114 @@ main(int argc, char **argv)
 	char **parts = &argv[optind + 1];
 	int part_count = (argc - optind - 1) / 2;
 
-	uint32_t addr;
-	char *address, *image;
+	uint32_t addrs[20];
+	char *images[20];
+	char *address;
 	for (int i = 0; i < part_count; i++) {
 		address = parts[i * 2];
-		image = parts[i * 2 + 1];
+		images[i] = parts[i * 2 + 1];
 
-		if (sscanf(address, "0x%x", &addr) != 1 && sscanf(address, "%d", &addr) != 1) {
+		if (sscanf(address, "0x%x", &addrs[i]) != 1 && sscanf(address, "%d", &addrs[i]) != 1) {
 			printf("错误: 分区 %d 的地址格式不合法: %s\n", i + 1, address);
 			return 0;
 		}
 
-		if (access(image, F_OK) != 0) {
-			printf("错误: 分区 %d 的文件不存在: %s\n", i + 1, image);
+		if (access(images[i], F_OK) != 0) {
+			printf("错误: 分区 %d 的文件不存在: %s\n", i + 1, images[i]);
 			return 0;
 		}
 
-		printf("分区 %d: 0x%08x %s\n", i + 1, addr, image);
+		printf("分区 %d: 0x%08X %s\n", i + 1, addrs[i], images[i]);
+	}
+
+	if (usb != NULL) {
+		burn_usb(usb, wait, burner, addrs, images, part_count);
+	} else if (serial != NULL) {
+		printf("serial: %lu\n", strlen(serial));
 	}
 
 	return 0;
+}
+
+static uint32_t
+read_file(const char *path, uint8_t *buf, uint32_t limit)
+{
+	FILE *f = fopen(path, "r");
+	if (f == NULL) {
+		printf("错误: 文件打开失败: %s\n", strerror(errno));
+		return 0;
+	}
+
+	size_t len = fread(buf, 1, limit, f);
+	fclose(f);
+	return len;
+}
+
+static void
+burn_usb(char *device, bool wait, char *burner, uint32_t *addrs, char **images, int parts)
+{
+	if (cskburn_usb_init() != 0) {
+		printf("错误: 初始化失败\n");
+		goto err_init;
+	}
+
+	if (wait) {
+		int w = 0;
+		while (!cskburn_usb_wait(device, 10)) {
+			if (w == 0) {
+				w = 1;
+			} else if (w == 1) {
+				printf("正在等待设备接入…\n");
+				w = 2;
+			}
+		}
+	}
+
+	cskburn_usb_device_t *dev = cskburn_usb_open(device);
+	if (dev == NULL) {
+		printf("错误: 设备打开失败\n");
+		goto err_open;
+	}
+
+	uint8_t *burner_buf = malloc(MAX_IMAGE_SIZE);
+	uint32_t burner_len = read_file(burner, burner_buf, MAX_IMAGE_SIZE);
+	if (burner_len == 0) {
+		printf("错误: 无法读取 %s\n", burner);
+		goto err_enter;
+	}
+
+	printf("正在进入烧录模式…\n");
+	if (cskburn_usb_enter(dev, burner_buf, burner_len)) {
+		printf("错误: 无法进入烧录模式\n");
+		goto err_enter;
+	}
+
+	uint8_t *image_buf = malloc(MAX_IMAGE_SIZE);
+	uint32_t image_len;
+	for (int i = 0; i < parts; i++) {
+		image_len = read_file(images[i], image_buf, MAX_IMAGE_SIZE);
+		if (image_len == 0) {
+			printf("错误: 无法读取 %s\n", images[i]);
+			goto err_enter;
+		}
+
+		printf("正在烧录分区 %d (0x%08X)…\n", i + 1, addrs[i]);
+		if (cskburn_usb_write(dev, addrs[i], image_buf, image_len)) {
+			printf("错误: 无法烧录分区 %d\n", i + 1);
+			goto err_write;
+		}
+	}
+
+	cskburn_usb_finish(dev);
+
+	printf("烧录完成\n");
+
+err_write:
+	free(image_buf);
+err_enter:
+	free(burner_buf);
+	cskburn_usb_close(&dev);
+err_open:
+err_init:
+	cskburn_usb_exit();
 }
