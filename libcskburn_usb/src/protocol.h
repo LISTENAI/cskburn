@@ -54,8 +54,8 @@ typedef struct {
 	uint8_t zero;
 	uint8_t op;  // csk_command
 	uint16_t data_len;
-	uint64_t checksum;
-	uint8_t data_buf[0];
+	uint32_t checksum;
+	// uint8_t data_buf[0];
 } csk_command_req_t;
 
 typedef struct {
@@ -64,22 +64,22 @@ typedef struct {
 } csk_command_data_status_t;
 
 typedef struct {
-	uint64_t total_size;
-	uint64_t packets;
-	uint64_t pkt_size;
-	uint64_t moffset;
+	uint32_t total_size;
+	uint32_t packets;
+	uint32_t pkt_size;
+	uint32_t moffset;
 } csk_mem_begin_t;
 
 typedef struct {
-	uint64_t mdata_len;  // Mem data length, little endian 32bit word.
-	uint64_t seq_no;  // Sequence number, little endian 32bit word, 0 based.
-	uint64_t rsvd[2];  // Two words of 0, unused.
-	uint8_t mdata[0];  // Payload of mem data
+	uint32_t mdata_len;  // Mem data length, little endian 32bit word.
+	uint32_t seq_no;  // Sequence number, little endian 32bit word, 0 based.
+	uint32_t rsvd[2];  // Two words of 0, unused.
+	// uint8_t mdata[0];  // Payload of mem data
 } csk_mem_data_t;
 
 typedef struct {
-	uint64_t exec_flag;
-	uint64_t entry_point;
+	uint32_t exec_flag;
+	uint32_t entry_point;
 } csk_mem_end_t;
 
 bool send_mem_begin_command(

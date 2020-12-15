@@ -16,10 +16,9 @@ send_mem_command(cskburn_usb_device_t *dev, uint8_t *buf, uint32_t data_len)
 {
 	int ret, xferred = 0;
 
-	struct {
-		csk_command_req_t req;
-		csk_command_data_status_t data_status;
-	} resp = {0};
+	uint8_t resp[sizeof(csk_command_req_t) + sizeof(csk_command_data_status_t)] = {0};
+	csk_command_data_status_t *data_status =
+			(csk_command_data_status_t *)(resp + sizeof(csk_command_req_t));
 
 	ret = libusb_bulk_transfer(
 			dev->handle, EP_ADDR_DATA_OUT, (unsigned char *)buf, data_len, &xferred, 0);
@@ -47,13 +46,13 @@ send_mem_command(cskburn_usb_device_t *dev, uint8_t *buf, uint32_t data_len)
 		return false;
 	}
 
-	if (resp.data_status.error >= 0xF0) {
-		printf("错误: 设备返回致命错误: %02X\n", resp.data_status.error);
+	if (data_status->error >= 0xF0) {
+		printf("错误: 设备返回致命错误: %02X\n", data_status->error);
 		return false;
 	}
 
-	if (resp.data_status.error != 0) {
-		printf("错误: 设备返回错误: %02X\n", resp.data_status.error);
+	if (data_status->error != 0) {
+		printf("错误: 设备返回错误: %02X\n", data_status->error);
 		return false;
 	}
 

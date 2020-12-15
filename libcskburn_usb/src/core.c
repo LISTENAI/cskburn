@@ -33,6 +33,10 @@ cskburn_usb_open(char *device)
 		goto err_open;
 	}
 
+	libusb_set_configuration(handle, 1);
+	libusb_claim_interface(handle, 0);
+	libusb_set_interface_alt_setting(handle, 0, 0);
+
 	dev->handle = handle;
 	return dev;
 
@@ -84,6 +88,10 @@ cskburn_usb_enter(cskburn_usb_device_t *dev, uint8_t *burner, uint32_t len)
 
 		xferred += packet_len;
 		seq++;
+
+		if (xferred >= len) {
+			break;
+		}
 
 		usleep(10 * 1000);
 	}
