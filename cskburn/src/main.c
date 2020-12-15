@@ -20,21 +20,24 @@ static struct option long_options[] = {
 };
 
 static void
-print_help(void)
+print_help(const char *progname)
 {
-	printf("用法: cskburn [<选项>] <burner> <地址1> <文件1> [<地址2> <文件2>...]\n");
+	printf("用法: %s [<选项>] <burner> <地址1> <文件1> [<地址2> <文件2>...]\n", progname);
 	printf("\n");
-	printf("选项:\n");
+	printf("烧录选项 (二选一，不传默认 USB):\n");
+	printf("  -u, --usb (-|<端口>|<总线>:<设备>)\t使用指定 USB 端口烧录。传 - "
+		   "表示自动根据 VID/PID 选取第一个\n");
+	printf("  -s, --serial <端口>\t\t\t使用指定串口端口烧录 (/dev/cu.usbserial-*)\n");
+	printf("\n");
+	printf("其它选项:\n");
 	printf("  -h, --help\t\t\t\t显示帮助\n");
 	printf("  -V, --version\t\t\t\t显示版本号\n");
 	printf("  -w, --wait\t\t\t\t等待设备插入\n");
-	printf("  -u, --usb (-|<端口>|<总线>:<设备>)\t使用指定 USB 端口烧录\n");
-	printf("  -s, --serial <端口>\t\t\t使用指定串口端口烧录\n");
 	printf("\n");
 	printf("用例:\n");
 	printf("  cskburn -w -u 128:000 burner.img 0x0 flashboot.bin 0x10000 master.bin 0x100000 "
 		   "respack.bin\n");
-	printf("  cskburn -w -s /dev/tty.usbserial-142120 burner.img 0x0 flashboot.bin 0x10000 "
+	printf("  cskburn -w -s /dev/cu.usbserial-1440 burner.img 0x0 flashboot.bin 0x10000 "
 		   "master.bin 0x100000 respack.bin\n");
 }
 
@@ -72,7 +75,7 @@ main(int argc, char **argv)
 				return 0;
 			case 'h':
 			case '?':
-				print_help();
+				print_help(argv[0]);
 				return 0;
 		}
 	}
@@ -189,7 +192,8 @@ burn_usb(char *device, bool wait, char *burner, uint32_t *addrs, char **images, 
 			goto err_enter;
 		}
 
-		printf("正在烧录分区 %d (0x%08X)…\n", i + 1, addrs[i]);
+		printf("正在烧录分区 %d/%d… (0x%08X, %02.f KB)\n", i + 1, parts, addrs[i],
+				(float)image_len / 1024.0f);
 		if (cskburn_usb_write(dev, addrs[i], image_buf, image_len)) {
 			printf("错误: 无法烧录分区 %d\n", i + 1);
 			goto err_write;
