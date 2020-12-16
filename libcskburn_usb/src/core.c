@@ -2,8 +2,11 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include <libusb.h>
+#include <cskburn_usb.h>
+
 #include "core.h"
-#include "protocol.h"
+#include "bootrom.h"
 
 int
 cskburn_usb_init(void)
@@ -108,42 +111,8 @@ cskburn_usb_close(cskburn_usb_device_t **dev)
 int
 cskburn_usb_enter(cskburn_usb_device_t *dev, uint8_t *burner, uint32_t len)
 {
-	uint32_t hdr_len = sizeof(csk_command_req_t) + sizeof(csk_mem_data_t);
-	uint32_t buf_len = hdr_len + DATA_BUF_SIZE;
-	uint8_t *buf = malloc(buf_len);
-
-	if (!send_mem_begin_command(dev, buf, buf_len, len)) {
-		printf("错误: MEM_BEGIN 发送失败\n");
-		goto err;
-	}
-
-	uint32_t xferred = 0;
-	uint32_t packet_len = 0;
-	uint32_t seq = 0;
-	while (1) {
-		packet_len = DATA_BUF_SIZE;
-		if (xferred + packet_len > len) {
-			packet_len = len - xferred;
-		}
-
-		if (!send_mem_data_command(dev, buf, buf_len, burner + xferred, packet_len, seq)) {
-			printf("错误: MEM_DATA 发送失败\n");
-			goto err;
-		}
-
-		xferred += packet_len;
-		seq++;
-
-		if (xferred >= len) {
-			break;
-		}
-
-		usleep(10 * 1000);
-	}
-
-	if (!send_mem_end_command(dev, buf, buf_len)) {
-		printf("错误: MEM_END 发送失败\n");
-		goto err;
+	if (!bootrom_load(dev->handle, burner, len)) {
+		return 1;
 	}
 
 	usleep(100 * 1000);
@@ -151,14 +120,10 @@ cskburn_usb_enter(cskburn_usb_device_t *dev, uint8_t *burner, uint32_t len)
 	int tmp = 0;
 	if (libusb_get_configuration(dev->handle, &tmp) != 0) {
 		printf("错误: 设备未响应\n");
-		goto err;
+		return 1;
 	}
 
 	return 0;
-
-err:
-	free(buf);
-	return 1;
 }
 
 int

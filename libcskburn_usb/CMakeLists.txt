@@ -3,7 +3,7 @@ project(cskburn_usb)
 add_library(
     cskburn_usb STATIC
     src/core.c
-    src/protocol.c
+    src/bootrom.c
 )
 
 target_include_directories(
