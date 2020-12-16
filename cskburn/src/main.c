@@ -25,9 +25,9 @@ print_help(const char *progname)
 	printf("用法: %s [<选项>] <burner> <地址1> <文件1> [<地址2> <文件2>...]\n", progname);
 	printf("\n");
 	printf("烧录选项 (二选一，不传默认 USB):\n");
-	printf("  -u, --usb (-|<端口>|<总线>:<设备>)\t使用指定 USB 端口烧录。传 - "
-		   "表示自动根据 VID/PID 选取第一个\n");
-	printf("  -s, --serial <端口>\t\t\t使用指定串口端口烧录 (/dev/cu.usbserial-*)\n");
+	printf("  -u, --usb (-|<总线>:<设备>)\t使用指定 USB 设备烧录。传 - 表示自动选取第一个 CSK "
+		   "设备\n");
+	printf("  -s, --serial <端口>\t\t\t使用指定串口端口烧录 (如 /dev/cu.usbserial-*)\n");
 	printf("\n");
 	printf("其它选项:\n");
 	printf("  -h, --help\t\t\t\t显示帮助\n");
@@ -47,15 +47,15 @@ print_version(void)
 	printf("0.0.0\n");
 }
 
-static void burn_usb(
-		char *device, bool wait, char *burner, uint32_t *addrs, char **images, int parts);
+static void burn_usb(int16_t bus, int16_t address, bool wait, char *burner, uint32_t *addrs,
+		char **images, int parts);
 
 int
 main(int argc, char **argv)
 {
 	bool wait;
-	char *usb;
-	char *serial;
+	char *usb = NULL, *serial = NULL;
+	int16_t usb_bus = -1, usb_addr = -1;
 
 	while (1) {
 		int c = getopt_long(argc, argv, "hVwu:s:", long_options, NULL);
@@ -77,6 +77,13 @@ main(int argc, char **argv)
 			case '?':
 				print_help(argv[0]);
 				return 0;
+		}
+	}
+
+	if (serial == NULL && usb != NULL && strcmp(usb, "-") != 0) {
+		if (sscanf(usb, "%hu:%hu\n", &usb_bus, &usb_addr) != 2) {
+			printf("错误: -u/--usb 参数的格式应为 <总线>:<设备> (如: -u 020:004)\n");
+			return 0;
 		}
 	}
 
@@ -121,10 +128,10 @@ main(int argc, char **argv)
 		printf("分区 %d: 0x%08X %s\n", i + 1, addrs[i], images[i]);
 	}
 
-	if (usb != NULL) {
-		burn_usb(usb, wait, burner, addrs, images, part_count);
-	} else if (serial != NULL) {
+	if (serial != NULL) {
 		printf("serial: %lu\n", strlen(serial));
+	} else {
+		burn_usb(usb_bus, usb_addr, wait, burner, addrs, images, part_count);
 	}
 
 	return 0;
@@ -145,7 +152,8 @@ read_file(const char *path, uint8_t *buf, uint32_t limit)
 }
 
 static void
-burn_usb(char *device, bool wait, char *burner, uint32_t *addrs, char **images, int parts)
+burn_usb(int16_t bus, int16_t address, bool wait, char *burner, uint32_t *addrs, char **images,
+		int parts)
 {
 	if (cskburn_usb_init() != 0) {
 		printf("错误: 初始化失败\n");
@@ -154,7 +162,7 @@ burn_usb(char *device, bool wait, char *burner, uint32_t *addrs, char **images, 
 
 	if (wait) {
 		int w = 0;
-		while (!cskburn_usb_wait(device, 10)) {
+		while (!cskburn_usb_wait(bus, address, 10)) {
 			if (w == 0) {
 				w = 1;
 			} else if (w == 1) {
@@ -164,7 +172,7 @@ burn_usb(char *device, bool wait, char *burner, uint32_t *addrs, char **images, 
 		}
 	}
 
-	cskburn_usb_device_t *dev = cskburn_usb_open(device);
+	cskburn_usb_device_t *dev = cskburn_usb_open(bus, address);
 	if (dev == NULL) {
 		printf("错误: 设备打开失败\n");
 		goto err_open;
@@ -178,6 +186,7 @@ burn_usb(char *device, bool wait, char *burner, uint32_t *addrs, char **images, 
 	}
 
 	printf("正在进入烧录模式…\n");
+	usleep(2000 * 1000);
 	if (cskburn_usb_enter(dev, burner_buf, burner_len)) {
 		printf("错误: 无法进入烧录模式\n");
 		goto err_enter;

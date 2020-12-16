@@ -6,13 +6,13 @@
 int cskburn_usb_init(void);
 void cskburn_usb_exit(void);
 
-int cskburn_usb_wait(char *device, int timeout);
+int cskburn_usb_wait(int16_t bus, int16_t address, int timeout);
 
 typedef struct {
 	void *handle;
 } cskburn_usb_device_t;
 
-cskburn_usb_device_t *cskburn_usb_open(char *device);
+cskburn_usb_device_t *cskburn_usb_open(int16_t bus, int16_t address);
 void cskburn_usb_close(cskburn_usb_device_t **dev);
 
 int cskburn_usb_enter(cskburn_usb_device_t *dev, uint8_t *burner, uint32_t len);

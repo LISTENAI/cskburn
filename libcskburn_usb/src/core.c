@@ -17,19 +17,66 @@ cskburn_usb_exit(void)
 	libusb_exit(NULL);
 }
 
-int
-cskburn_usb_wait(char *device, int timeout)
+static libusb_device *
+find_device(int16_t bus, int16_t address)
 {
-	return 1;
+	libusb_device **devs;
+
+	if (libusb_get_device_list(NULL, &devs) < 0) {
+		return NULL;
+	}
+
+	libusb_device *found = NULL;
+	struct libusb_device_descriptor desc = {0};
+
+	for (size_t i = 0; devs[i] != NULL; i++) {
+		if (libusb_get_device_descriptor(devs[i], &desc) < 0) {
+			continue;
+		}
+		if (desc.idVendor != CSK_VID || desc.idProduct != CSK_PID) {
+			continue;
+		}
+		if (bus != -1 && address != -1) {
+			if (bus != libusb_get_bus_number(devs[i]) ||
+					address != libusb_get_device_address(devs[i])) {
+				continue;
+			}
+		}
+		found = devs[i];
+		break;
+	}
+
+	libusb_free_device_list(devs, 1);
+	return found;
+}
+
+int
+cskburn_usb_wait(int16_t bus, int16_t address, int timeout)
+{
+	while (timeout > 0) {
+		libusb_device *found = find_device(bus, address);
+		if (found != NULL) {
+			return 1;
+		}
+		timeout -= 10;
+		usleep(10 * 1000);
+	}
+
+	return 0;
 }
 
 cskburn_usb_device_t *
-cskburn_usb_open(char *device)
+cskburn_usb_open(int16_t bus, int16_t address)
 {
 	cskburn_usb_device_t *dev = (cskburn_usb_device_t *)malloc(sizeof(cskburn_usb_device_t));
 
-	libusb_device_handle *handle = libusb_open_device_with_vid_pid(NULL, CSK_VID, CSK_PID);
-	if (handle == NULL) {
+	libusb_device *device = find_device(bus, address);
+	if (device == NULL) {
+		goto err_open;
+	}
+
+	libusb_device_handle *handle = NULL;
+	if (libusb_open(device, &handle) < 0) {
 		goto err_open;
 	}
 
@@ -64,8 +111,6 @@ cskburn_usb_enter(cskburn_usb_device_t *dev, uint8_t *burner, uint32_t len)
 	uint32_t hdr_len = sizeof(csk_command_req_t) + sizeof(csk_mem_data_t);
 	uint32_t buf_len = hdr_len + DATA_BUF_SIZE;
 	uint8_t *buf = malloc(buf_len);
-
-	usleep(800 * 1000);
 
 	if (!send_mem_begin_command(dev, buf, buf_len, len)) {
 		printf("错误: MEM_BEGIN 发送失败\n");
@@ -102,6 +147,12 @@ cskburn_usb_enter(cskburn_usb_device_t *dev, uint8_t *burner, uint32_t len)
 	}
 
 	usleep(100 * 1000);
+
+	int tmp = 0;
+	if (libusb_get_configuration(dev->handle, &tmp) != 0) {
+		printf("错误: 设备未响应\n");
+		goto err;
+	}
 
 	return 0;
 
