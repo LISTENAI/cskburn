@@ -304,8 +304,6 @@ burner_burn(void *handle, uint32_t addr, uint8_t *image, uint32_t len,
 		if (on_progress != NULL) {
 			on_progress(wrote, len);
 		}
-
-		usleep(20 * 1000);
 	}
 
 	return true;

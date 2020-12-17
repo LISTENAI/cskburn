@@ -153,6 +153,14 @@ read_file(const char *path, uint8_t *buf, uint32_t limit)
 }
 
 static void
+print_progress(uint32_t wrote_bytes, uint32_t total_bytes)
+{
+	printf("%.2f KB / %.2f KB (%.2f%%)\r", (float)wrote_bytes / 1024.0f,
+			(float)total_bytes / 1024.0f, (float)wrote_bytes / (float)total_bytes * 100.0f);
+	fflush(stdout);
+}
+
+static void
 burn_usb(int16_t bus, int16_t address, bool wait, char *burner, uint32_t *addrs, char **images,
 		int parts)
 {
@@ -202,9 +210,9 @@ burn_usb(int16_t bus, int16_t address, bool wait, char *burner, uint32_t *addrs,
 			goto err_enter;
 		}
 
-		printf("正在烧录分区 %d/%d… (0x%08X, %02.f KB)\n", i + 1, parts, addrs[i],
+		printf("正在烧录分区 %d/%d… (0x%08X, %.2f KB)\n", i + 1, parts, addrs[i],
 				(float)image_len / 1024.0f);
-		if (cskburn_usb_write(dev, addrs[i], image_buf, image_len)) {
+		if (cskburn_usb_write(dev, addrs[i], image_buf, image_len, print_progress)) {
 			printf("错误: 无法烧录分区 %d\n", i + 1);
 			goto err_write;
 		}
