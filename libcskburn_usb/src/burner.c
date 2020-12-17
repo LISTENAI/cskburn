@@ -160,6 +160,7 @@ burner_set_crc64(void *handle, uint64_t crc64, uint32_t flag)
 			.flag = flag,
 			.cmdcode = CMD_CODE_H2D_SET_CRC64,
 	};
+	memcpy(&cmd.crc64[0], &crc64, sizeof(uint64_t));
 
 	for (int i = 0; i < RETRY_COMMAND_COUNT; i++) {
 		if (!burner_transmit(handle, &cmd, sizeof(cmd), &resp)) {
@@ -234,13 +235,6 @@ burner_burn(void *handle, uint32_t addr, uint8_t *image, uint32_t len,
 {
 	uint32_t flag = (1 << 3);  // verify
 
-	uint64_t crc64 = calc_crc64(image, len);
-	printf("分区 CRC64: 0x%08llx\n", crc64);
-	if (!burner_set_crc64(handle, crc64, flag)) {
-		printf("错误: 向设备传输 CRC64 失败\n");
-		return false;
-	}
-
 	if (!burner_flash_write(handle, addr, len, flag)) {
 		return false;
 	}
@@ -304,6 +298,12 @@ burner_burn(void *handle, uint32_t addr, uint8_t *image, uint32_t len,
 		if (on_progress != NULL) {
 			on_progress(wrote, len);
 		}
+	}
+
+	uint64_t crc64 = calc_crc64(image, len);
+	if (!burner_set_crc64(handle, crc64, flag)) {
+		printf("错误: 向设备传输 CRC64 失败\n");
+		return false;
 	}
 
 	return true;
