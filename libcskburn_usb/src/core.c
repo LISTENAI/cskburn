@@ -7,6 +7,7 @@
 
 #include "core.h"
 #include "bootrom.h"
+#include "burner.h"
 
 int
 cskburn_usb_init(void)
@@ -129,6 +130,10 @@ cskburn_usb_enter(cskburn_usb_device_t *dev, uint8_t *burner, uint32_t len)
 int
 cskburn_usb_write(cskburn_usb_device_t *dev, uint32_t addr, uint8_t *image, uint32_t len)
 {
+	if (!burner_burn(dev->handle, addr, image, len, NULL)) {
+		return 1;
+	}
+
 	return 0;
 }
 
