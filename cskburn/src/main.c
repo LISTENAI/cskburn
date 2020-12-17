@@ -25,14 +25,15 @@ print_help(const char *progname)
 	printf("用法: %s [<选项>] <burner> <地址1> <文件1> [<地址2> <文件2>...]\n", progname);
 	printf("\n");
 	printf("烧录选项 (二选一，不传默认 USB):\n");
-	printf("  -u, --usb (-|<总线>:<设备>)\t使用指定 USB 设备烧录。传 - 表示自动选取第一个 CSK "
+	printf("  -u, --usb (-|<总线>:<设备>)\t\t使用指定 USB 设备烧录。传 - 表示自动选取第一个 CSK "
 		   "设备\n");
 	printf("  -s, --serial <端口>\t\t\t使用指定串口端口烧录 (如 /dev/cu.usbserial-*)\n");
 	printf("\n");
 	printf("其它选项:\n");
 	printf("  -h, --help\t\t\t\t显示帮助\n");
 	printf("  -V, --version\t\t\t\t显示版本号\n");
-	printf("  -w, --wait\t\t\t\t等待设备插入\n");
+	printf("  -w, --wait\t\t\t\t等待设备插入，并自动开始烧录\n");
+	printf("  -r, --repeat\t\t\t\t烧录成功后不退出，等待下次插入\n");
 	printf("\n");
 	printf("用例:\n");
 	printf("  cskburn -w -u 128:000 burner.img 0x0 flashboot.bin 0x10000 master.bin 0x100000 "
