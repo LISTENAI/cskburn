@@ -3,6 +3,7 @@ project(cskburn)
 add_executable(
     cskburn
     src/main.c
+    src/serial.c
 )
 
 target_link_libraries(
