@@ -8,6 +8,8 @@
 
 #include <cskburn_usb.h>
 
+#include "serial.h"
+
 #define MAX_IMAGE_SIZE (20 * 1024 * 1024)
 
 static struct option long_options[] = {
@@ -15,6 +17,7 @@ static struct option long_options[] = {
 		{"version", no_argument, NULL, 'V'},
 		{"wait", no_argument, NULL, 'w'},
 		{"usb", required_argument, NULL, 'u'},
+		{"reset", required_argument, NULL, 'r'},
 		{0, 0, NULL, 0},
 };
 
@@ -26,6 +29,7 @@ print_help(const char *progname)
 	printf("烧录选项:\n");
 	printf("  -u, --usb (-|<总线>:<设备>)\t\t使用指定 USB 设备烧录。传 - 表示自动选取第一个 CSK "
 		   "设备\n");
+	printf("  -r, --reset <端口>\t\t\t自动通过指定串口设备 (如 /dev/cu.SLAB_USBtoUART) 进行复位\n");
 	printf("\n");
 	printf("其它选项:\n");
 	printf("  -h, --help\t\t\t\t显示帮助\n");
@@ -44,6 +48,9 @@ print_version(void)
 	printf("0.0.0\n");
 }
 
+static void update_enter(int fd);
+static void update_exit(int fd);
+
 static void burn_usb(int16_t bus, int16_t address, bool wait, char *burner, uint32_t *addrs,
 		char **images, int parts);
 
@@ -52,10 +59,11 @@ main(int argc, char **argv)
 {
 	bool wait;
 	char *usb = NULL;
+	char *reset = NULL;
 	int16_t usb_bus = -1, usb_addr = -1;
 
 	while (1) {
-		int c = getopt_long(argc, argv, "hVwu:", long_options, NULL);
+		int c = getopt_long(argc, argv, "hVwu:r:", long_options, NULL);
 		if (c == EOF) break;
 		switch (c) {
 			case 'w':
@@ -63,6 +71,10 @@ main(int argc, char **argv)
 				break;
 			case 'u':
 				usb = optarg;
+				break;
+			case 'r':
+				reset = optarg;
+				wait = true;
 				break;
 			case 'V':
 				print_version();
@@ -122,7 +134,26 @@ main(int argc, char **argv)
 		printf("分区 %d: 0x%08X %s\n", i + 1, addrs[i], images[i]);
 	}
 
+	int fd = 0;
+	if (reset != NULL) {
+		fd = serial_open(reset);
+		if (fd <= 0) {
+			printf("错误: 无法打开串口设备 %s: %s\n", reset, strerror(errno));
+			return 0;
+		}
+
+		printf("正在复位设备…\n");
+		update_enter(fd);
+	}
+
 	burn_usb(usb_bus, usb_addr, wait, burner, addrs, images, part_count);
+
+	if (reset != NULL && fd > 0) {
+		printf("正在复位设备…\n");
+		update_exit(fd);
+		close(fd);
+		fd = 0;
+	}
 
 	return 0;
 }
@@ -150,6 +181,30 @@ print_progress(uint32_t wrote_bytes, uint32_t total_bytes)
 		printf("\n");
 	}
 	fflush(stdout);
+}
+
+static void
+update_enter(int fd)
+{
+	serial_set_dtr(fd, 1);  // UPDATE
+
+	serial_set_rts(fd, 1);  // SYS_RST
+	usleep(100 * 1000);
+	serial_set_rts(fd, 0);  // SYS_RST
+
+	usleep(500 * 1000);
+}
+
+static void
+update_exit(int fd)
+{
+	serial_set_dtr(fd, 0);  // UPDATE
+
+	usleep(500 * 1000);
+
+	serial_set_rts(fd, 1);  // SYS_RST
+	usleep(100 * 1000);
+	serial_set_rts(fd, 0);  // SYS_RST
 }
 
 static void
