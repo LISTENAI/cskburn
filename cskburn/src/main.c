@@ -45,7 +45,7 @@ print_help(const char *progname)
 static void
 print_version(void)
 {
-	printf("0.0.0\n");
+	printf("%s (%d)\n", GIT_TAG, GIT_INCREMENT);
 }
 
 static void update_enter(int fd);
