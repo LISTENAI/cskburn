@@ -15,7 +15,6 @@ static struct option long_options[] = {
 		{"version", no_argument, NULL, 'V'},
 		{"wait", no_argument, NULL, 'w'},
 		{"usb", required_argument, NULL, 'u'},
-		{"serial", required_argument, NULL, 's'},
 		{0, 0, NULL, 0},
 };
 
@@ -24,10 +23,9 @@ print_help(const char *progname)
 {
 	printf("用法: %s [<选项>] <burner> <地址1> <文件1> [<地址2> <文件2>...]\n", progname);
 	printf("\n");
-	printf("烧录选项 (二选一，不传默认 USB):\n");
+	printf("烧录选项:\n");
 	printf("  -u, --usb (-|<总线>:<设备>)\t\t使用指定 USB 设备烧录。传 - 表示自动选取第一个 CSK "
 		   "设备\n");
-	printf("  -s, --serial <端口>\t\t\t使用指定串口端口烧录 (如 /dev/cu.usbserial-*)\n");
 	printf("\n");
 	printf("其它选项:\n");
 	printf("  -h, --help\t\t\t\t显示帮助\n");
@@ -38,8 +36,6 @@ print_help(const char *progname)
 	printf("用例:\n");
 	printf("  cskburn -w -u 128:000 burner.img 0x0 flashboot.bin 0x10000 master.bin 0x100000 "
 		   "respack.bin\n");
-	printf("  cskburn -w -s /dev/cu.usbserial-1440 burner.img 0x0 flashboot.bin 0x10000 "
-		   "master.bin 0x100000 respack.bin\n");
 }
 
 static void
@@ -55,11 +51,11 @@ int
 main(int argc, char **argv)
 {
 	bool wait;
-	char *usb = NULL, *serial = NULL;
+	char *usb = NULL;
 	int16_t usb_bus = -1, usb_addr = -1;
 
 	while (1) {
-		int c = getopt_long(argc, argv, "hVwu:s:", long_options, NULL);
+		int c = getopt_long(argc, argv, "hVwu:", long_options, NULL);
 		if (c == EOF) break;
 		switch (c) {
 			case 'w':
@@ -67,9 +63,6 @@ main(int argc, char **argv)
 				break;
 			case 'u':
 				usb = optarg;
-				break;
-			case 's':
-				serial = optarg;
 				break;
 			case 'V':
 				print_version();
@@ -81,7 +74,7 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (serial == NULL && usb != NULL && strcmp(usb, "-") != 0) {
+	if (usb != NULL && strcmp(usb, "-") != 0) {
 		if (sscanf(usb, "%hu:%hu\n", &usb_bus, &usb_addr) != 2) {
 			printf("错误: -u/--usb 参数的格式应为 <总线>:<设备> (如: -u 020:004)\n");
 			return 0;
@@ -129,11 +122,7 @@ main(int argc, char **argv)
 		printf("分区 %d: 0x%08X %s\n", i + 1, addrs[i], images[i]);
 	}
 
-	if (serial != NULL) {
-		printf("serial: %lu\n", strlen(serial));
-	} else {
-		burn_usb(usb_bus, usb_addr, wait, burner, addrs, images, part_count);
-	}
+	burn_usb(usb_bus, usb_addr, wait, burner, addrs, images, part_count);
 
 	return 0;
 }
