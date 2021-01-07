@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 
 #include <libusb.h>
+#include <msleep.h>
 #include <cskburn_usb.h>
 
 #include "core.h"
@@ -63,7 +63,7 @@ cskburn_usb_wait(int16_t bus, int16_t address, int timeout)
 			return 1;
 		}
 		timeout -= 10;
-		usleep(10 * 1000);
+		msleep(10);
 	}
 
 	return 0;
@@ -116,7 +116,7 @@ cskburn_usb_enter(cskburn_usb_device_t *dev, uint8_t *burner, uint32_t len)
 		return 1;
 	}
 
-	usleep(100 * 1000);
+	msleep(100);
 
 	int tmp = 0;
 	if (libusb_get_configuration(dev->handle, &tmp) != 0) {

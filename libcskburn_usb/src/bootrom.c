@@ -2,8 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include <unistd.h>
 #include <libusb.h>
+
+#include <msleep.h>
 
 #include "core.h"
 #include "bootrom.h"
@@ -252,7 +253,7 @@ bootrom_load(void *handle, uint8_t *burner, uint32_t len)
 			break;
 		}
 
-		usleep(10 * 1000);
+		msleep(10);
 	}
 
 	if (!bootrom_mem_end(handle, buf, buf_len)) {

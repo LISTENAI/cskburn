@@ -2,8 +2,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
-#include <unistd.h>
 #include <libusb.h>
+
+#include <msleep.h>
 
 #include "core.h"
 #include "burner.h"
@@ -167,7 +168,7 @@ burner_set_crc64(void *handle, uint64_t crc64, uint32_t flag)
 			return false;
 		}
 		if (resp.respcode == RESP_CODE_BUSY) {
-			usleep(20 * 1000);
+			msleep(20);
 		}
 		if (resp.respcode == RESP_CODE_SUCCESS && resp.cmdorg == cmd.cmdcode) {
 			return true;
@@ -194,7 +195,7 @@ burner_flash_write(void *handle, uint32_t addr, uint32_t len, uint32_t flag)
 			return false;
 		}
 		if (resp.respcode == RESP_CODE_BUSY) {
-			usleep(200 * 1000);
+			msleep(200);
 		}
 		if (resp.respcode == RESP_CODE_READY) {
 			return true;
@@ -218,7 +219,7 @@ burner_sync(void *handle, int retries)
 			return false;
 		}
 		if (resp.respcode == RESP_CODE_BUSY) {
-			usleep(200 * 1000);
+			msleep(200);
 		}
 		if ((resp.respcode == RESP_CODE_SUCCESS || resp.respcode == RESP_CODE_READY) &&
 				(resp.cmdorg == cmd.cmdcode || resp.cmdorg == CMD_CODE_ANY)) {
@@ -239,7 +240,7 @@ burner_burn(void *handle, uint32_t addr, uint8_t *image, uint32_t len,
 		return false;
 	}
 
-	usleep(CR_INTERVAL_MS * 1000);
+	msleep(CR_INTERVAL_MS);
 
 	burner_resp_common_t resp = {0};
 	int ret, xferred = 0;
@@ -268,7 +269,7 @@ burner_burn(void *handle, uint32_t addr, uint8_t *image, uint32_t len,
 					sizeof(burner_resp_common_t), &xferred, CR_IN_TIMEOUT_MS);
 
 			if (xferred != sizeof(burner_resp_common_t)) {
-				usleep(200 * 1000);
+				msleep(200);
 				continue;
 			}
 

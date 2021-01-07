@@ -1,11 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include <unistd.h>
 #include <getopt.h>
 #include <errno.h>
 #include <string.h>
 
+#include <msleep.h>
 #include <cskburn_usb.h>
 
 #include "serial.h"
@@ -188,10 +188,10 @@ update_enter(int fd)
 	serial_set_dtr(fd, 1);  // UPDATE
 
 	serial_set_rts(fd, 1);  // SYS_RST
-	usleep(100 * 1000);
+	msleep(100);
 	serial_set_rts(fd, 0);  // SYS_RST
 
-	usleep(500 * 1000);
+	msleep(500);
 }
 
 static void
@@ -199,10 +199,10 @@ update_exit(int fd)
 {
 	serial_set_dtr(fd, 0);  // UPDATE
 
-	usleep(500 * 1000);
+	msleep(500);
 
 	serial_set_rts(fd, 1);  // SYS_RST
-	usleep(100 * 1000);
+	msleep(100);
 	serial_set_rts(fd, 0);  // SYS_RST
 }
 
@@ -241,7 +241,7 @@ burn_usb(int16_t bus, int16_t address, bool wait, char *burner, uint32_t *addrs,
 	}
 
 	printf("正在进入烧录模式…\n");
-	usleep(2000 * 1000);
+	msleep(2000);
 	if (cskburn_usb_enter(dev, burner_buf, burner_len)) {
 		printf("错误: 无法进入烧录模式\n");
 		goto err_enter;

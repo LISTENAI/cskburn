@@ -13,6 +13,8 @@ target_include_directories(
     "${cskburn_usb_SOURCE_DIR}/include"
 )
 
+target_link_libraries(cskburn_usb portable)
+
 find_package(PkgConfig)
 pkg_search_module(USB REQUIRED IMPORTED_TARGET libusb-1.0)
 target_link_libraries(cskburn_usb PkgConfig::USB)

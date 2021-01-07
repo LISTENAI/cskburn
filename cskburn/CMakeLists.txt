@@ -6,6 +6,8 @@ add_executable(
     src/serial.c
 )
 
+target_link_libraries(cskburn portable)
+
 target_link_libraries(
     cskburn
     cskburn_usb
