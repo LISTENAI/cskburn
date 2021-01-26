@@ -112,7 +112,7 @@ burner_transmit(void *handle, void *data, uint32_t len, burner_resp_common_t *re
 		return false;
 	}
 
-	if (xferred < len) {
+	if ((uint32_t)xferred < len) {
 		printf("错误: USB 数据写入中断\n");
 		return false;
 	}
@@ -257,7 +257,7 @@ burner_burn(void *handle, uint32_t addr, uint8_t *image, uint32_t len,
 			return false;
 		}
 
-		if (xferred < slice) {
+		if ((uint32_t)xferred < slice) {
 			printf("错误: USB 数据写入中断\n");
 			return false;
 		}

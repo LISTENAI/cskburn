@@ -168,7 +168,7 @@ read_file(const char *path, uint8_t *buf, uint32_t limit)
 
 	size_t len = fread(buf, 1, limit, f);
 	fclose(f);
-	return len;
+	return (uint32_t)len;
 }
 
 static void

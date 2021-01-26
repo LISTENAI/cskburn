@@ -118,7 +118,7 @@ send_mem_command(void *handle, uint8_t *buf, uint32_t data_len)
 		return false;
 	}
 
-	if (xferred < data_len) {
+	if ((uint32_t)xferred < data_len) {
 		printf("错误: USB 数据写入中断\n");
 		return false;
 	}
@@ -187,7 +187,7 @@ bootrom_mem_data(void *handle, uint8_t *buf, uint32_t buf_len, uint8_t *payload,
 	memset(buf, 0, header_len);
 
 	cmd->op = BOOTROM_MEM_DATA;
-	cmd->data_len = sizeof(bootrom_mem_data_t) + payload_len;
+	cmd->data_len = (uint16_t)sizeof(bootrom_mem_data_t) + payload_len;
 	cmd->checksum = calc_data_checksum(payload, payload_len);
 
 	mem->mdata_len = payload_len;
@@ -211,7 +211,7 @@ bootrom_mem_end(void *handle, uint8_t *buf, uint32_t buf_len)
 	memset(buf, 0, header_len);
 
 	cmd->op = BOOTROM_MEM_END;
-	cmd->data_len = sizeof(bootrom_mem_end_t);
+	cmd->data_len = (uint16_t)sizeof(bootrom_mem_end_t);
 	cmd->checksum = 0;
 
 	mem->exec_flag = 0;
