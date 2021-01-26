@@ -29,13 +29,12 @@ print_help(const char *progname)
 	printf("烧录选项:\n");
 	printf("  -u, --usb (-|<总线>:<设备>)\t\t使用指定 USB 设备烧录。传 - 表示自动选取第一个 CSK "
 		   "设备\n");
-	printf("  -r, --reset <端口>\t\t\t自动通过指定串口设备 (如 /dev/cu.SLAB_USBtoUART) 进行复位\n");
+	printf("  -r, --reset <端口>\t\t\t自动通过指定串口设备 (如 /dev/cu.usbserial-1000) 进行复位\n");
 	printf("\n");
 	printf("其它选项:\n");
 	printf("  -h, --help\t\t\t\t显示帮助\n");
 	printf("  -V, --version\t\t\t\t显示版本号\n");
 	printf("  -w, --wait\t\t\t\t等待设备插入，并自动开始烧录\n");
-	printf("  -r, --repeat\t\t\t\t烧录成功后不退出，等待下次插入\n");
 	printf("\n");
 	printf("用例:\n");
 	printf("  cskburn -w -u 128:000 burner.img 0x0 flashboot.bin 0x10000 master.bin 0x100000 "
