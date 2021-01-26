@@ -1,5 +1,5 @@
 #!/bin/bash
 mkdir -p out
 pushd out > /dev/null
-cmake .. && make -j4
+cmake .. && cmake --build .
 popd > /dev/null

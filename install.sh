@@ -1,5 +1,5 @@
 #!/bin/bash
 mkdir -p out
 pushd out > /dev/null
-make install
+cmake --install .
 popd > /dev/null
