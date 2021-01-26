@@ -1,9 +1,11 @@
+#include "serial.h"
+
+#ifdef FEATURE_SERIAL
+
 #include <fcntl.h>
 #include <unistd.h>
 #include <termios.h>
 #include <sys/ioctl.h>
-
-#include "serial.h"
 
 static int
 set_interface_attribs(int fd, int speed)
@@ -103,3 +105,5 @@ serial_set_dtr(int fd, int val)
 {
 	return set_modem_control(fd, TIOCM_DTR, val);
 }
+
+#endif  // FEATURE_SERIAL
