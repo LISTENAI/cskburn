@@ -67,7 +67,7 @@ static void burn_usb(int16_t bus, int16_t address, bool wait, char *burner, uint
 int
 main(int argc, char **argv)
 {
-	bool wait;
+	bool wait = false;
 	char *usb = NULL;
 #ifdef FEATURE_SERIAL
 	char *reset = NULL;
