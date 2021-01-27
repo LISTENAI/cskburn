@@ -8,6 +8,10 @@ add_executable(
 
 target_link_libraries(cskburn portable)
 
+if(WIN32)
+    target_link_libraries(cskburn getopt)
+endif()
+
 target_link_libraries(
     cskburn
     cskburn_usb
