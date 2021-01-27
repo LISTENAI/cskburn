@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include <msleep.h>
+#include <exists.h>
 #include <cskburn_usb.h>
 
 #include "features.h"
@@ -117,7 +118,7 @@ main(int argc, char **argv)
 	}
 
 	char *burner = argv[optind];
-	if (access(burner, F_OK) != 0) {
+	if (!exists(burner)) {
 		printf("错误: burner 不存在: %s\n", burner);
 		return 0;
 	}
@@ -139,7 +140,7 @@ main(int argc, char **argv)
 			return 0;
 		}
 
-		if (access(images[i], F_OK) != 0) {
+		if (!exists(images[i])) {
 			printf("错误: 分区 %d 的文件不存在: %s\n", i + 1, images[i]);
 			return 0;
 		}
