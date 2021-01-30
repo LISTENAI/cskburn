@@ -269,7 +269,7 @@ burner_burn(void *handle, uint32_t addr, uint8_t *image, uint32_t len,
 					sizeof(burner_resp_common_t), &xferred, CR_IN_TIMEOUT_MS);
 
 			if (xferred != sizeof(burner_resp_common_t)) {
-				msleep(200);
+				msleep(1000);
 				continue;
 			}
 
