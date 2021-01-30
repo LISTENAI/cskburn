@@ -61,7 +61,7 @@ static void update_enter(int fd);
 static void update_exit(int fd);
 #endif
 
-static void burn_usb(int16_t bus, int16_t address, bool wait, char *burner, uint32_t *addrs,
+static bool burn_usb(int16_t bus, int16_t address, bool wait, char *burner, uint32_t *addrs,
 		char **images, int parts);
 
 int
@@ -162,7 +162,9 @@ main(int argc, char **argv)
 	}
 #endif
 
-	burn_usb(usb_bus, usb_addr, wait, burner, addrs, images, part_count);
+	if (!burn_usb(usb_bus, usb_addr, wait, burner, addrs, images, part_count)) {
+		return -1;
+	}
 
 #ifdef FEATURE_SERIAL
 	if (reset != NULL && fd > 0) {
@@ -227,7 +229,7 @@ update_exit(int fd)
 }
 #endif
 
-static void
+static bool
 burn_usb(int16_t bus, int16_t address, bool wait, char *burner, uint32_t *addrs, char **images,
 		int parts)
 {
@@ -289,6 +291,8 @@ burn_usb(int16_t bus, int16_t address, bool wait, char *burner, uint32_t *addrs,
 
 	printf("烧录完成\n");
 
+	return true;
+
 err_write:
 	free(image_buf);
 err_enter:
@@ -297,4 +301,6 @@ err_enter:
 err_open:
 err_init:
 	cskburn_usb_exit();
+
+	return false;
 }
