@@ -31,17 +31,19 @@ libusb_close(libusb_device_handle *dev_handle)
 	usb_close(dev_handle);
 }
 
+#define MAX_DEVICE_CNT 1000
+
 int64_t
 libusb_get_device_list(libusb_context *ctx, libusb_device ***list)
 {
 	usb_find_busses();
-	uint32_t dev_count = usb_find_devices();
+	usb_find_devices();
 
 	struct usb_bus *bus;
 	struct usb_device *dev;
 
 	uint32_t i = 0;
-	*list = (libusb_device **)malloc(sizeof(libusb_device *) * (dev_count + 1));
+	*list = (libusb_device **)malloc(sizeof(libusb_device *) * MAX_DEVICE_CNT);
 
 	for (bus = usb_get_busses(); bus; bus = bus->next) {
 		for (dev = bus->devices; dev; dev = dev->next) {
@@ -50,7 +52,7 @@ libusb_get_device_list(libusb_context *ctx, libusb_device ***list)
 		}
 	}
 
-	return dev_count;
+	return i;
 }
 
 void

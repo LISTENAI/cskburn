@@ -24,16 +24,17 @@ cskburn_usb_exit(void)
 static libusb_device *
 find_device(int16_t bus, int16_t address)
 {
+	int64_t count = 0;
 	libusb_device **devs;
 
-	if (libusb_get_device_list(NULL, &devs) < 0) {
+	if ((count = libusb_get_device_list(NULL, &devs)) < 0) {
 		return NULL;
 	}
 
 	libusb_device *found = NULL;
 	struct libusb_device_descriptor desc = {0};
 
-	for (size_t i = 0; devs[i] != NULL; i++) {
+	for (size_t i = 0; i < count; i++) {
 		if (libusb_get_device_descriptor(devs[i], &desc) < 0) {
 			continue;
 		}
