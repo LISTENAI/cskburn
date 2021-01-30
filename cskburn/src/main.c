@@ -179,7 +179,7 @@ main(int argc, char **argv)
 static uint32_t
 read_file(const char *path, uint8_t *buf, uint32_t limit)
 {
-	FILE *f = fopen(path, "r");
+	FILE *f = fopen(path, "rb");
 	if (f == NULL) {
 		printf("错误: 文件打开失败: %s\n", strerror(errno));
 		return 0;
