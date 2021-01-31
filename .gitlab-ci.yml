@@ -1,5 +1,9 @@
 stages:
   - build
+  - bundle
+
+variables:
+  LINUX_BUILDER: "registry.cn-beijing.aliyuncs.com/iflyos-service/linux-builder:latest"
 
 build-win32:
   stage: build
@@ -9,3 +13,31 @@ build-win32:
       - cskburn-win32.exe
   tags:
     - csk_builder
+
+build-linux:
+  stage: build
+  script: |
+    docker pull ${LINUX_BUILDER}
+    docker run --rm -v ${PWD}:/project ${LINUX_BUILDER} bash -c './build.sh'
+    docker rmi ${LINUX_BUILDER}
+    cp out/cskburn/cskburn cskburn-linux
+  artifacts:
+    paths:
+      - cskburn-linux
+  tags:
+    - iflyos-builder
+
+bundle:
+  stage: bundle
+  script: echo
+  needs:
+    - job: build-win32
+      artifacts: true
+    - job: build-linux
+      artifacts: true
+  artifacts:
+    paths:
+      - cskburn-win32.exe
+      - cskburn-linux
+  tags:
+    - iflyos-builder
