@@ -13,6 +13,3 @@ target_include_directories(
     serial PUBLIC
     "${serial_SOURCE_DIR}/include"
 )
-
-install(TARGETS serial DESTINATION lib)
-install(FILES include/serial.h DESTINATION include)

@@ -22,6 +22,3 @@ else()
     pkg_search_module(USB REQUIRED IMPORTED_TARGET libusb-1.0)
     target_link_libraries(cskburn_usb PkgConfig::USB)
 endif()
-
-install(TARGETS cskburn_usb DESTINATION lib)
-install(FILES include/cskburn_usb.h DESTINATION include)
