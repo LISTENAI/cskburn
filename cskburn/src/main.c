@@ -139,7 +139,7 @@ main(int argc, char **argv)
 	if (reset != NULL) {
 		serial = serial_open(reset);
 		if (serial == NULL) {
-			printf("错误: 无法打开串口设备 %s: %s\n", reset, strerror(errno));
+			printf("错误: 无法打开串口设备 %s\n", reset);
 			return 0;
 		}
 
