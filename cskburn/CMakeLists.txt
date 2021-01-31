@@ -3,7 +3,6 @@ project(cskburn)
 add_executable(
     cskburn
     src/main.c
-    src/serial.c
 )
 
 target_link_libraries(cskburn portable)
@@ -15,6 +14,7 @@ endif()
 target_link_libraries(
     cskburn
     cskburn_usb
+    serial
 )
 
 execute_process(COMMAND git describe --tags --abbrev=0 OUTPUT_VARIABLE GIT_TAG OUTPUT_STRIP_TRAILING_WHITESPACE)

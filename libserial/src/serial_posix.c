@@ -1,11 +1,14 @@
-#include "serial.h"
-
-#ifdef FEATURE_SERIAL
+#include <serial.h>
 
 #include <fcntl.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <termios.h>
 #include <sys/ioctl.h>
+
+struct _serial_dev_t {
+	int fd;
+};
 
 static int
 set_interface_attribs(int fd, int speed)
@@ -70,40 +73,43 @@ set_modem_control(int fd, int flag, int val)
 	return 1;
 }
 
-int
+serial_dev_t *
 serial_open(const char *path)
 {
 	int fd, ret;
 
 	fd = open(path, O_RDWR | O_NOCTTY | O_SYNC);
 	if (fd < 0) {
-		return fd;
+		return NULL;
 	}
 
 	ret = set_interface_attribs(fd, B115200);
 	if (ret != 0) {
-		return ret;
+		return NULL;
 	}
 
-	return fd;
+	serial_dev_t *dev = (serial_dev_t *)malloc(sizeof(serial_dev_t));
+	dev->fd = fd;
+
+	return dev;
 }
 
 void
-serial_close(int fd)
+serial_close(serial_dev_t **dev)
 {
-	close(fd);
+	close((*dev)->fd);
+	free(*dev);
+	*dev = NULL;
 }
 
-int
-serial_set_rts(int fd, int val)
+bool
+serial_set_rts(serial_dev_t *dev, bool val)
 {
-	return set_modem_control(fd, TIOCM_RTS, val);
+	return set_modem_control(dev->fd, TIOCM_RTS, val);
 }
 
-int
-serial_set_dtr(int fd, int val)
+bool
+serial_set_dtr(serial_dev_t *dev, bool val)
 {
-	return set_modem_control(fd, TIOCM_DTR, val);
+	return set_modem_control(dev->fd, TIOCM_DTR, val);
 }
-
-#endif  // FEATURE_SERIAL

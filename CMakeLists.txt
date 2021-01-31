@@ -9,5 +9,6 @@ if(WIN32)
 endif()
 
 add_subdirectory(libportable)
+add_subdirectory(libserial)
 add_subdirectory(libcskburn_usb)
 add_subdirectory(cskburn)

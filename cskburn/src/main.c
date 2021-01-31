@@ -7,13 +7,8 @@
 
 #include <msleep.h>
 #include <exists.h>
+#include <serial.h>
 #include <cskburn_usb.h>
-
-#include "features.h"
-
-#ifdef FEATURE_SERIAL
-#include "serial.h"
-#endif
 
 #define MAX_IMAGE_SIZE (20 * 1024 * 1024)
 
@@ -22,9 +17,7 @@ static struct option long_options[] = {
 		{"version", no_argument, NULL, 'V'},
 		{"wait", no_argument, NULL, 'w'},
 		{"usb", required_argument, NULL, 'u'},
-#ifdef FEATURE_SERIAL
 		{"reset", required_argument, NULL, 'r'},
-#endif
 		{0, 0, NULL, 0},
 };
 
@@ -36,7 +29,7 @@ print_help(const char *progname)
 	printf("烧录选项:\n");
 	printf("  -u, --usb (-|<总线>:<设备>)\t\t使用指定 USB 设备烧录。传 - 表示自动选取第一个 CSK "
 		   "设备\n");
-#ifdef FEATURE_SERIAL
+#if 0
 	printf("  -r, --reset <端口>\t\t\t自动通过指定串口设备 (如 /dev/cu.usbserial-1000) 进行复位\n");
 #endif
 	printf("\n");
@@ -56,10 +49,8 @@ print_version(void)
 	printf("%s (%d)\n", GIT_TAG, GIT_INCREMENT);
 }
 
-#ifdef FEATURE_SERIAL
-static void update_enter(int fd);
-static void update_exit(int fd);
-#endif
+static void update_enter(serial_dev_t *dev);
+static void update_exit(serial_dev_t *dev);
 
 static bool burn_usb(int16_t bus, int16_t address, bool wait, char *burner, uint32_t *addrs,
 		char **images, int parts);
@@ -69,9 +60,7 @@ main(int argc, char **argv)
 {
 	bool wait = false;
 	char *usb = NULL;
-#ifdef FEATURE_SERIAL
 	char *reset = NULL;
-#endif
 	int16_t usb_bus = -1, usb_addr = -1;
 
 	while (1) {
@@ -84,12 +73,10 @@ main(int argc, char **argv)
 			case 'u':
 				usb = optarg;
 				break;
-#ifdef FEATURE_SERIAL
 			case 'r':
 				reset = optarg;
 				wait = true;
 				break;
-#endif
 			case 'V':
 				print_version();
 				return 0;
@@ -148,32 +135,27 @@ main(int argc, char **argv)
 		printf("分区 %d: 0x%08X %s\n", i + 1, addrs[i], images[i]);
 	}
 
-#ifdef FEATURE_SERIAL
-	int fd = 0;
+	serial_dev_t *serial;
 	if (reset != NULL) {
-		fd = serial_open(reset);
-		if (fd <= 0) {
+		serial = serial_open(reset);
+		if (serial == NULL) {
 			printf("错误: 无法打开串口设备 %s: %s\n", reset, strerror(errno));
 			return 0;
 		}
 
 		printf("正在复位设备…\n");
-		update_enter(fd);
+		update_enter(serial);
 	}
-#endif
 
 	if (!burn_usb(usb_bus, usb_addr, wait, burner, addrs, images, part_count)) {
 		return -1;
 	}
 
-#ifdef FEATURE_SERIAL
-	if (reset != NULL && fd > 0) {
+	if (serial != NULL) {
 		printf("正在复位设备…\n");
-		update_exit(fd);
-		close(fd);
-		fd = 0;
+		update_exit(serial);
+		serial_close(&serial);
 	}
-#endif
 
 	return 0;
 }
@@ -203,31 +185,29 @@ print_progress(uint32_t wrote_bytes, uint32_t total_bytes)
 	fflush(stdout);
 }
 
-#ifdef FEATURE_SERIAL
 static void
-update_enter(int fd)
+update_enter(serial_dev_t *dev)
 {
-	serial_set_dtr(fd, 1);  // UPDATE
+	serial_set_dtr(dev, 1);  // UPDATE
 
-	serial_set_rts(fd, 1);  // SYS_RST
+	serial_set_rts(dev, 1);  // SYS_RST
 	msleep(100);
-	serial_set_rts(fd, 0);  // SYS_RST
+	serial_set_rts(dev, 0);  // SYS_RST
 
 	msleep(500);
 }
 
 static void
-update_exit(int fd)
+update_exit(serial_dev_t *dev)
 {
-	serial_set_dtr(fd, 0);  // UPDATE
+	serial_set_dtr(dev, 0);  // UPDATE
 
 	msleep(500);
 
-	serial_set_rts(fd, 1);  // SYS_RST
+	serial_set_rts(dev, 1);  // SYS_RST
 	msleep(100);
-	serial_set_rts(fd, 0);  // SYS_RST
+	serial_set_rts(dev, 0);  // SYS_RST
 }
-#endif
 
 static bool
 burn_usb(int16_t bus, int16_t address, bool wait, char *burner, uint32_t *addrs, char **images,
