@@ -1,0 +1,11 @@
+stages:
+  - build
+
+build-win32:
+  stage: build
+  script: cmd.exe /c 'chcp 437 && build.bat && cp out\cskburn\Release\cskburn.exe cskburn-win32.exe'
+  artifacts:
+    paths:
+      - cskburn-win32.exe
+  tags:
+    - csk_builder
