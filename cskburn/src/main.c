@@ -135,7 +135,7 @@ main(int argc, char **argv)
 		printf("分区 %d: 0x%08X %s\n", i + 1, addrs[i], images[i]);
 	}
 
-	serial_dev_t *serial;
+	serial_dev_t *serial = NULL;
 	if (reset != NULL) {
 		serial = serial_open(reset);
 		if (serial == NULL) {
@@ -151,7 +151,7 @@ main(int argc, char **argv)
 		return -1;
 	}
 
-	if (serial != NULL) {
+	if (reset != NULL && serial != NULL) {
 		printf("正在复位设备…\n");
 		update_exit(serial);
 		serial_close(&serial);
