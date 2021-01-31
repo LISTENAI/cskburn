@@ -19,6 +19,14 @@
 #define CR_IN_TIMEOUT_MS 20 * 10  // 100ms is not enough if usb cable is too long or instable
 #define CR_INTERVAL_MS 10
 
+#define FLAG_D2H (1 << 0)
+#define FLAG_RESPONSE (1 << 1)
+#define FLAG_EXT_FLASH (1 << 2)
+#define FLAG_VERIFY (1 << 3)
+#define FLAG_LOCK (1 << 4)
+#define FLAG_ERASE_ALL (1 << 5)
+#define FLAG_UNLOCK (1 << 6)
+
 typedef enum {
 	// CMD_CODE_UNUSED = 0,
 	CMD_CODE_ANY = 0,
@@ -230,13 +238,51 @@ burner_sync(void *handle, int retries)
 	return false;
 }
 
+static bool
+burner_get_result(void *handle, uint8_t cmdcode, int timeout)
+{
+	burner_resp_common_t resp = {0};
+
+	burner_cmd_common_t cmd = {
+			.cmdcode = CMD_CODE_H2D_GET_RESULT,
+	};
+
+	while (true) {
+		if (!burner_transmit(handle, &cmd, sizeof(cmd), &resp)) {
+			return false;
+		}
+		if (resp.respcode == RESP_CODE_SUCCESS &&
+				(resp.cmdorg == cmdcode || resp.cmdorg == CMD_CODE_ANY)) {
+			return true;
+		}
+
+		timeout -= 200;
+		if (timeout < 0) {
+			break;
+		} else {
+			msleep(200);
+		}
+	}
+
+	return false;
+}
+
 bool
 burner_burn(void *handle, uint32_t addr, uint8_t *image, uint32_t len,
 		burner_burn_progress_cb on_progress)
 {
-	uint32_t flag = (1 << 3);  // verify
+	if (!burner_sync(handle, 10)) {
+		printf("错误: 设备未响应\n");
+		return false;
+	}
 
-	if (!burner_flash_write(handle, addr, len, flag)) {
+	uint64_t crc64 = calc_crc64(image, len);
+	if (!burner_set_crc64(handle, crc64, FLAG_VERIFY)) {
+		printf("错误: 向设备传输 CRC64 失败\n");
+		return false;
+	}
+
+	if (!burner_flash_write(handle, addr, len, FLAG_VERIFY)) {
 		return false;
 	}
 
@@ -263,12 +309,10 @@ burner_burn(void *handle, uint32_t addr, uint8_t *image, uint32_t len,
 		}
 
 		while (true) {
-			memset(&resp, 0, sizeof(resp));
-
 			ret = libusb_bulk_transfer(handle, EP_ADDR_DATA_IN, (unsigned char *)&resp,
-					sizeof(burner_resp_common_t), &xferred, CR_IN_TIMEOUT_MS);
+					sizeof(resp), &xferred, CR_IN_TIMEOUT_MS);
 
-			if (xferred != sizeof(burner_resp_common_t)) {
+			if (xferred != sizeof(resp)) {
 				msleep(1000);
 				continue;
 			}
@@ -301,9 +345,13 @@ burner_burn(void *handle, uint32_t addr, uint8_t *image, uint32_t len,
 		}
 	}
 
-	uint64_t crc64 = calc_crc64(image, len);
-	if (!burner_set_crc64(handle, crc64, flag)) {
-		printf("错误: 向设备传输 CRC64 失败\n");
+	// it takes abut 10~15 sec to write 1MB data onto flash according to flash datasheet or
+	// experience, and here we double the time if verify flag is present...
+	uint32_t max_wait_ms = (len + 1024 * 1024 - 1) / (1024 * 1024) * 15 * 1000;
+	max_wait_ms *= 2;  // for verify
+
+	if (!burner_get_result(handle, CMD_CODE_H2D_FLASH_WRITE, max_wait_ms)) {
+		printf("错误: 分区烧录失败\n");
 		return false;
 	}
 
