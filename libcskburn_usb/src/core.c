@@ -130,7 +130,7 @@ cskburn_usb_enter(cskburn_usb_device_t *dev, uint8_t *burner, uint32_t len)
 
 int
 cskburn_usb_write(cskburn_usb_device_t *dev, uint32_t addr, uint8_t *image, uint32_t len,
-		void (*on_progress)(uint32_t wrote_bytes, uint32_t total_bytes))
+		void (*on_progress)(int32_t wrote_bytes, uint32_t total_bytes))
 {
 	if (!burner_burn(dev->handle, addr, image, len, on_progress)) {
 		return 1;

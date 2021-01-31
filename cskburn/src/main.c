@@ -175,12 +175,20 @@ read_file(const char *path, uint8_t *buf, uint32_t limit)
 }
 
 static void
-print_progress(uint32_t wrote_bytes, uint32_t total_bytes)
+print_progress(int32_t wrote_bytes, uint32_t total_bytes)
 {
-	printf("%.2f KB / %.2f KB (%.2f%%)\r", (float)wrote_bytes / 1024.0f,
-			(float)total_bytes / 1024.0f, (float)wrote_bytes / (float)total_bytes * 100.0f);
-	if (wrote_bytes == total_bytes) {
-		printf("\n");
+	if (wrote_bytes < 0) {
+		printf("正在擦除");
+		for (int i = 0; i <= -wrote_bytes; i++) {
+			printf(".");
+		}
+		printf("  \r");
+	} else {
+		printf("%.2f KB / %.2f KB (%.2f%%)  \r", (float)wrote_bytes / 1024.0f,
+				(float)total_bytes / 1024.0f, (float)wrote_bytes / (float)total_bytes * 100.0f);
+		if (wrote_bytes == total_bytes) {
+			printf("\n");
+		}
 	}
 	fflush(stdout);
 }

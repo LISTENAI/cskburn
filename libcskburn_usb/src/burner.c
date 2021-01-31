@@ -308,11 +308,14 @@ burner_burn(void *handle, uint32_t addr, uint8_t *image, uint32_t len,
 			return false;
 		}
 
+		int wait = 0;
 		while (true) {
 			ret = libusb_bulk_transfer(handle, EP_ADDR_DATA_IN, (unsigned char *)&resp,
 					sizeof(resp), &xferred, CR_IN_TIMEOUT_MS);
 
 			if (xferred != sizeof(resp)) {
+				wait++;
+				on_progress(-wait, len);
 				msleep(1000);
 				continue;
 			}
