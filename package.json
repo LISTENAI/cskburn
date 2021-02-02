@@ -5,7 +5,8 @@
   "scripts": {
     "burn": "run-script-os --",
     "burn:win32": ".\\cskburn-win32.exe",
-    "burn:linux": "./cskburn-linux"
+    "burn:linux": "./cskburn-linux",
+    "burn:darwin": "./cskburn-darwin"
   },
   "author": "xychen <xychen@listenai.com>",
   "license": "UNLICENSED",

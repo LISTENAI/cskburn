@@ -28,6 +28,18 @@ build-linux:
   tags:
     - iflyos-builder
 
+build-darwin:
+  stage: build
+  script: |
+    export CMAKE_PREFIX_PATH=/usr/local
+    ./build.sh
+    cp out/cskburn/cskburn cskburn-darwin
+  artifacts:
+    paths:
+      - cskburn-darwin
+  tags:
+    - ios
+
 bundle:
   stage: publish
   script: echo
@@ -35,6 +47,7 @@ bundle:
     paths:
       - cskburn-win32.exe
       - cskburn-linux
+      - cskburn-darwin
   tags:
     - iflyos-builder
 
