@@ -20,7 +20,6 @@ build-linux:
   script: |
     docker pull ${LINUX_BUILDER}
     docker run --rm -v ${PWD}:/project ${LINUX_BUILDER} bash -c './build.sh'
-    docker rmi ${LINUX_BUILDER}
     cp out/cskburn/cskburn cskburn-linux
   artifacts:
     paths:
@@ -53,6 +52,9 @@ bundle:
 
 publish:
   stage: publish
+  only:
+    refs:
+      - tags
   script: |
     docker run --rm \
       -v ${PWD}:/project \
