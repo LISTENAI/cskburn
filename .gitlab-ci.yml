@@ -1,9 +1,10 @@
 stages:
   - build
-  - bundle
+  - publish
 
 variables:
   LINUX_BUILDER: "registry.cn-beijing.aliyuncs.com/iflyos-service/linux-builder:latest"
+  LPM_REGISTRY: "https://integration-registry-lpm.listenai.com"
 
 build-win32:
   stage: build
@@ -28,16 +29,23 @@ build-linux:
     - iflyos-builder
 
 bundle:
-  stage: bundle
+  stage: publish
   script: echo
-  needs:
-    - job: build-win32
-      artifacts: true
-    - job: build-linux
-      artifacts: true
   artifacts:
     paths:
       - cskburn-win32.exe
       - cskburn-linux
+  tags:
+    - iflyos-builder
+
+publish:
+  stage: publish
+  script: |
+    docker run --rm \
+      -v ${PWD}:/project \
+      -e LPMRC="${LPMRC}" \
+      -e LPM_REGISTRY="${LPM_REGISTRY}" \
+      node:lts \
+      bash -c 'cd /project && ./publish.sh'
   tags:
     - iflyos-builder

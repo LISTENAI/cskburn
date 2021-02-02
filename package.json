@@ -1,0 +1,15 @@
+{
+  "name": "@listenai/tool-cskburn",
+  "version": "1.3.0",
+  "description": "Burn tool for CSK300X/400X series",
+  "scripts": {
+    "burn": "run-script-os --",
+    "burn:win32": ".\\cskburn-win32.exe",
+    "burn:linux": "./cskburn-linux"
+  },
+  "author": "xychen <xychen@listenai.com>",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "run-script-os": "^1.1.5"
+  }
+}
