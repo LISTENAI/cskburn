@@ -1,5 +1,5 @@
 {
-  "name": "@listenai/tool-cskburn",
+  "name": "@tool/cskburn",
   "version": "1.4.0",
   "description": "Burn tool for CSK300X/400X series",
   "scripts": {
