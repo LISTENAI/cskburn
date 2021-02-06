@@ -17,6 +17,7 @@ static struct option long_options[] = {
 		{"version", no_argument, NULL, 'V'},
 		{"wait", no_argument, NULL, 'w'},
 		{"usb", required_argument, NULL, 'u'},
+		{"repeat", no_argument, NULL, 'R'},
 		{"reset", required_argument, NULL, 'r'},
 		{"check", no_argument, NULL, 'c'},
 		{0, 0, NULL, 0},
@@ -31,6 +32,7 @@ print_help(const char *progname)
 	printf("  -h, --help\t\t\t\t显示帮助\n");
 	printf("  -V, --version\t\t\t\t显示版本号\n");
 	printf("  -w, --wait\t\t\t\t等待设备插入，并自动开始烧录\n");
+	printf("  -R, --repeat\t\t\t\t循环等待设备插入，并自动开始烧录\n");
 	printf("  -c, --check\t\t\t\t检查设备是否插入 (不进行烧录)\n");
 	printf("\n");
 	printf("用例:\n");
@@ -55,17 +57,21 @@ int
 main(int argc, char **argv)
 {
 	bool wait = false;
+	bool repeat = false;
 	bool check = false;
 	char *usb = NULL;
 	char *reset = NULL;
 	int16_t usb_bus = -1, usb_addr = -1;
 
 	while (1) {
-		int c = getopt_long(argc, argv, "hVwu:r:c", long_options, NULL);
+		int c = getopt_long(argc, argv, "hVwRu:r:c", long_options, NULL);
 		if (c == EOF) break;
 		switch (c) {
 			case 'w':
 				wait = true;
+				break;
+			case 'R':
+				repeat = true;
 				break;
 			case 'u':
 				usb = optarg;
@@ -143,6 +149,11 @@ main(int argc, char **argv)
 		printf("分区 %d: 0x%08X %s\n", i + 1, addrs[i], images[i]);
 	}
 
+	if (reset != NULL && repeat) {
+		printf("错误: --reset 和 --repeat 不能共存\n");
+		return -1;
+	}
+
 	serial_dev_t *serial = NULL;
 	if (reset != NULL) {
 		serial = serial_open(reset);
@@ -155,8 +166,16 @@ main(int argc, char **argv)
 		update_enter(serial);
 	}
 
-	if (!burn_usb(usb_bus, usb_addr, wait, burner, addrs, images, part_count)) {
-		return -1;
+	if (repeat) {
+		while (1) {
+			burn_usb(usb_bus, usb_addr, true, burner, addrs, images, part_count);
+			printf("----------\n");
+			msleep(2000);
+		}
+	} else {
+		if (!burn_usb(usb_bus, usb_addr, wait, burner, addrs, images, part_count)) {
+			return -1;
+		}
 	}
 
 	if (reset != NULL && serial != NULL) {
