@@ -90,7 +90,7 @@ main(int argc, char **argv)
 	if (usb != NULL && strcmp(usb, "-") != 0) {
 		if (sscanf(usb, "%hu:%hu\n", &usb_bus, &usb_addr) != 2) {
 			printf("错误: -u/--usb 参数的格式应为 <总线>:<设备> (如: -u 020:004)\n");
-			return 0;
+			return -1;
 		}
 	}
 
@@ -104,18 +104,18 @@ main(int argc, char **argv)
 
 	if (argc - optind < 3) {
 		printf("错误: 你必须指定 burner 及至少一个烧录地址及文件\n");
-		return 0;
+		return -1;
 	}
 
 	if ((argc - optind) % 2 != 1) {
 		printf("错误: 烧录地址及文件必须成对出现\n");
-		return 0;
+		return -1;
 	}
 
 	char *burner = argv[optind];
 	if (!exists(burner)) {
 		printf("错误: burner 不存在: %s\n", burner);
-		return 0;
+		return -1;
 	}
 
 	printf("burner: %s\n", burner);
@@ -132,12 +132,12 @@ main(int argc, char **argv)
 
 		if (sscanf(address, "0x%x", &addrs[i]) != 1 && sscanf(address, "%d", &addrs[i]) != 1) {
 			printf("错误: 分区 %d 的地址格式不合法: %s\n", i + 1, address);
-			return 0;
+			return -1;
 		}
 
 		if (!exists(images[i])) {
 			printf("错误: 分区 %d 的文件不存在: %s\n", i + 1, images[i]);
-			return 0;
+			return -1;
 		}
 
 		printf("分区 %d: 0x%08X %s\n", i + 1, addrs[i], images[i]);
@@ -148,7 +148,7 @@ main(int argc, char **argv)
 		serial = serial_open(reset);
 		if (serial == NULL) {
 			printf("错误: 无法打开串口设备 %s\n", reset);
-			return 0;
+			return -1;
 		}
 
 		printf("正在复位设备…\n");
