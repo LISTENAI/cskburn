@@ -18,6 +18,7 @@ static struct option long_options[] = {
 		{"wait", no_argument, NULL, 'w'},
 		{"usb", required_argument, NULL, 'u'},
 		{"reset", required_argument, NULL, 'r'},
+		{"check", no_argument, NULL, 'c'},
 		{0, 0, NULL, 0},
 };
 
@@ -30,10 +31,10 @@ print_help(const char *progname)
 	printf("  -h, --help\t\t\t\t显示帮助\n");
 	printf("  -V, --version\t\t\t\t显示版本号\n");
 	printf("  -w, --wait\t\t\t\t等待设备插入，并自动开始烧录\n");
+	printf("  -c, --check\t\t\t\t检查设备是否插入 (不进行烧录)\n");
 	printf("\n");
 	printf("用例:\n");
-	printf("  cskburn -w burner.img 0x0 flashboot.bin 0x10000 master.bin 0x100000 "
-		   "respack.bin\n");
+	printf("  cskburn -w burner.img 0x0 flashboot.bin 0x10000 master.bin 0x100000 respack.bin\n");
 }
 
 static void
@@ -45,6 +46,8 @@ print_version(void)
 static void update_enter(serial_dev_t *dev);
 static void update_exit(serial_dev_t *dev);
 
+static bool check_usb(int16_t bus, int16_t address, bool wait);
+
 static bool burn_usb(int16_t bus, int16_t address, bool wait, char *burner, uint32_t *addrs,
 		char **images, int parts);
 
@@ -52,12 +55,13 @@ int
 main(int argc, char **argv)
 {
 	bool wait = false;
+	bool check = false;
 	char *usb = NULL;
 	char *reset = NULL;
 	int16_t usb_bus = -1, usb_addr = -1;
 
 	while (1) {
-		int c = getopt_long(argc, argv, "hVwu:r:", long_options, NULL);
+		int c = getopt_long(argc, argv, "hVwu:r:c", long_options, NULL);
 		if (c == EOF) break;
 		switch (c) {
 			case 'w':
@@ -69,6 +73,9 @@ main(int argc, char **argv)
 			case 'r':
 				reset = optarg;
 				wait = true;
+				break;
+			case 'c':
+				check = true;
 				break;
 			case 'V':
 				print_version();
@@ -84,6 +91,14 @@ main(int argc, char **argv)
 		if (sscanf(usb, "%hu:%hu\n", &usb_bus, &usb_addr) != 2) {
 			printf("错误: -u/--usb 参数的格式应为 <总线>:<设备> (如: -u 020:004)\n");
 			return 0;
+		}
+	}
+
+	if (check) {
+		if (check_usb(usb_bus, usb_addr, wait)) {
+			return 0;
+		} else {
+			return -1;
 		}
 	}
 
@@ -208,6 +223,28 @@ update_exit(serial_dev_t *dev)
 	serial_set_rts(dev, 1);  // SYS_RST
 	msleep(100);
 	serial_set_rts(dev, 0);  // SYS_RST
+}
+
+static bool
+check_usb(int16_t bus, int16_t address, bool wait)
+{
+	bool ret = false;
+
+	if (cskburn_usb_init() != 0) {
+		printf("错误: 初始化失败\n");
+		goto exit;
+	}
+
+	do {
+		if (cskburn_usb_wait(bus, address, 10)) {
+			ret = true;
+			goto exit;
+		}
+	} while (wait);
+
+exit:
+	cskburn_usb_exit();
+	return ret;
 }
 
 static bool
