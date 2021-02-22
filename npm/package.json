@@ -2,6 +2,7 @@
   "name": "@tool/cskburn",
   "version": "1.5.1",
   "description": "Burn tool for CSK300X/400X series",
+  "main": "index.js",
   "scripts": {
     "cskburn": "run-script-os --",
     "cskburn:win32": ".\\cskburn-win32.exe",
