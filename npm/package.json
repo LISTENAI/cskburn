@@ -3,15 +3,11 @@
   "version": "1.5.1",
   "description": "Burn tool for CSK300X/400X series",
   "main": "index.js",
+  "bin": "cskburn",
   "scripts": {
-    "cskburn": "run-script-os --",
-    "cskburn:win32": ".\\cskburn-win32.exe",
-    "cskburn:linux": "./cskburn-linux",
-    "cskburn:darwin": "./cskburn-darwin"
+    "cskburn": "./cskburn"
   },
   "author": "xychen <xychen@listenai.com>",
   "license": "UNLICENSED",
-  "dependencies": {
-    "run-script-os": "^1.1.5"
-  }
+  "dependencies": {}
 }
