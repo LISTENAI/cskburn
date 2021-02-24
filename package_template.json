@@ -1,6 +1,6 @@
 {
-  "name": "@tool/cskburn",
-  "version": "1.6.0",
+  "name": "{{NAME}}",
+  "version": "{{VERSION}}",
   "description": "Burn tool for CSK300X/400X series",
   "main": "index.js",
   "bin": "cskburn",

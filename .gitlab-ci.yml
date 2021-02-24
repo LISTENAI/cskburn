@@ -4,7 +4,6 @@ stages:
 
 variables:
   LINUX_BUILDER: "registry.cn-beijing.aliyuncs.com/iflyos-service/linux-builder:latest"
-  LPM_REGISTRY: "https://integration-registry-lpm.listenai.com"
 
 build-win32:
   stage: build
@@ -50,16 +49,39 @@ bundle:
   tags:
     - iflyos-builder
 
-publish:
+publish-lpm:
   stage: publish
+  when: manual
   only:
     refs:
       - tags
   script: |
     docker run --rm \
       -v ${PWD}:/project \
-      -e LPMRC="${LPMRC}" \
-      -e LPM_REGISTRY="${LPM_REGISTRY}" \
+      -e NPMRC="" \
+      -e NPM_CONFIG_REGISTRY="${LPM_REGISTRY}" \
+      -e NPM_CONFIG_USERNAME="xychen" \
+      -e NPM_CONFIG_EMAIL="xychen@listenai.com" \
+      -e NPM_CONFIG__PASSWORD="${LPM_TOKEN}" \
+      -e PKG_NAME="@tool/cskburn" \
+      -e PKG_VERSION="${CI_COMMIT_REF_NAME}" \
+      node:lts \
+      bash -c 'cd /project && ./publish.sh'
+  tags:
+    - iflyos-builder
+
+publish-npm:
+  stage: publish
+  when: manual
+  only:
+    refs:
+      - tags
+  script: |
+    docker run --rm \
+      -v ${PWD}:/project \
+      -e NPMRC="//registry.npmjs.org/:_authToken=${NPM_TOKEN}" \
+      -e PKG_NAME="@listenai/cskburn" \
+      -e PKG_VERSION="${CI_COMMIT_REF_NAME}" \
       node:lts \
       bash -c 'cd /project && ./publish.sh'
   tags:
