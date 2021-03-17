@@ -7,7 +7,6 @@
 
 #include <msleep.h>
 #include <exists.h>
-#include <serial.h>
 #include <cskburn_usb.h>
 
 #define MAX_IMAGE_SIZE (20 * 1024 * 1024)
@@ -18,7 +17,6 @@ static struct option long_options[] = {
 		{"wait", no_argument, NULL, 'w'},
 		{"usb", required_argument, NULL, 'u'},
 		{"repeat", no_argument, NULL, 'R'},
-		{"reset", required_argument, NULL, 'r'},
 		{"check", no_argument, NULL, 'c'},
 		{0, 0, NULL, 0},
 };
@@ -45,9 +43,6 @@ print_version(void)
 	printf("%s (%d)\n", GIT_TAG, GIT_INCREMENT);
 }
 
-static void update_enter(serial_dev_t *dev);
-static void update_exit(serial_dev_t *dev);
-
 static bool check_usb(int16_t bus, int16_t address, bool wait);
 
 static bool burn_usb(int16_t bus, int16_t address, bool wait, char *burner, uint32_t *addrs,
@@ -60,7 +55,6 @@ main(int argc, char **argv)
 	bool repeat = false;
 	bool check = false;
 	char *usb = NULL;
-	char *reset = NULL;
 	int16_t usb_bus = -1, usb_addr = -1;
 
 	while (1) {
@@ -75,10 +69,6 @@ main(int argc, char **argv)
 				break;
 			case 'u':
 				usb = optarg;
-				break;
-			case 'r':
-				reset = optarg;
-				wait = true;
 				break;
 			case 'c':
 				check = true;
@@ -149,23 +139,6 @@ main(int argc, char **argv)
 		printf("分区 %d: 0x%08X %s\n", i + 1, addrs[i], images[i]);
 	}
 
-	if (reset != NULL && repeat) {
-		printf("错误: --reset 和 --repeat 不能共存\n");
-		return -1;
-	}
-
-	serial_dev_t *serial = NULL;
-	if (reset != NULL) {
-		serial = serial_open(reset);
-		if (serial == NULL) {
-			printf("错误: 无法打开串口设备 %s\n", reset);
-			return -1;
-		}
-
-		printf("正在复位设备…\n");
-		update_enter(serial);
-	}
-
 	if (repeat) {
 		while (1) {
 			burn_usb(usb_bus, usb_addr, true, burner, addrs, images, part_count);
@@ -176,12 +149,6 @@ main(int argc, char **argv)
 		if (!burn_usb(usb_bus, usb_addr, wait, burner, addrs, images, part_count)) {
 			return -1;
 		}
-	}
-
-	if (reset != NULL && serial != NULL) {
-		printf("正在复位设备…\n");
-		update_exit(serial);
-		serial_close(&serial);
 	}
 
 	return 0;
@@ -218,30 +185,6 @@ print_progress(int32_t wrote_bytes, uint32_t total_bytes)
 		}
 	}
 	fflush(stdout);
-}
-
-static void
-update_enter(serial_dev_t *dev)
-{
-	serial_set_dtr(dev, 1);  // UPDATE
-
-	serial_set_rts(dev, 1);  // SYS_RST
-	msleep(100);
-	serial_set_rts(dev, 0);  // SYS_RST
-
-	msleep(500);
-}
-
-static void
-update_exit(serial_dev_t *dev)
-{
-	serial_set_dtr(dev, 0);  // UPDATE
-
-	msleep(500);
-
-	serial_set_rts(dev, 1);  // SYS_RST
-	msleep(100);
-	serial_set_rts(dev, 0);  // SYS_RST
 }
 
 static bool
