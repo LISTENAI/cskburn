@@ -10,6 +10,7 @@
 #include <cskburn_usb.h>
 
 #define MAX_IMAGE_SIZE (20 * 1024 * 1024)
+#define ENTER_TRIES 5
 
 static struct option long_options[] = {
 		{"help", no_argument, NULL, 'h'},
@@ -230,17 +231,30 @@ burn_usb(uint32_t *addrs, char **images, int parts)
 		}
 	}
 
-	cskburn_usb_device_t *dev = cskburn_usb_open(options.usb_bus, options.usb_addr);
-	if (dev == NULL) {
-		printf("错误: 设备打开失败\n");
-		goto err_open;
-	}
-
 	printf("正在进入烧录模式…\n");
-	msleep(2000);
-	if (cskburn_usb_enter(dev)) {
-		printf("错误: 无法进入烧录模式\n");
-		goto err_enter;
+	cskburn_usb_device_t *dev;
+	for (int i = 0; i < ENTER_TRIES; i++) {
+		if ((dev = cskburn_usb_open(options.usb_bus, options.usb_addr)) == NULL) {
+			if (i == ENTER_TRIES - 1) {
+				printf("错误: 设备打开失败\n");
+				goto err_open;
+			} else {
+				msleep(2000);
+				continue;
+			}
+		}
+		msleep(500);
+		if (cskburn_usb_enter(dev)) {
+			if (i == ENTER_TRIES - 1) {
+				printf("错误: 无法进入烧录模式\n");
+				goto err_enter;
+			} else {
+				cskburn_usb_close(&dev);
+				msleep(2000);
+				continue;
+			}
+		}
+		break;
 	}
 
 	uint8_t *image_buf = malloc(MAX_IMAGE_SIZE);
