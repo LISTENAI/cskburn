@@ -1,9 +1,10 @@
 #ifndef __LIB_CSKBURN_USB__
 #define __LIB_CSKBURN_USB__
 
+#include <stdbool.h>
 #include <stdint.h>
 
-int cskburn_usb_init(void);
+int cskburn_usb_init(bool verbose);
 void cskburn_usb_exit(void);
 
 int cskburn_usb_wait(int16_t bus, int16_t address, int timeout);

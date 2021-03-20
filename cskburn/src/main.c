@@ -14,6 +14,7 @@
 static struct option long_options[] = {
 		{"help", no_argument, NULL, 'h'},
 		{"version", no_argument, NULL, 'V'},
+		{"verbose", no_argument, NULL, 'v'},
 		{"wait", no_argument, NULL, 'w'},
 		{"usb", required_argument, NULL, 'u'},
 		{"repeat", no_argument, NULL, 'R'},
@@ -22,6 +23,7 @@ static struct option long_options[] = {
 };
 
 static struct {
+	bool verbose;
 	bool wait;
 	bool repeat;
 	bool check;
@@ -29,6 +31,7 @@ static struct {
 	int16_t usb_bus;
 	int16_t usb_addr;
 } options = {
+		.verbose = false,
 		.wait = false,
 		.repeat = false,
 		.check = false,
@@ -45,6 +48,7 @@ print_help(const char *progname)
 	printf("选项:\n");
 	printf("  -h, --help\t\t\t\t显示帮助\n");
 	printf("  -V, --version\t\t\t\t显示版本号\n");
+	printf("  -v, --verbose\t\t\t\t显示详细日志\n");
 	printf("  -w, --wait\t\t\t\t等待设备插入，并自动开始烧录\n");
 	printf("  -R, --repeat\t\t\t\t循环等待设备插入，并自动开始烧录\n");
 	printf("  -c, --check\t\t\t\t检查设备是否插入 (不进行烧录)\n");
@@ -69,6 +73,9 @@ main(int argc, char **argv)
 		int c = getopt_long(argc, argv, "hVvwRu:r:c", long_options, NULL);
 		if (c == EOF) break;
 		switch (c) {
+			case 'v':
+				options.verbose = true;
+				break;
 			case 'w':
 				options.wait = true;
 				break;
@@ -186,7 +193,7 @@ check_usb()
 {
 	bool ret = false;
 
-	if (cskburn_usb_init() != 0) {
+	if (cskburn_usb_init(options.verbose) != 0) {
 		printf("错误: 初始化失败\n");
 		goto exit;
 	}
@@ -206,7 +213,7 @@ exit:
 static bool
 burn_usb(uint32_t *addrs, char **images, int parts)
 {
-	if (cskburn_usb_init() != 0) {
+	if (cskburn_usb_init(options.verbose) != 0) {
 		printf("错误: 初始化失败\n");
 		goto err_init;
 	}

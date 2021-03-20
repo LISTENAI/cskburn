@@ -5,6 +5,7 @@
 #include <msleep.h>
 #include <cskburn_usb.h>
 
+#include "log.h"
 #include "core.h"
 #include "bootrom.h"
 #include "burner.h"
@@ -13,8 +14,9 @@ extern uint8_t burner_img[];
 extern uint32_t burner_img_len;
 
 int
-cskburn_usb_init(void)
+cskburn_usb_init(bool verbose)
 {
+	log_enabled = verbose;
 	return libusb_init(NULL);
 }
 
@@ -124,7 +126,7 @@ cskburn_usb_enter(cskburn_usb_device_t *dev)
 
 	int tmp = 0;
 	if (libusb_get_configuration(dev->handle, &tmp) != 0) {
-		printf("错误: 设备未响应\n");
+		LOGD("错误: 设备未响应");
 		return 1;
 	}
 

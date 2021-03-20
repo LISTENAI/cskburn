@@ -6,6 +6,7 @@
 
 #include <msleep.h>
 
+#include "log.h"
 #include "core.h"
 #include "bootrom.h"
 
@@ -114,12 +115,12 @@ send_mem_command(void *handle, uint8_t *buf, uint32_t data_len)
 			handle, EP_ADDR_DATA_OUT, (unsigned char *)buf, data_len, &xferred, 0);
 
 	if (ret != 0) {
-		printf("错误: USB 数据写入失败: %d\n", ret);
+		LOGD("错误: USB 数据写入失败: %d", ret);
 		return false;
 	}
 
 	if ((uint32_t)xferred < data_len) {
-		printf("错误: USB 数据写入中断\n");
+		LOGD("错误: USB 数据写入中断");
 		return false;
 	}
 
@@ -127,22 +128,22 @@ send_mem_command(void *handle, uint8_t *buf, uint32_t data_len)
 			handle, EP_ADDR_CMD_RESP_IN, (unsigned char *)&resp, sizeof(resp), &xferred, 0);
 
 	if (ret != 0) {
-		printf("错误: USB 数据读取失败: %d\n", ret);
+		LOGD("错误: USB 数据读取失败: %d", ret);
 		return false;
 	}
 
 	if (xferred < sizeof(resp)) {
-		printf("错误: USB 数据读取中断\n");
+		LOGD("错误: USB 数据读取中断");
 		return false;
 	}
 
 	if (data_status->error >= 0xF0) {
-		printf("错误: 设备返回致命错误: %02X\n", data_status->error);
+		LOGD("错误: 设备返回致命错误: %02X", data_status->error);
 		return false;
 	}
 
 	if (data_status->error != 0) {
-		printf("错误: 设备返回错误: %02X\n", data_status->error);
+		LOGD("错误: 设备返回错误: %02X", data_status->error);
 		return false;
 	}
 
@@ -228,7 +229,7 @@ bootrom_load(void *handle, uint8_t *burner, uint32_t len)
 	uint8_t *buf = malloc(buf_len);
 
 	if (!bootrom_mem_begin(handle, buf, buf_len, len)) {
-		printf("错误: MEM_BEGIN 发送失败\n");
+		LOGD("错误: MEM_BEGIN 发送失败");
 		goto err;
 	}
 
@@ -242,7 +243,7 @@ bootrom_load(void *handle, uint8_t *burner, uint32_t len)
 		}
 
 		if (!bootrom_mem_data(handle, buf, buf_len, burner + xferred, packet_len, seq)) {
-			printf("错误: MEM_DATA 发送失败\n");
+			LOGD("错误: MEM_DATA 发送失败");
 			goto err;
 		}
 
@@ -257,7 +258,7 @@ bootrom_load(void *handle, uint8_t *burner, uint32_t len)
 	}
 
 	if (!bootrom_mem_end(handle, buf, buf_len)) {
-		printf("错误: MEM_END 发送失败\n");
+		LOGD("错误: MEM_END 发送失败");
 		goto err;
 	}
 
