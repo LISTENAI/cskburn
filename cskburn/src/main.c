@@ -21,6 +21,22 @@ static struct option long_options[] = {
 		{0, 0, NULL, 0},
 };
 
+static struct {
+	bool wait;
+	bool repeat;
+	bool check;
+	char *usb;
+	int16_t usb_bus;
+	int16_t usb_addr;
+} options = {
+		.wait = false,
+		.repeat = false,
+		.check = false,
+		.usb = NULL,
+		.usb_bus = -1,
+		.usb_addr = -1,
+};
+
 static void
 print_help(const char *progname)
 {
@@ -43,35 +59,27 @@ print_version(void)
 	printf("%s (%d)\n", GIT_TAG, GIT_INCREMENT);
 }
 
-static bool check_usb(int16_t bus, int16_t address, bool wait);
-
-static bool burn_usb(
-		int16_t bus, int16_t address, bool wait, uint32_t *addrs, char **images, int parts);
+static bool check_usb();
+static bool burn_usb(uint32_t *addrs, char **images, int parts);
 
 int
 main(int argc, char **argv)
 {
-	bool wait = false;
-	bool repeat = false;
-	bool check = false;
-	char *usb = NULL;
-	int16_t usb_bus = -1, usb_addr = -1;
-
 	while (1) {
-		int c = getopt_long(argc, argv, "hVwRu:r:c", long_options, NULL);
+		int c = getopt_long(argc, argv, "hVvwRu:r:c", long_options, NULL);
 		if (c == EOF) break;
 		switch (c) {
 			case 'w':
-				wait = true;
+				options.wait = true;
 				break;
 			case 'R':
-				repeat = true;
+				options.repeat = true;
 				break;
 			case 'u':
-				usb = optarg;
+				options.usb = optarg;
 				break;
 			case 'c':
-				check = true;
+				options.check = true;
 				break;
 			case 'V':
 				print_version();
@@ -83,15 +91,15 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (usb != NULL && strcmp(usb, "-") != 0) {
-		if (sscanf(usb, "%hu:%hu\n", &usb_bus, &usb_addr) != 2) {
+	if (options.usb != NULL && strcmp(options.usb, "-") != 0) {
+		if (sscanf(options.usb, "%hu:%hu\n", &options.usb_bus, &options.usb_addr) != 2) {
 			printf("错误: -u/--usb 参数的格式应为 <总线>:<设备> (如: -u 020:004)\n");
 			return -1;
 		}
 	}
 
-	if (check) {
-		if (check_usb(usb_bus, usb_addr, wait)) {
+	if (options.check) {
+		if (check_usb()) {
 			return 0;
 		} else {
 			return -1;
@@ -125,14 +133,14 @@ main(int argc, char **argv)
 		return -1;
 	}
 
-	if (repeat) {
+	if (options.repeat) {
 		while (1) {
-			burn_usb(usb_bus, usb_addr, true, addrs, images, j);
+			burn_usb(addrs, images, j);
 			printf("----------\n");
 			msleep(2000);
 		}
 	} else {
-		if (!burn_usb(usb_bus, usb_addr, wait, addrs, images, j)) {
+		if (!burn_usb(addrs, images, j)) {
 			return -1;
 		}
 	}
@@ -174,7 +182,7 @@ print_progress(int32_t wrote_bytes, uint32_t total_bytes)
 }
 
 static bool
-check_usb(int16_t bus, int16_t address, bool wait)
+check_usb()
 {
 	bool ret = false;
 
@@ -184,11 +192,11 @@ check_usb(int16_t bus, int16_t address, bool wait)
 	}
 
 	do {
-		if (cskburn_usb_wait(bus, address, 10)) {
+		if (cskburn_usb_wait(options.usb_bus, options.usb_addr, 10)) {
 			ret = true;
 			goto exit;
 		}
-	} while (wait);
+	} while (options.wait);
 
 exit:
 	cskburn_usb_exit();
@@ -196,16 +204,16 @@ exit:
 }
 
 static bool
-burn_usb(int16_t bus, int16_t address, bool wait, uint32_t *addrs, char **images, int parts)
+burn_usb(uint32_t *addrs, char **images, int parts)
 {
 	if (cskburn_usb_init() != 0) {
 		printf("错误: 初始化失败\n");
 		goto err_init;
 	}
 
-	if (wait) {
+	if (options.wait) {
 		int w = 0;
-		while (!cskburn_usb_wait(bus, address, 10)) {
+		while (!cskburn_usb_wait(options.usb_bus, options.usb_addr, 10)) {
 			if (w == 0) {
 				w = 1;
 			} else if (w == 1) {
@@ -215,7 +223,7 @@ burn_usb(int16_t bus, int16_t address, bool wait, uint32_t *addrs, char **images
 		}
 	}
 
-	cskburn_usb_device_t *dev = cskburn_usb_open(bus, address);
+	cskburn_usb_device_t *dev = cskburn_usb_open(options.usb_bus, options.usb_addr);
 	if (dev == NULL) {
 		printf("错误: 设备打开失败\n");
 		goto err_open;
