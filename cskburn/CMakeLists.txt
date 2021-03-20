@@ -14,6 +14,7 @@ endif()
 target_link_libraries(
     cskburn
     cskburn_usb
+    cskburn_serial
 )
 
 execute_process(COMMAND git describe --tags --abbrev=0 OUTPUT_VARIABLE GIT_TAG OUTPUT_STRIP_TRAILING_WHITESPACE)

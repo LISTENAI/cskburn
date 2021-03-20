@@ -36,9 +36,8 @@ set_interface_attribs(int fd, int speed)
 	tty.c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
 	tty.c_oflag &= ~OPOST;
 
-	/* fetch bytes as they become available */
-	tty.c_cc[VMIN] = 1;
-	tty.c_cc[VTIME] = 1;
+	tty.c_cc[VMIN] = 0;
+	tty.c_cc[VTIME] = 0;
 
 	ret = tcsetattr(fd, TCSANOW, &tty);
 	if (ret != 0) {
@@ -100,6 +99,56 @@ serial_close(serial_dev_t **dev)
 	close((*dev)->fd);
 	free(*dev);
 	*dev = NULL;
+}
+
+uint32_t
+serial_get_speed(serial_dev_t *dev)
+{
+	int ret = 0;
+	struct termios tty;
+
+	ret = tcgetattr(dev->fd, &tty);
+	if (ret < 0) {
+		return 0;
+	}
+
+	return cfgetospeed(&tty);
+}
+
+bool
+serial_set_speed(serial_dev_t *dev, uint32_t speed)
+{
+	int ret = 0;
+	struct termios tty;
+
+	ret = tcgetattr(dev->fd, &tty);
+	if (ret < 0) {
+		return false;
+	}
+
+	cfsetospeed(&tty, (speed_t)speed);
+	cfsetispeed(&tty, (speed_t)speed);
+
+	ret = tcsetattr(dev->fd, TCSANOW, &tty);
+	if (ret != 0) {
+		return false;
+	}
+
+	return true;
+}
+
+ssize_t
+serial_read(serial_dev_t *dev, void *buf, size_t count)
+{
+	return read(dev->fd, buf, count);
+}
+
+ssize_t
+serial_write(serial_dev_t *dev, const void *buf, size_t count)
+{
+	ssize_t wrote = write(dev->fd, buf, count);
+	tcdrain(dev->fd);
+	return wrote;
 }
 
 bool

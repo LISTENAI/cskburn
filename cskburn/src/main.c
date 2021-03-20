@@ -8,6 +8,7 @@
 #include <msleep.h>
 #include <exists.h>
 #include <cskburn_usb.h>
+#include <cskburn_serial.h>
 
 #define MAX_IMAGE_SIZE (20 * 1024 * 1024)
 #define ENTER_TRIES 5
@@ -18,6 +19,8 @@ static struct option long_options[] = {
 		{"verbose", no_argument, NULL, 'v'},
 		{"wait", no_argument, NULL, 'w'},
 		{"usb", required_argument, NULL, 'u'},
+		{"serial", required_argument, NULL, 's'},
+		{"baud", required_argument, NULL, 'b'},
 		{"repeat", no_argument, NULL, 'R'},
 		{"check", no_argument, NULL, 'c'},
 		{0, 0, NULL, 0},
@@ -31,6 +34,8 @@ static struct {
 	char *usb;
 	int16_t usb_bus;
 	int16_t usb_addr;
+	char *serial;
+	uint32_t serial_baud;
 } options = {
 		.verbose = false,
 		.wait = false,
@@ -39,6 +44,8 @@ static struct {
 		.usb = NULL,
 		.usb_bus = -1,
 		.usb_addr = -1,
+		.serial = NULL,
+		.serial_baud = 115200,
 };
 
 static void
@@ -67,11 +74,13 @@ print_version(void)
 static bool check_usb();
 static bool burn_usb(uint32_t *addrs, char **images, int parts);
 
+static bool burn_serial(uint32_t *addrs, char **images, int parts);
+
 int
 main(int argc, char **argv)
 {
 	while (1) {
-		int c = getopt_long(argc, argv, "hVvwRu:r:c", long_options, NULL);
+		int c = getopt_long(argc, argv, "hVvwRu:s:b:c", long_options, NULL);
 		if (c == EOF) break;
 		switch (c) {
 			case 'v':
@@ -85,6 +94,12 @@ main(int argc, char **argv)
 				break;
 			case 'u':
 				options.usb = optarg;
+				break;
+			case 's':
+				options.serial = optarg;
+				break;
+			case 'b':
+				sscanf(optarg, "%d", &options.serial_baud);
 				break;
 			case 'c':
 				options.check = true;
@@ -148,8 +163,14 @@ main(int argc, char **argv)
 			msleep(2000);
 		}
 	} else {
-		if (!burn_usb(addrs, images, j)) {
-			return -1;
+		if (options.serial != NULL) {
+			if (!burn_serial(addrs, images, j)) {
+				return -1;
+			}
+		} else {
+			if (!burn_usb(addrs, images, j)) {
+				return -1;
+			}
 		}
 	}
 
@@ -274,6 +295,7 @@ burn_usb(uint32_t *addrs, char **images, int parts)
 		}
 	}
 
+	free(image_buf);
 	printf("烧录完成\n");
 
 	return true;
@@ -286,5 +308,71 @@ err_open:
 err_init:
 	cskburn_usb_exit();
 
+	return false;
+}
+
+static bool
+burn_serial(uint32_t *addrs, char **images, int parts)
+{
+	cskburn_serial_init(options.verbose);
+
+	cskburn_serial_device_t *dev = cskburn_serial_open(options.serial);
+	if (dev == NULL) {
+		printf("错误: 设备打开失败\n");
+		goto err_open;
+	}
+
+	for (int i = 0; options.wait || i < ENTER_TRIES; i++) {
+		if (!cskburn_serial_connect(dev)) {
+			if (i == 0) {
+				printf("正在等待设备接入…\n");
+			}
+			if (!options.wait && i == ENTER_TRIES - 1) {
+				printf("错误: 设备打开失败\n");
+				goto err_enter;
+			} else {
+				continue;
+			}
+		}
+		printf("正在进入烧录模式…\n");
+		if (!cskburn_serial_enter(dev, options.serial_baud)) {
+			if (!options.wait && i == ENTER_TRIES - 1) {
+				printf("错误: 无法进入烧录模式\n");
+				goto err_enter;
+			} else {
+				msleep(2000);
+				continue;
+			}
+		}
+		break;
+	}
+
+	uint8_t *image_buf = malloc(MAX_IMAGE_SIZE);
+	uint32_t image_len;
+	for (int i = 0; i < parts; i++) {
+		image_len = read_file(images[i], image_buf, MAX_IMAGE_SIZE);
+		if (image_len == 0) {
+			printf("错误: 无法读取 %s\n", images[i]);
+			goto err_enter;
+		}
+
+		printf("正在烧录分区 %d/%d… (0x%08X, %.2f KB)\n", i + 1, parts, addrs[i],
+				(float)image_len / 1024.0f);
+		if (!cskburn_serial_write(dev, addrs[i], image_buf, image_len, print_progress)) {
+			printf("错误: 无法烧录分区 %d\n", i + 1);
+			goto err_write;
+		}
+	}
+
+	free(image_buf);
+	printf("烧录完成\n");
+
+	return true;
+
+err_write:
+	free(image_buf);
+err_enter:
+	cskburn_serial_close(&dev);
+err_open:
 	return false;
 }
