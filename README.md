@@ -6,7 +6,7 @@ cskburn
 ## 使用
 
 ```
-用法: cskburn [<选项>] <burner> <地址1> <文件1> [<地址2> <文件2>...]
+用法: cskburn [<选项>] <地址1> <文件1> [<地址2> <文件2>...]
 
 选项:
   -h, --help				显示帮助
@@ -16,5 +16,5 @@ cskburn
   -c, --check				检查设备是否插入 (不进行烧录)
 
 用例:
-  cskburn -w burner.img 0x0 flashboot.bin 0x10000 master.bin 0x100000 respack.bin
+  cskburn -w 0x0 flashboot.bin 0x10000 master.bin 0x100000 respack.bin
 ```

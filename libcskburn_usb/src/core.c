@@ -9,6 +9,9 @@
 #include "bootrom.h"
 #include "burner.h"
 
+extern uint8_t burner_img[];
+extern uint32_t burner_img_len;
+
 int
 cskburn_usb_init(void)
 {
@@ -111,9 +114,9 @@ cskburn_usb_close(cskburn_usb_device_t **dev)
 }
 
 int
-cskburn_usb_enter(cskburn_usb_device_t *dev, uint8_t *burner, uint32_t len)
+cskburn_usb_enter(cskburn_usb_device_t *dev)
 {
-	if (!bootrom_load(dev->handle, burner, len)) {
+	if (!bootrom_load(dev->handle, burner_img, burner_img_len)) {
 		return 1;
 	}
 

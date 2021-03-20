@@ -15,7 +15,7 @@ typedef struct {
 cskburn_usb_device_t *cskburn_usb_open(int16_t bus, int16_t address);
 void cskburn_usb_close(cskburn_usb_device_t **dev);
 
-int cskburn_usb_enter(cskburn_usb_device_t *dev, uint8_t *burner, uint32_t len);
+int cskburn_usb_enter(cskburn_usb_device_t *dev);
 int cskburn_usb_write(cskburn_usb_device_t *dev, uint32_t addr, uint8_t *image, uint32_t len,
 		void (*on_progress)(int32_t wrote_bytes, uint32_t total_bytes));
 int cskburn_usb_finish(cskburn_usb_device_t *dev);

@@ -4,6 +4,7 @@ add_library(
     cskburn_usb STATIC
     src/core.c
     src/bootrom.c
+    src/burner_img.c
     src/burner.c
     src/crc64.c
 )

@@ -24,7 +24,7 @@ static struct option long_options[] = {
 static void
 print_help(const char *progname)
 {
-	printf("用法: %s [<选项>] <burner> <地址1> <文件1> [<地址2> <文件2>...]\n", progname);
+	printf("用法: %s [<选项>] <地址1> <文件1> [<地址2> <文件2>...]\n", progname);
 	printf("\n");
 	printf("选项:\n");
 	printf("  -h, --help\t\t\t\t显示帮助\n");
@@ -34,7 +34,7 @@ print_help(const char *progname)
 	printf("  -c, --check\t\t\t\t检查设备是否插入 (不进行烧录)\n");
 	printf("\n");
 	printf("用例:\n");
-	printf("  cskburn -w burner.img 0x0 flashboot.bin 0x10000 master.bin 0x100000 respack.bin\n");
+	printf("  cskburn -w 0x0 flashboot.bin 0x10000 master.bin 0x100000 respack.bin\n");
 }
 
 static void
@@ -45,8 +45,8 @@ print_version(void)
 
 static bool check_usb(int16_t bus, int16_t address, bool wait);
 
-static bool burn_usb(int16_t bus, int16_t address, bool wait, char *burner, uint32_t *addrs,
-		char **images, int parts);
+static bool burn_usb(
+		int16_t bus, int16_t address, bool wait, uint32_t *addrs, char **images, int parts);
 
 int
 main(int argc, char **argv)
@@ -98,55 +98,41 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (argc - optind < 3) {
-		printf("错误: 你必须指定 burner 及至少一个烧录地址及文件\n");
-		return -1;
-	}
-
-	if ((argc - optind) % 2 != 1) {
-		printf("错误: 烧录地址及文件必须成对出现\n");
-		return -1;
-	}
-
-	char *burner = argv[optind];
-	if (!exists(burner)) {
-		printf("错误: burner 不存在: %s\n", burner);
-		return -1;
-	}
-
-	printf("burner: %s\n", burner);
-
-	char **parts = &argv[optind + 1];
-	int part_count = (argc - optind - 1) / 2;
-
 	uint32_t addrs[20];
 	char *images[20];
-	char *address;
-	for (int i = 0; i < part_count; i++) {
-		address = parts[i * 2];
-		images[i] = parts[i * 2 + 1];
+	int i = optind, j = 0;
+	while (i < argc - 1) {
+		if (sscanf(argv[i], "0x%x", &addrs[j]) != 1 && sscanf(argv[i], "%d", &addrs[j]) != 1) {
+			i++;
+			continue;
+		}
 
-		if (sscanf(address, "0x%x", &addrs[i]) != 1 && sscanf(address, "%d", &addrs[i]) != 1) {
-			printf("错误: 分区 %d 的地址格式不合法: %s\n", i + 1, address);
+		images[j] = argv[i + 1];
+
+		if (!exists(images[j])) {
+			printf("错误: 分区 %d 的文件不存在: %s\n", j + 1, images[j]);
 			return -1;
 		}
 
-		if (!exists(images[i])) {
-			printf("错误: 分区 %d 的文件不存在: %s\n", i + 1, images[i]);
-			return -1;
-		}
+		printf("分区 %d: 0x%08X %s\n", j + 1, addrs[j], images[j]);
 
-		printf("分区 %d: 0x%08X %s\n", i + 1, addrs[i], images[i]);
+		i += 2;
+		j += 1;
+	}
+
+	if (j < 1) {
+		printf("错误: 你必须指定至少一个烧录地址及文件\n");
+		return -1;
 	}
 
 	if (repeat) {
 		while (1) {
-			burn_usb(usb_bus, usb_addr, true, burner, addrs, images, part_count);
+			burn_usb(usb_bus, usb_addr, true, addrs, images, j);
 			printf("----------\n");
 			msleep(2000);
 		}
 	} else {
-		if (!burn_usb(usb_bus, usb_addr, wait, burner, addrs, images, part_count)) {
+		if (!burn_usb(usb_bus, usb_addr, wait, addrs, images, j)) {
 			return -1;
 		}
 	}
@@ -210,8 +196,7 @@ exit:
 }
 
 static bool
-burn_usb(int16_t bus, int16_t address, bool wait, char *burner, uint32_t *addrs, char **images,
-		int parts)
+burn_usb(int16_t bus, int16_t address, bool wait, uint32_t *addrs, char **images, int parts)
 {
 	if (cskburn_usb_init() != 0) {
 		printf("错误: 初始化失败\n");
@@ -236,16 +221,9 @@ burn_usb(int16_t bus, int16_t address, bool wait, char *burner, uint32_t *addrs,
 		goto err_open;
 	}
 
-	uint8_t *burner_buf = malloc(MAX_IMAGE_SIZE);
-	uint32_t burner_len = read_file(burner, burner_buf, MAX_IMAGE_SIZE);
-	if (burner_len == 0) {
-		printf("错误: 无法读取 %s\n", burner);
-		goto err_enter;
-	}
-
 	printf("正在进入烧录模式…\n");
 	msleep(2000);
-	if (cskburn_usb_enter(dev, burner_buf, burner_len)) {
+	if (cskburn_usb_enter(dev)) {
 		printf("错误: 无法进入烧录模式\n");
 		goto err_enter;
 	}
@@ -276,7 +254,6 @@ burn_usb(int16_t bus, int16_t address, bool wait, char *burner, uint32_t *addrs,
 err_write:
 	free(image_buf);
 err_enter:
-	free(burner_buf);
 	cskburn_usb_close(&dev);
 err_open:
 err_init:
