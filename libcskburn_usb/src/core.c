@@ -13,11 +13,11 @@
 extern uint8_t burner_img[];
 extern uint32_t burner_img_len;
 
-int
+bool
 cskburn_usb_init(bool verbose)
 {
 	log_enabled = verbose;
-	return libusb_init(NULL);
+	return libusb_init(NULL) == 0;
 }
 
 void
@@ -60,19 +60,19 @@ find_device(int16_t bus, int16_t address)
 	return found;
 }
 
-int
+bool
 cskburn_usb_wait(int16_t bus, int16_t address, int timeout)
 {
 	while (timeout > 0) {
 		libusb_device *found = find_device(bus, address);
 		if (found != NULL) {
-			return 1;
+			return true;
 		}
 		timeout -= 10;
 		msleep(10);
 	}
 
-	return 0;
+	return false;
 }
 
 cskburn_usb_device_t *
@@ -115,11 +115,11 @@ cskburn_usb_close(cskburn_usb_device_t **dev)
 	}
 }
 
-int
+bool
 cskburn_usb_enter(cskburn_usb_device_t *dev)
 {
 	if (!bootrom_load(dev->handle, burner_img, burner_img_len)) {
-		return 1;
+		return false;
 	}
 
 	msleep(100);
@@ -127,25 +127,15 @@ cskburn_usb_enter(cskburn_usb_device_t *dev)
 	int tmp = 0;
 	if (libusb_get_configuration(dev->handle, &tmp) != 0) {
 		LOGD("错误: 设备未响应");
-		return 1;
+		return false;
 	}
 
-	return 0;
+	return true;
 }
 
-int
+bool
 cskburn_usb_write(cskburn_usb_device_t *dev, uint32_t addr, uint8_t *image, uint32_t len,
 		void (*on_progress)(int32_t wrote_bytes, uint32_t total_bytes))
 {
-	if (!burner_burn(dev->handle, addr, image, len, on_progress)) {
-		return 1;
-	}
-
-	return 0;
-}
-
-int
-cskburn_usb_finish(cskburn_usb_device_t *dev)
-{
-	return 0;
+	return burner_burn(dev->handle, addr, image, len, on_progress);
 }

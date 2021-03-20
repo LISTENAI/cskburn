@@ -194,7 +194,7 @@ check_usb()
 {
 	bool ret = false;
 
-	if (cskburn_usb_init(options.verbose) != 0) {
+	if (!cskburn_usb_init(options.verbose)) {
 		printf("错误: 初始化失败\n");
 		goto exit;
 	}
@@ -214,7 +214,7 @@ exit:
 static bool
 burn_usb(uint32_t *addrs, char **images, int parts)
 {
-	if (cskburn_usb_init(options.verbose) != 0) {
+	if (!cskburn_usb_init(options.verbose)) {
 		printf("错误: 初始化失败\n");
 		goto err_init;
 	}
@@ -244,7 +244,7 @@ burn_usb(uint32_t *addrs, char **images, int parts)
 			}
 		}
 		msleep(500);
-		if (cskburn_usb_enter(dev)) {
+		if (!cskburn_usb_enter(dev)) {
 			if (i == ENTER_TRIES - 1) {
 				printf("错误: 无法进入烧录模式\n");
 				goto err_enter;
@@ -268,13 +268,11 @@ burn_usb(uint32_t *addrs, char **images, int parts)
 
 		printf("正在烧录分区 %d/%d… (0x%08X, %.2f KB)\n", i + 1, parts, addrs[i],
 				(float)image_len / 1024.0f);
-		if (cskburn_usb_write(dev, addrs[i], image_buf, image_len, print_progress)) {
+		if (!cskburn_usb_write(dev, addrs[i], image_buf, image_len, print_progress)) {
 			printf("错误: 无法烧录分区 %d\n", i + 1);
 			goto err_write;
 		}
 	}
-
-	cskburn_usb_finish(dev);
 
 	printf("烧录完成\n");
 
