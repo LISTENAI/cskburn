@@ -52,6 +52,38 @@ serial_close(serial_dev_t **dev)
 	*dev = NULL;
 }
 
+uint32_t
+serial_get_speed(serial_dev_t *dev)
+{
+}
+
+bool
+serial_set_speed(serial_dev_t *dev, uint32_t speed)
+{
+}
+
+int32_t
+serial_read(serial_dev_t *dev, void *buf, size_t count)
+{
+	size_t read = 0;
+	if (ReadFile(dev->handle, buf, count, &read, NULL)) {
+		return read;
+	} else {
+		return -1;
+	}
+}
+
+int32_t
+serial_write(serial_dev_t *dev, const void *buf, size_t count)
+{
+	size_t wrote = 0;
+	if (WriteFile(dev->handle, buf, count, &wrote, NULL)) {
+		return wrote;
+	} else {
+		return -1;
+	}
+}
+
 bool
 serial_set_rts(serial_dev_t *dev, bool val)
 {
