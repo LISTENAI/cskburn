@@ -9,6 +9,8 @@ endif()
 
 if(LINUX)
     list(APPEND SRCS "src/set_baud_linux.c")
+elseif (APPLE)
+    list(APPEND SRCS "src/set_baud_darwin.c")
 else()
     list(APPEND SRCS "src/set_baud_posix.c")
 endif()
