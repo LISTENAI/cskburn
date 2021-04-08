@@ -7,6 +7,12 @@ else()
     list(APPEND SRCS "src/serial_posix.c")
 endif()
 
+if(LINUX)
+    list(APPEND SRCS "src/set_baud_linux.c")
+else()
+    list(APPEND SRCS "src/set_baud_posix.c")
+endif()
+
 add_library(serial STATIC ${SRCS})
 
 target_include_directories(

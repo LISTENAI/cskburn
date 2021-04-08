@@ -6,6 +6,8 @@
 #include <termios.h>
 #include <sys/ioctl.h>
 
+#include "set_baud.h"
+
 struct _serial_dev_t {
 	int fd;
 };
@@ -20,9 +22,6 @@ set_interface_attribs(int fd, int speed)
 	if (ret < 0) {
 		return ret;
 	}
-
-	cfsetospeed(&tty, (speed_t)speed);
-	cfsetispeed(&tty, (speed_t)speed);
 
 	tty.c_cflag |= (CLOCAL | CREAD); /* ignore modem controls */
 	tty.c_cflag &= ~CSIZE;
@@ -40,6 +39,11 @@ set_interface_attribs(int fd, int speed)
 	tty.c_cc[VTIME] = 0;
 
 	ret = tcsetattr(fd, TCSANOW, &tty);
+	if (ret != 0) {
+		return ret;
+	}
+
+	ret = set_baud(fd, speed);
 	if (ret != 0) {
 		return ret;
 	}
@@ -82,7 +86,7 @@ serial_open(const char *path)
 		return NULL;
 	}
 
-	ret = set_interface_attribs(fd, B115200);
+	ret = set_interface_attribs(fd, 115200);
 	if (ret != 0) {
 		return NULL;
 	}
@@ -104,6 +108,7 @@ serial_close(serial_dev_t **dev)
 uint32_t
 serial_get_speed(serial_dev_t *dev)
 {
+#if 0
 	int ret = 0;
 	struct termios tty;
 
@@ -113,28 +118,15 @@ serial_get_speed(serial_dev_t *dev)
 	}
 
 	return cfgetospeed(&tty);
+#else
+	return 115200;
+#endif
 }
 
 bool
 serial_set_speed(serial_dev_t *dev, uint32_t speed)
 {
-	int ret = 0;
-	struct termios tty;
-
-	ret = tcgetattr(dev->fd, &tty);
-	if (ret < 0) {
-		return false;
-	}
-
-	cfsetospeed(&tty, (speed_t)speed);
-	cfsetispeed(&tty, (speed_t)speed);
-
-	ret = tcsetattr(dev->fd, TCSANOW, &tty);
-	if (ret != 0) {
-		return false;
-	}
-
-	return true;
+	return set_baud(dev->fd, speed) == 0;
 }
 
 ssize_t
