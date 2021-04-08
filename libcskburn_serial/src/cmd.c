@@ -316,7 +316,7 @@ cmd_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, 
 
 	memcpy(payload + sizeof(cmd_flash_block_t), data, data_len);
 
-	bool val = check_command(dev, CMD_FLASH_DATA, payload, size, checksum(data, data_len), 500);
+	bool val = check_command(dev, CMD_FLASH_DATA, payload, size, checksum(data, data_len), 2000);
 
 	free(payload);
 	return val;

@@ -125,6 +125,18 @@ cskburn_serial_enter(cskburn_serial_device_t *dev, uint32_t baud_rate)
 	return true;
 }
 
+static bool
+try_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, uint32_t seq)
+{
+	for (int i = 0; i < 5; i++) {
+		if (cmd_flash_block(dev, data, data_len, seq)) {
+			return true;
+		}
+		msleep(1000);
+	}
+	return false;
+}
+
 bool
 cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image, uint32_t len,
 		void (*on_progress)(int32_t wrote_bytes, uint32_t total_bytes))
@@ -145,7 +157,7 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image
 			length = len - offset;
 		}
 
-		if (!cmd_flash_block(dev, image + offset, length, i)) {
+		if (!try_flash_block(dev, image + offset, length, i)) {
 			return false;
 		}
 
