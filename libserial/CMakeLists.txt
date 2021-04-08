@@ -7,7 +7,7 @@ else()
     list(APPEND SRCS "src/serial_posix.c")
 endif()
 
-if(LINUX)
+if (UNIX AND NOT APPLE)
     list(APPEND SRCS "src/set_baud_linux.c")
 elseif (APPLE)
     list(APPEND SRCS "src/set_baud_darwin.c")
