@@ -36,7 +36,7 @@ set_interface_attribs(int fd, int speed)
 	tty.c_oflag &= ~OPOST;
 
 	tty.c_cc[VMIN] = 0;
-	tty.c_cc[VTIME] = 0;
+	tty.c_cc[VTIME] = 1;
 
 	ret = tcsetattr(fd, TCSANOW, &tty);
 	if (ret != 0) {

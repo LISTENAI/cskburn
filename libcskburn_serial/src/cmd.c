@@ -130,7 +130,6 @@ command(cskburn_serial_device_t *dev, uint8_t op, void *in_buf, uint16_t in_len,
 			goto err_read;
 		}
 		if (res_slip_len == 0) {
-			msleep(5);
 			continue;
 		}
 
@@ -316,7 +315,7 @@ cmd_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, 
 
 	memcpy(payload + sizeof(cmd_flash_block_t), data, data_len);
 
-	bool val = check_command(dev, CMD_FLASH_DATA, payload, size, checksum(data, data_len), 2000);
+	bool val = check_command(dev, CMD_FLASH_DATA, payload, size, checksum(data, data_len), 1000);
 
 	free(payload);
 	return val;

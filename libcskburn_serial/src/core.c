@@ -132,7 +132,6 @@ try_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, 
 		if (cmd_flash_block(dev, data, data_len, seq)) {
 			return true;
 		}
-		msleep(1000);
 	}
 	return false;
 }
