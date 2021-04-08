@@ -130,7 +130,7 @@ command(cskburn_serial_device_t *dev, uint8_t op, void *in_buf, uint16_t in_len,
 			goto err_read;
 		}
 		if (res_slip_len == 0) {
-			msleep(50);
+			msleep(5);
 			continue;
 		}
 
