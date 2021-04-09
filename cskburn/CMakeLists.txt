@@ -11,11 +11,13 @@ if(WIN32)
     target_link_libraries(cskburn getopt)
 endif()
 
-target_link_libraries(
-    cskburn
-    cskburn_usb
-    cskburn_serial
-)
+if(WITHOUT_USB)
+    target_compile_options(cskburn PRIVATE -DWITHOUT_USB)
+else()
+    target_link_libraries(cskburn cskburn_usb)
+endif()
+
+target_link_libraries(cskburn cskburn_serial)
 
 execute_process(COMMAND git describe --tags --abbrev=0 OUTPUT_VARIABLE GIT_TAG OUTPUT_STRIP_TRAILING_WHITESPACE)
 execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)

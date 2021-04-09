@@ -1,15 +1,15 @@
 project(serial)
 
 set(SRCS "")
-if (WIN32)
+if(WIN32)
     list(APPEND SRCS "src/serial_win32.c")
 else()
     list(APPEND SRCS "src/serial_posix.c")
 endif()
 
-if (UNIX AND NOT APPLE)
+if(UNIX AND NOT APPLE)
     list(APPEND SRCS "src/set_baud_linux.c")
-elseif (APPLE)
+elseif(APPLE)
     list(APPEND SRCS "src/set_baud_darwin.c")
 else()
     list(APPEND SRCS "src/set_baud_posix.c")

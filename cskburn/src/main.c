@@ -7,7 +7,9 @@
 
 #include <msleep.h>
 #include <exists.h>
+#ifndef WITHOUT_USB
 #include <cskburn_usb.h>
+#endif
 #include <cskburn_serial.h>
 
 #define MAX_IMAGE_SIZE (20 * 1024 * 1024)
@@ -18,32 +20,60 @@ static struct option long_options[] = {
 		{"version", no_argument, NULL, 'V'},
 		{"verbose", no_argument, NULL, 'v'},
 		{"wait", no_argument, NULL, 'w'},
+#ifndef WITHOUT_USB
 		{"usb", required_argument, NULL, 'u'},
+#endif
 		{"serial", required_argument, NULL, 's'},
 		{"baud", required_argument, NULL, 'b'},
+#ifndef WITHOUT_USB
 		{"repeat", no_argument, NULL, 'R'},
 		{"check", no_argument, NULL, 'c'},
+#endif
 		{0, 0, NULL, 0},
 };
+
+static const char option_string[] = {
+		"hVv"
+		"w"
+#ifndef WITHOUT_USB
+		"u:"
+		"R"
+		"c"
+#endif
+		"s:b:",
+};
+
+static const char example_serial_dev[] =
+#ifdef __WIN32__
+		"COM24";
+#elif __APPLE__
+		"/dev/cu.usbserial-0001";
+#else
+		"/dev/ttyUSB0";
+#endif
 
 static struct {
 	bool verbose;
 	bool wait;
 	bool repeat;
 	bool check;
+#ifndef WITHOUT_USB
 	char *usb;
 	int16_t usb_bus;
 	int16_t usb_addr;
+#endif
 	char *serial;
 	uint32_t serial_baud;
 } options = {
 		.verbose = false,
 		.wait = false,
+#ifndef WITHOUT_USB
 		.repeat = false,
 		.check = false,
 		.usb = NULL,
 		.usb_bus = -1,
 		.usb_addr = -1,
+#endif
 		.serial = NULL,
 		.serial_baud = 115200,
 };
@@ -53,13 +83,22 @@ print_help(const char *progname)
 {
 	printf("用法: %s [<选项>] <地址1> <文件1> [<地址2> <文件2>...]\n", progname);
 	printf("\n");
-	printf("选项:\n");
+	printf("烧录选项:\n");
+#ifndef WITHOUT_USB
+	printf("  -u, --usb (-|<总线>:<设备>)\t\t使用指定 USB 设备烧录。传 - 表示自动选取第一个 CSK "
+		   "设备\n");
+#endif
+	printf("  -s, --serial <端口>\t\t\t使用指定串口设备 (如 %s) 烧录\n", example_serial_dev);
+	printf("\n");
+	printf("其它选项:\n");
 	printf("  -h, --help\t\t\t\t显示帮助\n");
 	printf("  -V, --version\t\t\t\t显示版本号\n");
 	printf("  -v, --verbose\t\t\t\t显示详细日志\n");
 	printf("  -w, --wait\t\t\t\t等待设备插入，并自动开始烧录\n");
+#ifndef WITHOUT_USB
 	printf("  -R, --repeat\t\t\t\t循环等待设备插入，并自动开始烧录\n");
 	printf("  -c, --check\t\t\t\t检查设备是否插入 (不进行烧录)\n");
+#endif
 	printf("\n");
 	printf("用例:\n");
 	printf("  cskburn -w 0x0 flashboot.bin 0x10000 master.bin 0x100000 respack.bin\n");
@@ -71,8 +110,10 @@ print_version(void)
 	printf("%s (%d)\n", GIT_TAG, GIT_INCREMENT);
 }
 
+#ifndef WITHOUT_USB
 static bool check_usb();
 static bool burn_usb(uint32_t *addrs, char **images, int parts);
+#endif
 
 static bool burn_serial(uint32_t *addrs, char **images, int parts);
 
@@ -80,7 +121,7 @@ int
 main(int argc, char **argv)
 {
 	while (1) {
-		int c = getopt_long(argc, argv, "hVvwRu:s:b:c", long_options, NULL);
+		int c = getopt_long(argc, argv, option_string, long_options, NULL);
 		if (c == EOF) break;
 		switch (c) {
 			case 'v':
@@ -92,9 +133,11 @@ main(int argc, char **argv)
 			case 'R':
 				options.repeat = true;
 				break;
+#ifndef WITHOUT_USB
 			case 'u':
 				options.usb = optarg;
 				break;
+#endif
 			case 's':
 				options.serial = optarg;
 				break;
@@ -114,6 +157,12 @@ main(int argc, char **argv)
 		}
 	}
 
+#ifdef WITHOUT_USB
+	if (options.serial == NULL || strlen(options.serial) == 0) {
+		printf("错误: 必须指定一个串口设备 (如: -s %s)\n", example_serial_dev);
+		return -1;
+	}
+#else
 	if (options.usb != NULL && strcmp(options.usb, "-") != 0) {
 		if (sscanf(options.usb, "%hu:%hu\n", &options.usb_bus, &options.usb_addr) != 2) {
 			printf("错误: -u/--usb 参数的格式应为 <总线>:<设备> (如: -u 020:004)\n");
@@ -128,6 +177,7 @@ main(int argc, char **argv)
 			return -1;
 		}
 	}
+#endif
 
 	uint32_t addrs[20];
 	char *images[20];
@@ -156,6 +206,11 @@ main(int argc, char **argv)
 		return -1;
 	}
 
+#ifdef WITHOUT_USB
+	if (!burn_serial(addrs, images, j)) {
+		return -1;
+	}
+#else
 	if (options.repeat) {
 		while (1) {
 			burn_usb(addrs, images, j);
@@ -173,6 +228,7 @@ main(int argc, char **argv)
 			}
 		}
 	}
+#endif
 
 	return 0;
 }
@@ -210,6 +266,7 @@ print_progress(int32_t wrote_bytes, uint32_t total_bytes)
 	fflush(stdout);
 }
 
+#ifndef WITHOUT_USB
 static bool
 check_usb()
 {
@@ -310,6 +367,7 @@ err_init:
 
 	return false;
 }
+#endif
 
 static bool
 burn_serial(uint32_t *addrs, char **images, int parts)
