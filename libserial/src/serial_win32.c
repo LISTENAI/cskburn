@@ -38,6 +38,19 @@ serial_open(const char *path)
 		return NULL;
 	}
 
+	COMMTIMEOUTS timeouts = {0};
+	SecureZeroMemory(&timeouts, sizeof(COMMTIMEOUTS));
+
+	if (GetCommTimeouts(handle, &timeouts) == 0) {
+		return NULL;
+	}
+
+	timeouts.ReadIntervalTimeout = 1;
+
+	if (SetCommTimeouts(handle, &timeouts) == 0) {
+		return NULL;
+	}
+
 	serial_dev_t *dev = (serial_dev_t *)malloc(sizeof(serial_dev_t));
 	dev->handle = handle;
 
@@ -50,6 +63,48 @@ serial_close(serial_dev_t **dev)
 	CloseHandle((*dev)->handle);
 	free(*dev);
 	*dev = NULL;
+}
+
+bool
+serial_set_speed(serial_dev_t *dev, uint32_t speed)
+{
+	DCB dcb = {0};
+	SecureZeroMemory(&dcb, sizeof(DCB));
+	dcb.DCBlength = sizeof(DCB);
+
+	if (GetCommState(dev->handle, &dcb) == 0) {
+		return false;
+	}
+
+	dcb.BaudRate = speed;
+
+	if (SetCommState(dev->handle, &dcb) == 0) {
+		return false;
+	}
+
+	return true;
+}
+
+int32_t
+serial_read(serial_dev_t *dev, void *buf, size_t count)
+{
+	size_t read = 0;
+	if (ReadFile(dev->handle, buf, count, &read, NULL)) {
+		return read;
+	} else {
+		return -1;
+	}
+}
+
+int32_t
+serial_write(serial_dev_t *dev, const void *buf, size_t count)
+{
+	size_t wrote = 0;
+	if (WriteFile(dev->handle, buf, count, &wrote, NULL)) {
+		return wrote;
+	} else {
+		return -1;
+	}
 }
 
 bool

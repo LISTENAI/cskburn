@@ -44,7 +44,7 @@ static const char option_string[] = {
 };
 
 static const char example_serial_dev[] =
-#ifdef __WIN32__
+#if defined(_WIN32) || defined(_WIN64)
 		"COM24";
 #elif __APPLE__
 		"/dev/cu.usbserial-0001";
