@@ -111,16 +111,16 @@ serial_set_speed(serial_dev_t *dev, uint32_t speed)
 	return set_baud(dev->fd, speed) == 0;
 }
 
-ssize_t
+int32_t
 serial_read(serial_dev_t *dev, void *buf, size_t count)
 {
 	return read(dev->fd, buf, count);
 }
 
-ssize_t
+int32_t
 serial_write(serial_dev_t *dev, const void *buf, size_t count)
 {
-	ssize_t wrote = write(dev->fd, buf, count);
+	int32_t wrote = write(dev->fd, buf, count);
 	tcdrain(dev->fd);
 	return wrote;
 }

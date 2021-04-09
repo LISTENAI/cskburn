@@ -125,7 +125,7 @@ command(cskburn_serial_device_t *dev, uint8_t op, void *in_buf, uint16_t in_len,
 
 	clock_t start = clock();
 	do {
-		ssize_t res_slip_len = serial_read(dev->handle, res_slip_buf, MAX_RES_DATA_LEN);
+		int32_t res_slip_len = serial_read(dev->handle, res_slip_buf, MAX_RES_DATA_LEN);
 		if (res_slip_len < 0) {
 			goto err_read;
 		}
