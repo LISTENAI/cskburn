@@ -105,24 +105,6 @@ serial_close(serial_dev_t **dev)
 	*dev = NULL;
 }
 
-uint32_t
-serial_get_speed(serial_dev_t *dev)
-{
-#if 0
-	int ret = 0;
-	struct termios tty;
-
-	ret = tcgetattr(dev->fd, &tty);
-	if (ret < 0) {
-		return 0;
-	}
-
-	return cfgetospeed(&tty);
-#else
-	return 115200;
-#endif
-}
-
 bool
 serial_set_speed(serial_dev_t *dev, uint32_t speed)
 {

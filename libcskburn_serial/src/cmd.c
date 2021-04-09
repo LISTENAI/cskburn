@@ -81,7 +81,7 @@ typedef cmd_mem_finish_t cmd_flash_finish_t;
 
 typedef struct {
 	uint32_t baud;
-	uint32_t current_baud;
+	uint32_t rev;
 } cmd_change_baud_t;
 
 static bool
@@ -337,7 +337,6 @@ cmd_change_baud(cskburn_serial_device_t *dev, uint32_t baud)
 {
 	cmd_change_baud_t payload = {
 			.baud = baud,
-			.current_baud = serial_get_speed(dev->handle),
 	};
 
 	if (!command(
