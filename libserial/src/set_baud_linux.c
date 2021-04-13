@@ -2,6 +2,8 @@
 
 #include <asm/termios.h>
 
+extern int ioctl(int, unsigned long, ...);
+
 int
 set_baud(int fd, int speed)
 {
