@@ -38,6 +38,17 @@ build-darwin:
   tags:
     - ios
 
+build-rpi:
+  stage: build
+  script: |
+    ./build.sh
+    cp out/cskburn/cskburn cskburn-rpi
+  artifacts:
+    paths:
+      - cskburn-rpi
+  tags:
+    - rpi4b
+
 bundle:
   stage: publish
   script: echo
@@ -46,6 +57,7 @@ bundle:
       - cskburn-win32.exe
       - cskburn-linux
       - cskburn-darwin
+      - cskburn-rpi
   tags:
     - iflyos-builder
 
