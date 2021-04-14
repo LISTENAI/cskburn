@@ -15,6 +15,14 @@
 #define MAX_IMAGE_SIZE (20 * 1024 * 1024)
 #define ENTER_TRIES 5
 
+#if defined(_WIN32) || defined(_WIN64)
+#define DEFAULT_BAUD 3000000
+#elif defined(__APPLE__) || defined(__linux__)
+#define DEFAULT_BAUD 3840000
+#else
+#define DEFAULT_BAUD 115200
+#endif
+
 static struct option long_options[] = {
 		{"help", no_argument, NULL, 'h'},
 		{"version", no_argument, NULL, 'V'},
@@ -75,7 +83,7 @@ static struct {
 		.usb_addr = -1,
 #endif
 		.serial = NULL,
-		.serial_baud = 115200,
+		.serial_baud = DEFAULT_BAUD,
 };
 
 static void
@@ -95,6 +103,7 @@ print_help(const char *progname)
 	printf("  -V, --version\t\t\t\t显示版本号\n");
 	printf("  -v, --verbose\t\t\t\t显示详细日志\n");
 	printf("  -w, --wait\t\t\t\t等待设备插入，并自动开始烧录\n");
+	printf("  -b, --baud\t\t\t\t串口烧录所使用的波特率 (默认为 %d)\n", DEFAULT_BAUD);
 #ifndef WITHOUT_USB
 	printf("  -R, --repeat\t\t\t\t循环等待设备插入，并自动开始烧录\n");
 	printf("  -c, --check\t\t\t\t检查设备是否插入 (不进行烧录)\n");
