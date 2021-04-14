@@ -139,7 +139,7 @@ command(cskburn_serial_device_t *dev, uint8_t op, void *in_buf, uint16_t in_len,
 #endif
 
 		uint32_t res_slip_offset = 0;
-		while (res_slip_offset < res_slip_len) {
+		while (res_slip_offset < (uint32_t)res_slip_len) {
 			uint8_t *res_raw_ptr = res_slip_buf + res_slip_offset;
 			uint32_t res_slip_limit = res_slip_len - res_slip_offset;
 

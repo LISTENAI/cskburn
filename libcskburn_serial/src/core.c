@@ -172,7 +172,7 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image
 	uint64_t t2 = time_monotonic();
 
 	uint32_t spent = (uint32_t)(t2 - t1);
-	float speed = (float)(blocks * FLASH_BLOCK_SIZE) / 1024.0 / (float)spent;
+	float speed = (float)(blocks * FLASH_BLOCK_SIZE) / 1024.0f / (float)spent;
 	LOGD("耗时 %d s, 速度 %.2f KB/s", spent, speed);
 
 	msleep(500);
