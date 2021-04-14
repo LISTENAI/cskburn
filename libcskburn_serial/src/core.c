@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 
 #include <msleep.h>
+#include <time_monotonic.h>
 #include <serial.h>
 #include <cskburn_serial.h>
 
@@ -145,8 +145,7 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image
 	uint32_t blocks = BLOCKS(len, FLASH_BLOCK_SIZE);
 	int32_t wrote = 0;
 
-	struct timespec ts1, ts2;
-	clock_gettime(CLOCK_MONOTONIC, &ts1);
+	uint64_t t1 = time_monotonic();
 
 	if (!cmd_flash_begin(dev, len, blocks, FLASH_BLOCK_SIZE, addr)) {
 		return false;
@@ -170,9 +169,9 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image
 		}
 	}
 
-	clock_gettime(CLOCK_MONOTONIC, &ts2);
+	uint64_t t2 = time_monotonic();
 
-	uint32_t spent = ts2.tv_sec - ts1.tv_sec;
+	uint32_t spent = (uint32_t)(t2 - t1);
 	float speed = (float)(blocks * FLASH_BLOCK_SIZE) / 1024.0 / (float)spent;
 	LOGD("耗时 %d s, 速度 %.2f KB/s", spent, speed);
 
