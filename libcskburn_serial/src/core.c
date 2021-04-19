@@ -9,6 +9,8 @@
 #include "log.h"
 #include "cmd.h"
 
+#define EFUSE_BASE 0xF1800000
+
 extern uint8_t burner_serial[];
 extern uint32_t burner_serial_len;
 
@@ -177,6 +179,23 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image
 
 	msleep(500);
 
+	return true;
+}
+
+bool
+cskburn_serial_read_chip_id(cskburn_serial_device_t *dev, uint64_t *chip_id)
+{
+	uint32_t id0, id1;
+
+	if (!cmd_read_reg(dev, EFUSE_BASE + 0x80 + 0x0A, &id1)) {
+		return false;
+	}
+
+	if (!cmd_read_reg(dev, EFUSE_BASE + 0x80 + 0x0E, &id0)) {
+		return false;
+	}
+
+	*chip_id = ((uint64_t)id0 << 32) | id1;
 	return true;
 }
 

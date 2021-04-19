@@ -25,6 +25,7 @@
 #define CMD_MEM_END 0x06
 #define CMD_MEM_DATA 0x07
 #define CMD_SYNC 0x08
+#define CMD_READ_REG 0x0a
 #define CMD_CHANGE_BAUDRATE 0x0f
 
 #define CHECKSUM_MAGIC 0xef
@@ -240,6 +241,30 @@ cmd_sync(cskburn_serial_device_t *dev, uint16_t timeout)
 	uint8_t payload[36] = {0x07, 0x07, 0x12, 0x20};
 	memset(payload + 4, 0x55, sizeof(payload) - 4);
 	return command(dev, CMD_SYNC, payload, sizeof(payload), 0, NULL, NULL, NULL, 0, timeout);
+}
+
+bool
+cmd_read_reg(cskburn_serial_device_t *dev, uint32_t reg, uint32_t *val)
+{
+	uint8_t ret_buf[STATUS_BYTES_LENGTH];
+	uint16_t ret_len = 0;
+
+	if (!command(dev, CMD_READ_REG, &reg, sizeof(reg), 0, val, ret_buf, &ret_len, sizeof(ret_buf),
+				500)) {
+		return false;
+	}
+
+	if (ret_len < STATUS_BYTES_LENGTH) {
+		LOGD("错误: 串口读取异常");
+		return false;
+	}
+
+	if (ret_buf[0] != 0) {
+		LOGD("错误: 设备返回异常 %02X%02X", ret_buf[0], ret_buf[1]);
+		return false;
+	}
+
+	return true;
 }
 
 bool

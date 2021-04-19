@@ -37,6 +37,7 @@ static struct option long_options[] = {
 		{"repeat", no_argument, NULL, 'R'},
 		{"check", no_argument, NULL, 'c'},
 #endif
+		{"chip-id", no_argument, NULL, 'I'},
 		{0, 0, NULL, 0},
 };
 
@@ -48,6 +49,7 @@ static const char option_string[] = {
 		"R"
 		"c"
 #endif
+		"I"
 		"s:b:",
 };
 
@@ -70,6 +72,7 @@ typedef enum {
 typedef enum {
 	ACTION_NONE = 0,
 	ACTION_CHECK,
+	ACTION_READ_CHIP_ID,
 } cskburn_action_t;
 
 static struct {
@@ -137,6 +140,7 @@ static bool usb_check(void);
 static bool usb_burn(uint32_t *addrs, char **images, int parts);
 #endif
 
+static bool serial_read_chip_id(void);
 static bool serial_burn(uint32_t *addrs, char **images, int parts);
 
 int
@@ -168,6 +172,9 @@ main(int argc, char **argv)
 				break;
 			case 'c':
 				options.action = ACTION_CHECK;
+				break;
+			case 'I':
+				options.action = ACTION_READ_CHIP_ID;
 				break;
 			case 'V':
 				print_version();
@@ -206,6 +213,14 @@ main(int argc, char **argv)
 			}
 		}
 #endif
+	} else if (options.action == ACTION_READ_CHIP_ID) {
+		if (options.protocol == PROTO_SERIAL) {
+			if (serial_read_chip_id()) {
+				return 0;
+			} else {
+				return -1;
+			}
+		}
 	}
 
 	uint32_t addrs[20];
@@ -395,6 +410,68 @@ err_init:
 #endif
 
 static bool
+serial_connect(cskburn_serial_device_t *dev)
+{
+	for (int i = 0; options.wait || i < ENTER_TRIES; i++) {
+		if (!cskburn_serial_connect(dev)) {
+			if (i == 0) {
+				printf("正在等待设备接入…\n");
+			}
+			if (!options.wait && i == ENTER_TRIES - 1) {
+				printf("错误: 设备打开失败\n");
+				return false;
+			} else {
+				continue;
+			}
+		}
+		printf("正在进入烧录模式…\n");
+		if (!cskburn_serial_enter(dev, options.serial_baud)) {
+			if (!options.wait && i == ENTER_TRIES - 1) {
+				printf("错误: 无法进入烧录模式\n");
+				return false;
+			} else {
+				msleep(2000);
+				continue;
+			}
+		}
+		break;
+	}
+
+	return true;
+}
+
+static bool
+serial_read_chip_id(void)
+{
+	cskburn_serial_init(options.verbose);
+
+	cskburn_serial_device_t *dev = cskburn_serial_open(options.serial);
+	if (dev == NULL) {
+		printf("错误: 设备打开失败\n");
+		goto err_open;
+	}
+
+	if (!serial_connect(dev)) {
+		goto err_enter;
+	}
+
+	uint64_t chip_id = 0;
+	if (!cskburn_serial_read_chip_id(dev, &chip_id)) {
+		printf("错误: 无法读取设备\n");
+		goto err_enter;
+	}
+
+	printf("%016llX\n", chip_id);
+
+	return true;
+
+err_enter:
+	cskburn_serial_close(&dev);
+err_open:
+	return false;
+}
+
+static bool
 serial_burn(uint32_t *addrs, char **images, int parts)
 {
 	cskburn_serial_init(options.verbose);
@@ -405,29 +482,8 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 		goto err_open;
 	}
 
-	for (int i = 0; options.wait || i < ENTER_TRIES; i++) {
-		if (!cskburn_serial_connect(dev)) {
-			if (i == 0) {
-				printf("正在等待设备接入…\n");
-			}
-			if (!options.wait && i == ENTER_TRIES - 1) {
-				printf("错误: 设备打开失败\n");
-				goto err_enter;
-			} else {
-				continue;
-			}
-		}
-		printf("正在进入烧录模式…\n");
-		if (!cskburn_serial_enter(dev, options.serial_baud)) {
-			if (!options.wait && i == ENTER_TRIES - 1) {
-				printf("错误: 无法进入烧录模式\n");
-				goto err_enter;
-			} else {
-				msleep(2000);
-				continue;
-			}
-		}
-		break;
+	if (!serial_connect(dev)) {
+		goto err_enter;
 	}
 
 	uint8_t *image_buf = malloc(MAX_IMAGE_SIZE);

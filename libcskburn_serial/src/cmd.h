@@ -12,6 +12,8 @@
 
 bool cmd_sync(cskburn_serial_device_t *dev, uint16_t timeout);
 
+bool cmd_read_reg(cskburn_serial_device_t *dev, uint32_t reg, uint32_t *val);
+
 bool cmd_mem_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks,
 		uint32_t block_size, uint32_t offset);
 bool cmd_mem_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, uint32_t seq);
