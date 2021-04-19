@@ -1,6 +1,10 @@
 #!/bin/bash
 echo "${NPMRC}" > ~/.npmrc
-cp README.md cskburn-win32.exe cskburn-linux cskburn-darwin npm/
+cp README.md npm/
+cp cskburn-win32-x64.exe npm/
+cp cskburn-linux-x64 npm/
+cp cskburn-linux-arm npm/
+cp cskburn-darwin-x64 npm/
 cp package_template.json npm/package.json
 cd npm
 sed -i "s|{{NAME}}|${PKG_NAME}|" package.json

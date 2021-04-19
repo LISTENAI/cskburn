@@ -1,14 +1,13 @@
-const { platform } = require('os');
 const { join } = require('path');
+const { existsSync } = require('fs');
+const { arch, platform } = process;
+
 exports.CSKBURN = (() => {
-    switch (platform()) {
-        case 'darwin':
-            return join(__dirname, 'cskburn-darwin');
-        case 'linux':
-            return join(__dirname, 'cskburn-linux');
-        case 'win32':
-            return join(__dirname, 'cskburn-win32.exe');
-        default:
-            return null;
+    const suffix = (platform == 'win32') ? '.exe' : '';
+    const binary = join(__dirname, `cskburn-${platform}-${arch}${suffix}`);
+    if (existsSync(binary)) {
+        return binary;
+    } else {
+        return null;
     }
 })();
