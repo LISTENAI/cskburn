@@ -60,11 +60,24 @@ static const char example_serial_dev[] =
 		"/dev/ttyUSB0";
 #endif
 
+typedef enum {
+#ifndef WITHOUT_USB
+	PROTO_USB,
+#endif
+	PROTO_SERIAL,
+} cskburn_protocol_t;
+
+typedef enum {
+	ACTION_NONE = 0,
+	ACTION_CHECK,
+} cskburn_action_t;
+
 static struct {
 	bool verbose;
 	bool wait;
 	bool repeat;
-	bool check;
+	cskburn_protocol_t protocol;
+	cskburn_action_t action;
 #ifndef WITHOUT_USB
 	char *usb;
 	int16_t usb_bus;
@@ -77,7 +90,7 @@ static struct {
 		.wait = false,
 #ifndef WITHOUT_USB
 		.repeat = false,
-		.check = false,
+		.action = ACTION_NONE,
 		.usb = NULL,
 		.usb_bus = -1,
 		.usb_addr = -1,
@@ -120,11 +133,11 @@ print_version(void)
 }
 
 #ifndef WITHOUT_USB
-static bool check_usb();
-static bool burn_usb(uint32_t *addrs, char **images, int parts);
+static bool usb_check(void);
+static bool usb_burn(uint32_t *addrs, char **images, int parts);
 #endif
 
-static bool burn_serial(uint32_t *addrs, char **images, int parts);
+static bool serial_burn(uint32_t *addrs, char **images, int parts);
 
 int
 main(int argc, char **argv)
@@ -154,7 +167,7 @@ main(int argc, char **argv)
 				sscanf(optarg, "%d", &options.serial_baud);
 				break;
 			case 'c':
-				options.check = true;
+				options.action = ACTION_CHECK;
 				break;
 			case 'V':
 				print_version();
@@ -166,27 +179,34 @@ main(int argc, char **argv)
 		}
 	}
 
+	if (options.serial != NULL && strlen(options.serial) > 0) {
+		options.protocol = PROTO_SERIAL;
+	} else {
 #ifdef WITHOUT_USB
-	if (options.serial == NULL || strlen(options.serial) == 0) {
 		printf("错误: 必须指定一个串口设备 (如: -s %s)\n", example_serial_dev);
 		return -1;
-	}
 #else
-	if (options.usb != NULL && strcmp(options.usb, "-") != 0) {
-		if (sscanf(options.usb, "%hu:%hu\n", &options.usb_bus, &options.usb_addr) != 2) {
-			printf("错误: -u/--usb 参数的格式应为 <总线>:<设备> (如: -u 020:004)\n");
-			return -1;
+		if (options.usb != NULL && strcmp(options.usb, "-") != 0) {
+			if (sscanf(options.usb, "%hu:%hu\n", &options.usb_bus, &options.usb_addr) != 2) {
+				printf("错误: -u/--usb 参数的格式应为 <总线>:<设备> (如: -u 020:004)\n");
+				return -1;
+			}
 		}
+		options.protocol = PROTO_USB;
+#endif
 	}
 
-	if (options.check) {
-		if (check_usb()) {
-			return 0;
-		} else {
-			return -1;
+	if (options.action == ACTION_CHECK) {
+#ifndef WITHOUT_USB
+		if (options.protocol == PROTO_USB) {
+			if (usb_check()) {
+				return 0;
+			} else {
+				return -1;
+			}
 		}
-	}
 #endif
+	}
 
 	uint32_t addrs[20];
 	char *images[20];
@@ -215,29 +235,25 @@ main(int argc, char **argv)
 		return -1;
 	}
 
-#ifdef WITHOUT_USB
-	if (!burn_serial(addrs, images, j)) {
-		return -1;
-	}
-#else
-	if (options.repeat) {
-		while (1) {
-			burn_usb(addrs, images, j);
-			printf("----------\n");
-			msleep(2000);
+	if (options.protocol == PROTO_SERIAL) {
+		if (!serial_burn(addrs, images, j)) {
+			return -1;
 		}
-	} else {
-		if (options.serial != NULL) {
-			if (!burn_serial(addrs, images, j)) {
-				return -1;
+#ifndef WITHOUT_USB
+	} else if (options.protocol == PROTO_USB) {
+		if (options.repeat) {
+			while (1) {
+				usb_burn(addrs, images, j);
+				printf("----------\n");
+				msleep(2000);
 			}
 		} else {
-			if (!burn_usb(addrs, images, j)) {
+			if (!usb_burn(addrs, images, j)) {
 				return -1;
 			}
 		}
-	}
 #endif
+	}
 
 	return 0;
 }
@@ -277,7 +293,7 @@ print_progress(int32_t wrote_bytes, uint32_t total_bytes)
 
 #ifndef WITHOUT_USB
 static bool
-check_usb()
+usb_check(void)
 {
 	bool ret = false;
 
@@ -299,7 +315,7 @@ exit:
 }
 
 static bool
-burn_usb(uint32_t *addrs, char **images, int parts)
+usb_burn(uint32_t *addrs, char **images, int parts)
 {
 	if (!cskburn_usb_init(options.verbose)) {
 		printf("错误: 初始化失败\n");
@@ -379,7 +395,7 @@ err_init:
 #endif
 
 static bool
-burn_serial(uint32_t *addrs, char **images, int parts)
+serial_burn(uint32_t *addrs, char **images, int parts)
 {
 	cskburn_serial_init(options.verbose);
 
