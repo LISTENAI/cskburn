@@ -17,8 +17,8 @@ build:win32-x64:
 build:linux-x64:
   stage: build
   script: |
-    docker pull ${LINUX_BUILDER}
-    docker run --rm -v ${PWD}:/project ${LINUX_BUILDER} bash -c './build.sh'
+    docker build -f Dockerfile.debian -t cskburn-debian .
+    docker run --rm -v $PWD:/project cskburn-debian ./build.sh
     cp out/cskburn/cskburn cskburn-linux-x64
   artifacts:
     paths:
@@ -26,14 +26,39 @@ build:linux-x64:
   tags:
     - iflyos-builder
 
+build:linux-x64-musl:
+  stage: build
+  script: |
+    docker build -f Dockerfile.alpine -t cskburn-alpine .
+    docker run --rm -v $PWD:/project cskburn-alpine ./build.sh
+    cp out/cskburn/cskburn cskburn-linux-x64-musl
+  artifacts:
+    paths:
+      - cskburn-linux-x64-musl
+  tags:
+    - iflyos-builder
+
 build:linux-arm:
   stage: build
   script: |
-    ./build.sh
+    docker build -f Dockerfile.debian -t cskburn-debian .
+    docker run --rm --user 999:995 -v $PWD:/project cskburn-debian ./build.sh
     cp out/cskburn/cskburn cskburn-linux-arm
   artifacts:
     paths:
       - cskburn-linux-arm
+  tags:
+    - rpi4b
+
+build:linux-arm-musl:
+  stage: build
+  script: |
+    docker build -f Dockerfile.alpine -t cskburn-alpine .
+    docker run --rm --user 999:995 -v $PWD:/project cskburn-alpine ./build.sh
+    cp out/cskburn/cskburn cskburn-linux-arm-musl
+  artifacts:
+    paths:
+      - cskburn-linux-arm-musl
   tags:
     - rpi4b
 
@@ -44,7 +69,9 @@ bundle:
     paths:
       - cskburn-win32-x64.exe
       - cskburn-linux-x64
+      - cskburn-linux-x64-musl
       - cskburn-linux-arm
+      - cskburn-linux-arm-musl
   tags:
     - iflyos-builder
 
