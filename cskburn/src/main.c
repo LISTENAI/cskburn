@@ -332,6 +332,8 @@ exit:
 static bool
 usb_burn(uint32_t *addrs, char **images, int parts)
 {
+	bool ret = false;
+
 	if (!cskburn_usb_init(options.verbose)) {
 		printf("错误: 初始化失败\n");
 		goto err_init;
@@ -392,10 +394,8 @@ usb_burn(uint32_t *addrs, char **images, int parts)
 		}
 	}
 
-	free(image_buf);
 	printf("烧录完成\n");
-
-	return true;
+	ret = true;
 
 err_write:
 	free(image_buf);
@@ -404,8 +404,7 @@ err_enter:
 err_open:
 err_init:
 	cskburn_usb_exit();
-
-	return false;
+	return ret;
 }
 #endif
 
@@ -443,6 +442,8 @@ serial_connect(cskburn_serial_device_t *dev)
 static bool
 serial_read_chip_id(void)
 {
+	bool ret = false;
+
 	cskburn_serial_init(options.verbose);
 
 	cskburn_serial_device_t *dev = cskburn_serial_open(options.serial);
@@ -462,18 +463,19 @@ serial_read_chip_id(void)
 	}
 
 	printf("%016llX\n", chip_id);
-
-	return true;
+	ret = true;
 
 err_enter:
 	cskburn_serial_close(&dev);
 err_open:
-	return false;
+	return ret;
 }
 
 static bool
 serial_burn(uint32_t *addrs, char **images, int parts)
 {
+	bool ret = false;
+
 	cskburn_serial_init(options.verbose);
 
 	cskburn_serial_device_t *dev = cskburn_serial_open(options.serial);
@@ -503,15 +505,13 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 		}
 	}
 
-	free(image_buf);
 	printf("烧录完成\n");
-
-	return true;
+	ret = true;
 
 err_write:
 	free(image_buf);
 err_enter:
 	cskburn_serial_close(&dev);
 err_open:
-	return false;
+	return ret;
 }
