@@ -199,10 +199,20 @@ cskburn_serial_read_chip_id(cskburn_serial_device_t *dev, uint64_t *chip_id)
 }
 
 bool
-cskburn_serial_reset(cskburn_serial_device_t *dev)
+cskburn_serial_reset(cskburn_serial_device_t *dev, uint32_t delay, bool ok)
 {
+	if (ok) {
+		serial_set_rts(dev->handle, true);  // UPDATE=LOW, LED=GREEN
+	} else {
+		serial_set_rts(dev->handle, false);  // UPDATE=HIGH, LED=RED
+	}
+
 	serial_set_dtr(dev->handle, true);  // RESET=LOW
-	msleep(500);
+
+	msleep(delay);
+
 	serial_set_dtr(dev->handle, false);  // RESET=HIGH
+	serial_set_rts(dev->handle, false);  // UPDATE=HIGH
+
 	return true;
 }

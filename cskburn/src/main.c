@@ -466,6 +466,7 @@ serial_read_chip_id(void)
 	ret = true;
 
 err_enter:
+	cskburn_serial_reset(dev, 500, ret);
 	cskburn_serial_close(&dev);
 err_open:
 	return ret;
@@ -475,6 +476,7 @@ static bool
 serial_burn(uint32_t *addrs, char **images, int parts)
 {
 	bool ret = false;
+	uint32_t delay = 10 * 1000;
 
 	cskburn_serial_init(options.verbose);
 
@@ -506,11 +508,13 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 	}
 
 	printf("烧录完成\n");
+	delay = 5 * 1000;
 	ret = true;
 
 err_write:
 	free(image_buf);
 err_enter:
+	cskburn_serial_reset(dev, delay, ret);
 	cskburn_serial_close(&dev);
 err_open:
 	return ret;
