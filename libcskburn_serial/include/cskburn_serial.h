@@ -13,7 +13,8 @@ typedef struct {
 cskburn_serial_device_t *cskburn_serial_open(const char *path);
 void cskburn_serial_close(cskburn_serial_device_t **dev);
 
-bool cskburn_serial_connect(cskburn_serial_device_t *dev);
+bool cskburn_serial_connect(
+		cskburn_serial_device_t *dev, uint32_t reset_delay, uint32_t probe_timeout);
 
 bool cskburn_serial_enter(cskburn_serial_device_t *dev, uint32_t baud_rate);
 

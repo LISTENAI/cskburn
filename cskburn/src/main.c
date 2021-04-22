@@ -23,6 +23,11 @@
 #define DEFAULT_BAUD 115200
 #endif
 
+#define DEFAULT_PROBE_TIMEOUT 1000
+#define DEFAULT_RESET_DELAY 500
+#define DEFAULT_PASS_DELAY 5 * 1000
+#define DEFAULT_FAIL_DELAY 5 * 1000
+
 static struct option long_options[] = {
 		{"help", no_argument, NULL, 'h'},
 		{"version", no_argument, NULL, 'V'},
@@ -38,6 +43,10 @@ static struct option long_options[] = {
 		{"check", no_argument, NULL, 'c'},
 #endif
 		{"chip-id", no_argument, NULL, 0},
+		{"probe-timeout", required_argument, NULL, 0},
+		{"reset-delay", required_argument, NULL, 0},
+		{"pass-delay", required_argument, NULL, 0},
+		{"fail-delay", required_argument, NULL, 0},
 		{0, 0, NULL, 0},
 };
 
@@ -87,6 +96,10 @@ static struct {
 #endif
 	char *serial;
 	uint32_t serial_baud;
+	uint32_t probe_timeout;
+	uint32_t reset_delay;
+	uint32_t pass_delay;
+	uint32_t fail_delay;
 } options = {
 		.verbose = false,
 		.wait = false,
@@ -99,6 +112,10 @@ static struct {
 #endif
 		.serial = NULL,
 		.serial_baud = DEFAULT_BAUD,
+		.probe_timeout = DEFAULT_PROBE_TIMEOUT,
+		.reset_delay = DEFAULT_RESET_DELAY,
+		.pass_delay = DEFAULT_PASS_DELAY,
+		.fail_delay = DEFAULT_FAIL_DELAY,
 };
 
 static void
@@ -177,6 +194,18 @@ main(int argc, char **argv)
 				const char *name = long_options[long_index].name;
 				if (strcmp(name, "chip-id") == 0) {
 					options.action = ACTION_READ_CHIP_ID;
+					break;
+				} else if (strcmp(name, "probe-timeout") == 0) {
+					sscanf(optarg, "%d", &options.probe_timeout);
+					break;
+				} else if (strcmp(name, "reset-delay") == 0) {
+					sscanf(optarg, "%d", &options.reset_delay);
+					break;
+				} else if (strcmp(name, "pass-delay") == 0) {
+					sscanf(optarg, "%d", &options.pass_delay);
+					break;
+				} else if (strcmp(name, "fail-delay") == 0) {
+					sscanf(optarg, "%d", &options.fail_delay);
 					break;
 				} else {
 					print_help(argv[0]);
@@ -419,7 +448,7 @@ static bool
 serial_connect(cskburn_serial_device_t *dev)
 {
 	for (int i = 0; options.wait || i < ENTER_TRIES; i++) {
-		if (!cskburn_serial_connect(dev)) {
+		if (!cskburn_serial_connect(dev, options.reset_delay, options.probe_timeout)) {
 			if (i == 0) {
 				printf("正在等待设备接入…\n");
 			}
@@ -450,7 +479,7 @@ static bool
 serial_read_chip_id(void)
 {
 	bool ret = false;
-	uint32_t delay = 10 * 1000;
+	uint32_t delay = options.fail_delay;
 
 	cskburn_serial_init(options.verbose);
 
@@ -471,7 +500,7 @@ serial_read_chip_id(void)
 	}
 
 	printf("%016llX\n", chip_id);
-	delay = 500;
+	delay = DEFAULT_RESET_DELAY;
 	ret = true;
 
 err_enter:
@@ -485,7 +514,7 @@ static bool
 serial_burn(uint32_t *addrs, char **images, int parts)
 {
 	bool ret = false;
-	uint32_t delay = 10 * 1000;
+	uint32_t delay = options.fail_delay;
 
 	cskburn_serial_init(options.verbose);
 
@@ -517,7 +546,7 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 	}
 
 	printf("烧录完成\n");
-	delay = 5 * 1000;
+	delay = options.pass_delay;
 	ret = true;
 
 err_write:
