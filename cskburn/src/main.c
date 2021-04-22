@@ -37,7 +37,7 @@ static struct option long_options[] = {
 		{"repeat", no_argument, NULL, 'R'},
 		{"check", no_argument, NULL, 'c'},
 #endif
-		{"chip-id", no_argument, NULL, 'I'},
+		{"chip-id", no_argument, NULL, 0},
 		{0, 0, NULL, 0},
 };
 
@@ -49,7 +49,6 @@ static const char option_string[] = {
 		"R"
 		"c"
 #endif
-		"I"
 		"s:b:",
 };
 
@@ -146,8 +145,9 @@ static bool serial_burn(uint32_t *addrs, char **images, int parts);
 int
 main(int argc, char **argv)
 {
+	int long_index = -1;
 	while (1) {
-		int c = getopt_long(argc, argv, option_string, long_options, NULL);
+		int c = getopt_long(argc, argv, option_string, long_options, &long_index);
 		if (c == EOF) break;
 		switch (c) {
 			case 'v':
@@ -173,9 +173,16 @@ main(int argc, char **argv)
 			case 'c':
 				options.action = ACTION_CHECK;
 				break;
-			case 'I':
-				options.action = ACTION_READ_CHIP_ID;
-				break;
+			case 0: { /* long-only options */
+				const char *name = long_options[long_index].name;
+				if (strcmp(name, "chip-id") == 0) {
+					options.action = ACTION_READ_CHIP_ID;
+					break;
+				} else {
+					print_help(argv[0]);
+					return 0;
+				}
+			}
 			case 'V':
 				print_version();
 				return 0;
