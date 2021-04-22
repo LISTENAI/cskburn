@@ -450,6 +450,7 @@ static bool
 serial_read_chip_id(void)
 {
 	bool ret = false;
+	uint32_t delay = 10 * 1000;
 
 	cskburn_serial_init(options.verbose);
 
@@ -470,10 +471,11 @@ serial_read_chip_id(void)
 	}
 
 	printf("%016llX\n", chip_id);
+	delay = 500;
 	ret = true;
 
 err_enter:
-	cskburn_serial_reset(dev, 500, ret);
+	cskburn_serial_reset(dev, delay, ret);
 	cskburn_serial_close(&dev);
 err_open:
 	return ret;
