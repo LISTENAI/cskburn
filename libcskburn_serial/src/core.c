@@ -17,10 +17,13 @@
 extern uint8_t burner_serial[];
 extern uint32_t burner_serial_len;
 
+static bool rts_inverted = false;
+
 void
-cskburn_serial_init(bool verbose)
+cskburn_serial_init(bool verbose, bool invert_rts)
 {
 	log_enabled = verbose;
+	rts_inverted = invert_rts;
 }
 
 cskburn_serial_device_t *
@@ -70,12 +73,12 @@ cskburn_serial_connect(cskburn_serial_device_t *dev, uint32_t reset_delay, uint3
 {
 	if (reset_delay > 0) {
 		serial_set_dtr(dev->handle, PIN_HI);  // RESET=HIGH
-		serial_set_rts(dev->handle, PIN_HI);  // UPDATE=HIGH
+		serial_set_rts(dev->handle, rts_inverted ? PIN_LO : PIN_HI);  // UPDATE=HIGH
 
 		msleep(10);
 
 		serial_set_dtr(dev->handle, PIN_LO);  // RESET=LOW
-		serial_set_rts(dev->handle, PIN_LO);  // UPDATE=LOW
+		serial_set_rts(dev->handle, rts_inverted ? PIN_HI : PIN_LO);  // UPDATE=LOW
 
 		msleep(reset_delay);
 
@@ -217,7 +220,7 @@ cskburn_serial_reset(cskburn_serial_device_t *dev, uint32_t delay, bool ok)
 	msleep(delay);
 
 	serial_set_dtr(dev->handle, PIN_HI);  // RESET=HIGH
-	serial_set_rts(dev->handle, PIN_HI);  // UPDATE=HIGH
+	serial_set_rts(dev->handle, rts_inverted ? PIN_LO : PIN_HI);  // UPDATE=HIGH
 
 	return true;
 }

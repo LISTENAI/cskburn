@@ -47,6 +47,7 @@ static struct option long_options[] = {
 		{"reset-delay", required_argument, NULL, 0},
 		{"pass-delay", required_argument, NULL, 0},
 		{"fail-delay", required_argument, NULL, 0},
+		{"update-high", no_argument, NULL, 0},
 		{0, 0, NULL, 0},
 };
 
@@ -100,6 +101,7 @@ static struct {
 	uint32_t reset_delay;
 	uint32_t pass_delay;
 	uint32_t fail_delay;
+	bool update_high;
 } options = {
 		.verbose = false,
 		.wait = false,
@@ -116,6 +118,7 @@ static struct {
 		.reset_delay = DEFAULT_RESET_DELAY,
 		.pass_delay = DEFAULT_PASS_DELAY,
 		.fail_delay = DEFAULT_FAIL_DELAY,
+		.update_high = false,
 };
 
 static void
@@ -206,6 +209,9 @@ main(int argc, char **argv)
 					break;
 				} else if (strcmp(name, "fail-delay") == 0) {
 					sscanf(optarg, "%d", &options.fail_delay);
+					break;
+				} else if (strcmp(name, "update-high") == 0) {
+					options.update_high = true;
 					break;
 				} else {
 					print_help(argv[0]);
@@ -483,7 +489,7 @@ serial_read_chip_id(void)
 	bool ret = false;
 	uint32_t delay = options.fail_delay;
 
-	cskburn_serial_init(options.verbose);
+	cskburn_serial_init(options.verbose, options.update_high);
 
 	cskburn_serial_device_t *dev = cskburn_serial_open(options.serial);
 	if (dev == NULL) {
@@ -518,7 +524,7 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 	bool ret = false;
 	uint32_t delay = options.fail_delay;
 
-	cskburn_serial_init(options.verbose);
+	cskburn_serial_init(options.verbose, options.update_high);
 
 	cskburn_serial_device_t *dev = cskburn_serial_open(options.serial);
 	if (dev == NULL) {
