@@ -11,6 +11,9 @@
 
 #define EFUSE_BASE 0xF1800000
 
+#define PIN_LO true
+#define PIN_HI false
+
 extern uint8_t burner_serial[];
 extern uint32_t burner_serial_len;
 
@@ -66,17 +69,17 @@ bool
 cskburn_serial_connect(cskburn_serial_device_t *dev, uint32_t reset_delay, uint32_t probe_timeout)
 {
 	if (reset_delay > 0) {
-		serial_set_dtr(dev->handle, false);  // RESET=HIGH
-		serial_set_rts(dev->handle, false);  // UPDATE=HIGH
+		serial_set_dtr(dev->handle, PIN_HI);  // RESET=HIGH
+		serial_set_rts(dev->handle, PIN_HI);  // UPDATE=HIGH
 
 		msleep(10);
 
-		serial_set_dtr(dev->handle, true);  // RESET=LOW
-		serial_set_rts(dev->handle, true);  // UPDATE=LOW
+		serial_set_dtr(dev->handle, PIN_LO);  // RESET=LOW
+		serial_set_rts(dev->handle, PIN_LO);  // UPDATE=LOW
 
 		msleep(reset_delay);
 
-		serial_set_dtr(dev->handle, false);  // RESET=HIGH
+		serial_set_dtr(dev->handle, PIN_HI);  // RESET=HIGH
 	}
 
 	return try_sync(dev, 100, probe_timeout / 100);
@@ -204,17 +207,17 @@ bool
 cskburn_serial_reset(cskburn_serial_device_t *dev, uint32_t delay, bool ok)
 {
 	if (ok) {
-		serial_set_rts(dev->handle, true);  // UPDATE=LOW, LED=GREEN
+		serial_set_rts(dev->handle, PIN_LO);  // UPDATE=LOW, LED=GREEN
 	} else {
-		serial_set_rts(dev->handle, false);  // UPDATE=HIGH, LED=RED
+		serial_set_rts(dev->handle, PIN_HI);  // UPDATE=HIGH, LED=RED
 	}
 
-	serial_set_dtr(dev->handle, true);  // RESET=LOW
+	serial_set_dtr(dev->handle, PIN_LO);  // RESET=LOW
 
 	msleep(delay);
 
-	serial_set_dtr(dev->handle, false);  // RESET=HIGH
-	serial_set_rts(dev->handle, false);  // UPDATE=HIGH
+	serial_set_dtr(dev->handle, PIN_HI);  // RESET=HIGH
+	serial_set_rts(dev->handle, PIN_HI);  // UPDATE=HIGH
 
 	return true;
 }
