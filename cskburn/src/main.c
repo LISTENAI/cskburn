@@ -448,7 +448,9 @@ static bool
 serial_connect(cskburn_serial_device_t *dev)
 {
 	for (int i = 0; options.wait || i < ENTER_TRIES; i++) {
-		if (!cskburn_serial_connect(dev, options.reset_delay, options.probe_timeout)) {
+		uint32_t reset_delay = i == 0 ? 0 : options.reset_delay;
+		uint32_t probe_timeout = i == 0 ? 100 : options.probe_timeout;
+		if (!cskburn_serial_connect(dev, reset_delay, probe_timeout)) {
 			if (i == 0) {
 				printf("正在等待设备接入…\n");
 			}

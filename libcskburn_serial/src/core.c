@@ -65,17 +65,19 @@ try_sync(cskburn_serial_device_t *dev, int timeout, int tries)
 bool
 cskburn_serial_connect(cskburn_serial_device_t *dev, uint32_t reset_delay, uint32_t probe_timeout)
 {
-	serial_set_dtr(dev->handle, false);  // RESET=HIGH
-	serial_set_rts(dev->handle, false);  // UPDATE=HIGH
+	if (reset_delay > 0) {
+		serial_set_dtr(dev->handle, false);  // RESET=HIGH
+		serial_set_rts(dev->handle, false);  // UPDATE=HIGH
 
-	msleep(10);
+		msleep(10);
 
-	serial_set_dtr(dev->handle, true);  // RESET=LOW
-	serial_set_rts(dev->handle, true);  // UPDATE=LOW
+		serial_set_dtr(dev->handle, true);  // RESET=LOW
+		serial_set_rts(dev->handle, true);  // UPDATE=LOW
 
-	msleep(reset_delay);
+		msleep(reset_delay);
 
-	serial_set_dtr(dev->handle, false);  // RESET=HIGH
+		serial_set_dtr(dev->handle, false);  // RESET=HIGH
+	}
 
 	return try_sync(dev, 100, probe_timeout / 100);
 }
