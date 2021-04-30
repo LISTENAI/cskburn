@@ -24,6 +24,7 @@
 #endif
 
 #define DEFAULT_PROBE_TIMEOUT 10 * 1000
+#define DEFAULT_RESET_ATTEMPTS 4
 #define DEFAULT_RESET_DELAY 500
 #define DEFAULT_PASS_DELAY 5 * 1000
 #define DEFAULT_FAIL_DELAY 5 * 1000
@@ -44,6 +45,7 @@ static struct option long_options[] = {
 #endif
 		{"chip-id", no_argument, NULL, 0},
 		{"probe-timeout", required_argument, NULL, 0},
+		{"reset-attempts", required_argument, NULL, 0},
 		{"reset-delay", required_argument, NULL, 0},
 		{"pass-delay", required_argument, NULL, 0},
 		{"fail-delay", required_argument, NULL, 0},
@@ -98,6 +100,7 @@ static struct {
 	char *serial;
 	uint32_t serial_baud;
 	uint32_t probe_timeout;
+	uint32_t reset_attempts;
 	uint32_t reset_delay;
 	uint32_t pass_delay;
 	uint32_t fail_delay;
@@ -115,6 +118,7 @@ static struct {
 		.serial = NULL,
 		.serial_baud = DEFAULT_BAUD,
 		.probe_timeout = DEFAULT_PROBE_TIMEOUT,
+		.reset_attempts = DEFAULT_RESET_ATTEMPTS,
 		.reset_delay = DEFAULT_RESET_DELAY,
 		.pass_delay = DEFAULT_PASS_DELAY,
 		.fail_delay = DEFAULT_FAIL_DELAY,
@@ -200,6 +204,9 @@ main(int argc, char **argv)
 					break;
 				} else if (strcmp(name, "probe-timeout") == 0) {
 					sscanf(optarg, "%d", &options.probe_timeout);
+					break;
+				} else if (strcmp(name, "reset-attempts") == 0) {
+					sscanf(optarg, "%d", &options.reset_attempts);
 					break;
 				} else if (strcmp(name, "reset-delay") == 0) {
 					sscanf(optarg, "%d", &options.reset_delay);
@@ -453,14 +460,14 @@ err_init:
 static bool
 serial_connect(cskburn_serial_device_t *dev)
 {
-	for (int i = 0; options.wait || i < ENTER_TRIES; i++) {
+	for (int i = 0; options.wait || i < options.reset_attempts + 1; i++) {
 		uint32_t reset_delay = i == 0 ? 0 : options.reset_delay;
 		uint32_t probe_timeout = i == 0 ? 100 : options.probe_timeout;
 		if (!cskburn_serial_connect(dev, reset_delay, probe_timeout)) {
 			if (i == 0) {
 				printf("正在等待设备接入…\n");
 			}
-			if (!options.wait && i == ENTER_TRIES - 1) {
+			if (!options.wait && i == options.reset_attempts) {
 				printf("错误: 设备打开失败\n");
 				return false;
 			} else {
@@ -469,7 +476,7 @@ serial_connect(cskburn_serial_device_t *dev)
 		}
 		printf("正在进入烧录模式…\n");
 		if (!cskburn_serial_enter(dev, options.serial_baud)) {
-			if (!options.wait && i == ENTER_TRIES - 1) {
+			if (!options.wait && i == options.reset_attempts) {
 				printf("错误: 无法进入烧录模式\n");
 				return false;
 			} else {
