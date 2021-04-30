@@ -49,6 +49,7 @@ static struct option long_options[] = {
 		{"reset-delay", required_argument, NULL, 0},
 		{"pass-delay", required_argument, NULL, 0},
 		{"fail-delay", required_argument, NULL, 0},
+		{"burner", required_argument, NULL, 0},
 		{"update-high", no_argument, NULL, 0},
 		{0, 0, NULL, 0},
 };
@@ -104,6 +105,9 @@ static struct {
 	uint32_t reset_delay;
 	uint32_t pass_delay;
 	uint32_t fail_delay;
+	char *burner;
+	uint8_t *burner_buf;
+	uint32_t burner_len;
 	bool update_high;
 } options = {
 		.verbose = false,
@@ -122,6 +126,8 @@ static struct {
 		.reset_delay = DEFAULT_RESET_DELAY,
 		.pass_delay = DEFAULT_PASS_DELAY,
 		.fail_delay = DEFAULT_FAIL_DELAY,
+		.burner = NULL,
+		.burner_len = 0,
 		.update_high = false,
 };
 
@@ -157,6 +163,8 @@ print_version(void)
 {
 	printf("%s (%d)\n", GIT_TAG, GIT_INCREMENT);
 }
+
+static uint32_t read_file(const char *path, uint8_t *buf, uint32_t limit);
 
 #ifndef WITHOUT_USB
 static bool usb_check(void);
@@ -217,6 +225,9 @@ main(int argc, char **argv)
 				} else if (strcmp(name, "fail-delay") == 0) {
 					sscanf(optarg, "%d", &options.fail_delay);
 					break;
+				} else if (strcmp(name, "burner") == 0) {
+					options.burner = optarg;
+					break;
 				} else if (strcmp(name, "update-high") == 0) {
 					options.update_high = true;
 					break;
@@ -232,6 +243,14 @@ main(int argc, char **argv)
 			case '?':
 				print_help(argv[0]);
 				return 0;
+		}
+	}
+
+	if (options.burner != NULL) {
+		options.burner_buf = (uint8_t *)malloc(MAX_IMAGE_SIZE);
+		options.burner_len = read_file(options.burner, options.burner_buf, MAX_IMAGE_SIZE);
+		if (options.burner_len == 0) {
+			return -1;
 		}
 	}
 
@@ -413,7 +432,7 @@ usb_burn(uint32_t *addrs, char **images, int parts)
 			}
 		}
 		msleep(500);
-		if (!cskburn_usb_enter(dev)) {
+		if (!cskburn_usb_enter(dev, options.burner_buf, options.burner_len)) {
 			if (i == ENTER_TRIES - 1) {
 				printf("错误: 无法进入烧录模式\n");
 				goto err_enter;
@@ -475,7 +494,8 @@ serial_connect(cskburn_serial_device_t *dev)
 			}
 		}
 		printf("正在进入烧录模式…\n");
-		if (!cskburn_serial_enter(dev, options.serial_baud)) {
+		if (!cskburn_serial_enter(
+					dev, options.serial_baud, options.burner_buf, options.burner_len)) {
 			if (!options.wait && i == options.reset_attempts) {
 				printf("错误: 无法进入烧录模式\n");
 				return false;

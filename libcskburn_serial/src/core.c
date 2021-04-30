@@ -93,12 +93,18 @@ cskburn_serial_connect(cskburn_serial_device_t *dev, uint32_t reset_delay, uint3
 }
 
 bool
-cskburn_serial_enter(cskburn_serial_device_t *dev, uint32_t baud_rate)
+cskburn_serial_enter(
+		cskburn_serial_device_t *dev, uint32_t baud_rate, uint8_t *burner, uint32_t len)
 {
-	uint32_t offset, length;
-	uint32_t blocks = BLOCKS(burner_serial_len, RAM_BLOCK_SIZE);
+	if (len == 0) {
+		burner = burner_serial;
+		len = burner_serial_len;
+	}
 
-	if (!cmd_mem_begin(dev, burner_serial_len, blocks, RAM_BLOCK_SIZE, 0)) {
+	uint32_t offset, length;
+	uint32_t blocks = BLOCKS(len, RAM_BLOCK_SIZE);
+
+	if (!cmd_mem_begin(dev, len, blocks, RAM_BLOCK_SIZE, 0)) {
 		return false;
 	}
 
@@ -106,11 +112,11 @@ cskburn_serial_enter(cskburn_serial_device_t *dev, uint32_t baud_rate)
 		offset = RAM_BLOCK_SIZE * i;
 		length = RAM_BLOCK_SIZE;
 
-		if (offset + length > burner_serial_len) {
-			length = burner_serial_len - offset;
+		if (offset + length > len) {
+			length = len - offset;
 		}
 
-		if (!cmd_mem_block(dev, burner_serial + offset, length, i)) {
+		if (!cmd_mem_block(dev, burner + offset, length, i)) {
 			return false;
 		}
 	}

@@ -16,7 +16,8 @@ void cskburn_serial_close(cskburn_serial_device_t **dev);
 bool cskburn_serial_connect(
 		cskburn_serial_device_t *dev, uint32_t reset_delay, uint32_t probe_timeout);
 
-bool cskburn_serial_enter(cskburn_serial_device_t *dev, uint32_t baud_rate);
+bool cskburn_serial_enter(
+		cskburn_serial_device_t *dev, uint32_t baud_rate, uint8_t *burner, uint32_t len);
 
 bool cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image, uint32_t len,
 		void (*on_progress)(int32_t wrote_bytes, uint32_t total_bytes));

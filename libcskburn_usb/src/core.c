@@ -116,9 +116,14 @@ cskburn_usb_close(cskburn_usb_device_t **dev)
 }
 
 bool
-cskburn_usb_enter(cskburn_usb_device_t *dev)
+cskburn_usb_enter(cskburn_usb_device_t *dev, uint8_t *burner, uint32_t len)
 {
-	if (!bootrom_load(dev->handle, burner_usb, burner_usb_len)) {
+	if (len == 0) {
+		burner = burner_usb;
+		len = burner_usb_len;
+	}
+
+	if (!bootrom_load(dev->handle, burner, len)) {
 		return false;
 	}
 
