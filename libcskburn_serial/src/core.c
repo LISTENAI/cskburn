@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include <msleep.h>
 #include <time_monotonic.h>
@@ -13,6 +14,8 @@
 
 #define PIN_LO true
 #define PIN_HI false
+
+#define TIME_SINCE_MS(start) (uint16_t)((clock() - start) * 1000.0 * 1000.0 / CLOCKS_PER_SEC)
 
 extern uint8_t burner_serial[];
 extern uint32_t burner_serial_len;
@@ -58,13 +61,14 @@ cskburn_serial_close(cskburn_serial_device_t **dev)
 }
 
 static bool
-try_sync(cskburn_serial_device_t *dev, int timeout, int tries)
+try_sync(cskburn_serial_device_t *dev, int timeout)
 {
-	for (int i = 0; i < tries; i++) {
-		if (cmd_sync(dev, timeout)) {
+	clock_t start = clock();
+	do {
+		if (cmd_sync(dev, 100)) {
 			return true;
 		}
-	}
+	} while (TIME_SINCE_MS(start) < timeout);
 	return false;
 }
 
@@ -85,7 +89,7 @@ cskburn_serial_connect(cskburn_serial_device_t *dev, uint32_t reset_delay, uint3
 		serial_set_dtr(dev->handle, PIN_HI);  // RESET=HIGH
 	}
 
-	return try_sync(dev, 100, probe_timeout / 100);
+	return try_sync(dev, probe_timeout);
 }
 
 bool
@@ -117,7 +121,7 @@ cskburn_serial_enter(cskburn_serial_device_t *dev, uint32_t baud_rate)
 
 	msleep(500);
 
-	if (!try_sync(dev, 500, 5)) {
+	if (!try_sync(dev, 2000)) {
 		LOGD("错误: 无法识别设备");
 		return false;
 	}
@@ -127,7 +131,7 @@ cskburn_serial_enter(cskburn_serial_device_t *dev, uint32_t baud_rate)
 		return false;
 	}
 
-	if (!try_sync(dev, 500, 5)) {
+	if (!try_sync(dev, 2000)) {
 		LOGD("错误: 无法连接设备");
 		return false;
 	}
