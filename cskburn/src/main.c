@@ -364,14 +364,15 @@ print_progress(int32_t wrote_bytes, uint32_t total_bytes)
 			printf(".");
 		}
 		printf("  \r");
-	} else {
+		fflush(stdout);
+	} else if (wrote_bytes % (32 * 1024) == 0 || wrote_bytes == total_bytes) {
 		printf("%.2f KB / %.2f KB (%.2f%%)  \r", (float)wrote_bytes / 1024.0f,
 				(float)total_bytes / 1024.0f, (float)wrote_bytes / (float)total_bytes * 100.0f);
 		if (wrote_bytes == total_bytes) {
 			printf("\n");
 		}
+		fflush(stdout);
 	}
-	fflush(stdout);
 }
 
 #ifndef WITHOUT_USB
