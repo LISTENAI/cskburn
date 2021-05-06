@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-void cskburn_serial_init(bool verbose, bool invert_rts);
+void cskburn_serial_init(bool invert_rts);
 
 typedef struct {
 	void *handle;

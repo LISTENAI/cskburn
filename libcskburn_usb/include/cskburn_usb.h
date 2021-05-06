@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-bool cskburn_usb_init(bool verbose);
+bool cskburn_usb_init(void);
 void cskburn_usb_exit(void);
 
 bool cskburn_usb_wait(int16_t bus, int16_t address, int timeout);

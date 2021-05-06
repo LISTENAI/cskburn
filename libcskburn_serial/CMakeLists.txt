@@ -13,5 +13,6 @@ target_include_directories(
     "${cskburn_serial_SOURCE_DIR}/include"
 )
 
+target_link_libraries(cskburn_serial log)
 target_link_libraries(cskburn_serial portable)
 target_link_libraries(cskburn_serial serial)

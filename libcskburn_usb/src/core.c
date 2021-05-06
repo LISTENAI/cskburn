@@ -1,11 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <log.h>
 #include <libusb.h>
 #include <msleep.h>
 #include <cskburn_usb.h>
 
-#include "log.h"
 #include "core.h"
 #include "bootrom.h"
 #include "burner.h"
@@ -14,9 +14,8 @@ extern uint8_t burner_usb[];
 extern uint32_t burner_usb_len;
 
 bool
-cskburn_usb_init(bool verbose)
+cskburn_usb_init()
 {
-	log_enabled = verbose;
 	return libusb_init(NULL) == 0;
 }
 

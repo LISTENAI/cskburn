@@ -12,6 +12,7 @@ if(WIN32)
     endif()
 endif()
 
+add_subdirectory(liblog)
 add_subdirectory(libportable)
 add_subdirectory(libserial)
 if(NOT WITHOUT_USB)

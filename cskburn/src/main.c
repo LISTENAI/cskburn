@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <string.h>
 
+#include <log.h>
 #include <msleep.h>
 #include <exists.h>
 #ifndef WITHOUT_USB
@@ -88,7 +89,6 @@ typedef enum {
 } cskburn_action_t;
 
 static struct {
-	bool verbose;
 	bool wait;
 	bool repeat;
 	cskburn_protocol_t protocol;
@@ -110,7 +110,6 @@ static struct {
 	uint32_t burner_len;
 	bool update_high;
 } options = {
-		.verbose = false,
 		.wait = false,
 #ifndef WITHOUT_USB
 		.repeat = false,
@@ -134,34 +133,34 @@ static struct {
 static void
 print_help(const char *progname)
 {
-	printf("用法: %s [<选项>] <地址1> <文件1> [<地址2> <文件2>...]\n", progname);
-	printf("\n");
-	printf("烧录选项:\n");
+	LOGI("用法: %s [<选项>] <地址1> <文件1> [<地址2> <文件2>...]", progname);
+	LOGI("");
+	LOGI("烧录选项:");
 #ifndef WITHOUT_USB
-	printf("  -u, --usb (-|<总线>:<设备>)\t\t使用指定 USB 设备烧录。传 - 表示自动选取第一个 CSK "
-		   "设备\n");
+	LOGI("  -u, --usb (-|<总线>:<设备>)\t\t使用指定 USB 设备烧录。传 - 表示自动选取第一个 CSK "
+		 "设备");
 #endif
-	printf("  -s, --serial <端口>\t\t\t使用指定串口设备 (如 %s) 烧录\n", example_serial_dev);
-	printf("\n");
-	printf("其它选项:\n");
-	printf("  -h, --help\t\t\t\t显示帮助\n");
-	printf("  -V, --version\t\t\t\t显示版本号\n");
-	printf("  -v, --verbose\t\t\t\t显示详细日志\n");
-	printf("  -w, --wait\t\t\t\t等待设备插入，并自动开始烧录\n");
-	printf("  -b, --baud\t\t\t\t串口烧录所使用的波特率 (默认为 %d)\n", DEFAULT_BAUD);
+	LOGI("  -s, --serial <端口>\t\t\t使用指定串口设备 (如 %s) 烧录", example_serial_dev);
+	LOGI("");
+	LOGI("其它选项:");
+	LOGI("  -h, --help\t\t\t\t显示帮助");
+	LOGI("  -V, --version\t\t\t\t显示版本号");
+	LOGI("  -v, --verbose\t\t\t\t显示详细日志");
+	LOGI("  -w, --wait\t\t\t\t等待设备插入，并自动开始烧录");
+	LOGI("  -b, --baud\t\t\t\t串口烧录所使用的波特率 (默认为 %d)", DEFAULT_BAUD);
 #ifndef WITHOUT_USB
-	printf("  -R, --repeat\t\t\t\t循环等待设备插入，并自动开始烧录\n");
-	printf("  -c, --check\t\t\t\t检查设备是否插入 (不进行烧录)\n");
+	LOGI("  -R, --repeat\t\t\t\t循环等待设备插入，并自动开始烧录");
+	LOGI("  -c, --check\t\t\t\t检查设备是否插入 (不进行烧录)");
 #endif
-	printf("\n");
-	printf("用例:\n");
-	printf("  cskburn -w 0x0 flashboot.bin 0x10000 master.bin 0x100000 respack.bin\n");
+	LOGI("");
+	LOGI("用例:");
+	LOGI("  cskburn -w 0x0 flashboot.bin 0x10000 master.bin 0x100000 respack.bin");
 }
 
 static void
 print_version(void)
 {
-	printf("%s (%d)\n", GIT_TAG, GIT_INCREMENT);
+	LOGI("%s (%d)", GIT_TAG, GIT_INCREMENT);
 }
 
 static uint32_t read_file(const char *path, uint8_t *buf, uint32_t limit);
@@ -177,13 +176,15 @@ static bool serial_burn(uint32_t *addrs, char **images, int parts);
 int
 main(int argc, char **argv)
 {
+	set_log_level(LOGLEVEL_INFO);
+
 	int long_index = -1;
 	while (1) {
 		int c = getopt_long(argc, argv, option_string, long_options, &long_index);
 		if (c == EOF) break;
 		switch (c) {
 			case 'v':
-				options.verbose = true;
+				set_log_level(LOGLEVEL_DEBUG);
 				break;
 			case 'w':
 				options.wait = true;
@@ -258,12 +259,12 @@ main(int argc, char **argv)
 		options.protocol = PROTO_SERIAL;
 	} else {
 #ifdef WITHOUT_USB
-		printf("错误: 必须指定一个串口设备 (如: -s %s)\n", example_serial_dev);
+		LOGE("错误: 必须指定一个串口设备 (如: -s %s)", example_serial_dev);
 		return -1;
 #else
 		if (options.usb != NULL && strcmp(options.usb, "-") != 0) {
 			if (sscanf(options.usb, "%hu:%hu\n", &options.usb_bus, &options.usb_addr) != 2) {
-				printf("错误: -u/--usb 参数的格式应为 <总线>:<设备> (如: -u 020:004)\n");
+				LOGE("错误: -u/--usb 参数的格式应为 <总线>:<设备> (如: -u 020:004)");
 				return -1;
 			}
 		}
@@ -303,18 +304,18 @@ main(int argc, char **argv)
 		images[j] = argv[i + 1];
 
 		if (!exists(images[j])) {
-			printf("错误: 分区 %d 的文件不存在: %s\n", j + 1, images[j]);
+			LOGE("错误: 分区 %d 的文件不存在: %s", j + 1, images[j]);
 			return -1;
 		}
 
-		printf("分区 %d: 0x%08X %s\n", j + 1, addrs[j], images[j]);
+		LOGI("分区 %d: 0x%08X %s", j + 1, addrs[j], images[j]);
 
 		i += 2;
 		j += 1;
 	}
 
 	if (j < 1) {
-		printf("错误: 你必须指定至少一个烧录地址及文件\n");
+		LOGE("错误: 你必须指定至少一个烧录地址及文件");
 		return -1;
 	}
 
@@ -327,7 +328,7 @@ main(int argc, char **argv)
 		if (options.repeat) {
 			while (1) {
 				usb_burn(addrs, images, j);
-				printf("----------\n");
+				LOGI("----------");
 				msleep(2000);
 			}
 		} else {
@@ -346,7 +347,7 @@ read_file(const char *path, uint8_t *buf, uint32_t limit)
 {
 	FILE *f = fopen(path, "rb");
 	if (f == NULL) {
-		printf("错误: 文件打开失败: %s\n", strerror(errno));
+		LOGE("错误: 文件打开失败: %s", strerror(errno));
 		return 0;
 	}
 
@@ -381,8 +382,8 @@ usb_check(void)
 {
 	bool ret = false;
 
-	if (!cskburn_usb_init(options.verbose)) {
-		printf("错误: 初始化失败\n");
+	if (!cskburn_usb_init()) {
+		LOGE("错误: 初始化失败");
 		goto exit;
 	}
 
@@ -403,8 +404,8 @@ usb_burn(uint32_t *addrs, char **images, int parts)
 {
 	bool ret = false;
 
-	if (!cskburn_usb_init(options.verbose)) {
-		printf("错误: 初始化失败\n");
+	if (!cskburn_usb_init()) {
+		LOGE("错误: 初始化失败");
 		goto err_init;
 	}
 
@@ -414,18 +415,18 @@ usb_burn(uint32_t *addrs, char **images, int parts)
 			if (w == 0) {
 				w = 1;
 			} else if (w == 1) {
-				printf("正在等待设备接入…\n");
+				LOGI("正在等待设备接入…");
 				w = 2;
 			}
 		}
 	}
 
-	printf("正在进入烧录模式…\n");
+	LOGI("正在进入烧录模式…");
 	cskburn_usb_device_t *dev;
 	for (int i = 0; i < ENTER_TRIES; i++) {
 		if ((dev = cskburn_usb_open(options.usb_bus, options.usb_addr)) == NULL) {
 			if (i == ENTER_TRIES - 1) {
-				printf("错误: 设备打开失败\n");
+				LOGE("错误: 设备打开失败");
 				goto err_open;
 			} else {
 				msleep(2000);
@@ -435,7 +436,7 @@ usb_burn(uint32_t *addrs, char **images, int parts)
 		msleep(500);
 		if (!cskburn_usb_enter(dev, options.burner_buf, options.burner_len)) {
 			if (i == ENTER_TRIES - 1) {
-				printf("错误: 无法进入烧录模式\n");
+				LOGE("错误: 无法进入烧录模式");
 				goto err_enter;
 			} else {
 				cskburn_usb_close(&dev);
@@ -451,19 +452,19 @@ usb_burn(uint32_t *addrs, char **images, int parts)
 	for (int i = 0; i < parts; i++) {
 		image_len = read_file(images[i], image_buf, MAX_IMAGE_SIZE);
 		if (image_len == 0) {
-			printf("错误: 无法读取 %s\n", images[i]);
+			LOGE("错误: 无法读取 %s", images[i]);
 			goto err_enter;
 		}
 
-		printf("正在烧录分区 %d/%d… (0x%08X, %.2f KB)\n", i + 1, parts, addrs[i],
+		LOGI("正在烧录分区 %d/%d… (0x%08X, %.2f KB)", i + 1, parts, addrs[i],
 				(float)image_len / 1024.0f);
 		if (!cskburn_usb_write(dev, addrs[i], image_buf, image_len, print_progress)) {
-			printf("错误: 无法烧录分区 %d\n", i + 1);
+			LOGE("错误: 无法烧录分区 %d", i + 1);
 			goto err_write;
 		}
 	}
 
-	printf("烧录完成\n");
+	LOGI("烧录完成");
 	ret = true;
 
 err_write:
@@ -485,20 +486,20 @@ serial_connect(cskburn_serial_device_t *dev)
 		uint32_t probe_timeout = i == 0 ? 100 : options.probe_timeout;
 		if (!cskburn_serial_connect(dev, reset_delay, probe_timeout)) {
 			if (i == 0) {
-				printf("正在等待设备接入…\n");
+				LOGI("正在等待设备接入…");
 			}
 			if (!options.wait && i == options.reset_attempts) {
-				printf("错误: 设备打开失败\n");
+				LOGE("错误: 设备打开失败");
 				return false;
 			} else {
 				continue;
 			}
 		}
-		printf("正在进入烧录模式…\n");
+		LOGI("正在进入烧录模式…");
 		if (!cskburn_serial_enter(
 					dev, options.serial_baud, options.burner_buf, options.burner_len)) {
 			if (!options.wait && i == options.reset_attempts) {
-				printf("错误: 无法进入烧录模式\n");
+				LOGE("错误: 无法进入烧录模式");
 				return false;
 			} else {
 				msleep(2000);
@@ -517,11 +518,11 @@ serial_read_chip_id(void)
 	bool ret = false;
 	uint32_t delay = options.fail_delay;
 
-	cskburn_serial_init(options.verbose, options.update_high);
+	cskburn_serial_init(options.update_high);
 
 	cskburn_serial_device_t *dev = cskburn_serial_open(options.serial);
 	if (dev == NULL) {
-		printf("错误: 设备打开失败\n");
+		LOGE("错误: 设备打开失败");
 		goto err_open;
 	}
 
@@ -531,11 +532,11 @@ serial_read_chip_id(void)
 
 	uint64_t chip_id = 0;
 	if (!cskburn_serial_read_chip_id(dev, &chip_id)) {
-		printf("错误: 无法读取设备\n");
+		LOGE("错误: 无法读取设备");
 		goto err_enter;
 	}
 
-	printf("%016llX\n", chip_id);
+	LOGI("%016llX", chip_id);
 	delay = DEFAULT_RESET_DELAY;
 	ret = true;
 
@@ -552,11 +553,11 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 	bool ret = false;
 	uint32_t delay = options.fail_delay;
 
-	cskburn_serial_init(options.verbose, options.update_high);
+	cskburn_serial_init(options.update_high);
 
 	cskburn_serial_device_t *dev = cskburn_serial_open(options.serial);
 	if (dev == NULL) {
-		printf("错误: 设备打开失败\n");
+		LOGE("错误: 设备打开失败");
 		goto err_open;
 	}
 
@@ -569,19 +570,19 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 	for (int i = 0; i < parts; i++) {
 		image_len = read_file(images[i], image_buf, MAX_IMAGE_SIZE);
 		if (image_len == 0) {
-			printf("错误: 无法读取 %s\n", images[i]);
+			LOGE("错误: 无法读取 %s", images[i]);
 			goto err_enter;
 		}
 
-		printf("正在烧录分区 %d/%d… (0x%08X, %.2f KB)\n", i + 1, parts, addrs[i],
+		LOGI("正在烧录分区 %d/%d… (0x%08X, %.2f KB)", i + 1, parts, addrs[i],
 				(float)image_len / 1024.0f);
 		if (!cskburn_serial_write(dev, addrs[i], image_buf, image_len, print_progress)) {
-			printf("错误: 无法烧录分区 %d\n", i + 1);
+			LOGE("错误: 无法烧录分区 %d", i + 1);
 			goto err_write;
 		}
 	}
 
-	printf("烧录完成\n");
+	LOGI("烧录完成");
 	delay = options.pass_delay;
 	ret = true;
 

@@ -14,6 +14,7 @@ target_include_directories(
     "${cskburn_usb_SOURCE_DIR}/include"
 )
 
+target_link_libraries(cskburn_usb log)
 target_link_libraries(cskburn_usb portable)
 
 if(WIN32)

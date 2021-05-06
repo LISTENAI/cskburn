@@ -5,6 +5,7 @@ add_executable(
     src/main.c
 )
 
+target_link_libraries(cskburn log)
 target_link_libraries(cskburn portable)
 
 if(WIN32)

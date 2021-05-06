@@ -1,6 +1,5 @@
 #include <stdbool.h>
 
-#include "log.h"
 #include "slip.h"
 
 #define END 0300

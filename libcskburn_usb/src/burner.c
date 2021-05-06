@@ -4,9 +4,9 @@
 #include <string.h>
 #include <libusb.h>
 
+#include <log.h>
 #include <msleep.h>
 
-#include "log.h"
 #include "core.h"
 #include "burner.h"
 #include "crc64.h"

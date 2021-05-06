@@ -4,9 +4,9 @@
 #include <assert.h>
 #include <libusb.h>
 
+#include <log.h>
 #include <msleep.h>
 
-#include "log.h"
 #include "core.h"
 #include "bootrom.h"
 

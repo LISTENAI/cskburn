@@ -4,10 +4,10 @@
 #include <stdlib.h>
 #include <time.h>
 
+#include <log.h>
 #include <serial.h>
 #include <msleep.h>
 
-#include "log.h"
 #include "cmd.h"
 #include "slip.h"
 

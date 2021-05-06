@@ -2,12 +2,12 @@
 #include <stdlib.h>
 #include <time.h>
 
+#include <log.h>
 #include <msleep.h>
 #include <time_monotonic.h>
 #include <serial.h>
 #include <cskburn_serial.h>
 
-#include "log.h"
 #include "cmd.h"
 
 #define EFUSE_BASE 0xF1800000
@@ -23,9 +23,8 @@ extern uint32_t burner_serial_len;
 static bool rts_inverted = false;
 
 void
-cskburn_serial_init(bool verbose, bool invert_rts)
+cskburn_serial_init(bool invert_rts)
 {
-	log_enabled = verbose;
 	rts_inverted = invert_rts;
 }
 
