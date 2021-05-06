@@ -43,6 +43,11 @@ build:darwin-x64:
     export CMAKE_PREFIX_PATH=/usr/local
     ./build.sh
     cp out/cskburn/cskburn cskburn-darwin-x64
+    codesign \
+      --sign - \
+      --force \
+      --preserve-metadata=entitlements,requirements,flags,runtime \
+      cskburn-darwin-x64
   artifacts:
     paths:
       - cskburn-darwin-x64
