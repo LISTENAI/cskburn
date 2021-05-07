@@ -45,6 +45,7 @@ static struct option long_options[] = {
 		{"check", no_argument, NULL, 'c'},
 #endif
 		{"chip-id", no_argument, NULL, 0},
+		{"verify", required_argument, NULL, 0},
 		{"probe-timeout", required_argument, NULL, 0},
 		{"reset-attempts", required_argument, NULL, 0},
 		{"reset-delay", required_argument, NULL, 0},
@@ -85,6 +86,7 @@ typedef enum {
 typedef enum {
 	ACTION_NONE = 0,
 	ACTION_CHECK,
+	ACTION_VERIFY,
 } cskburn_action_t;
 
 static struct {
@@ -100,6 +102,8 @@ static struct {
 	char *serial;
 	uint32_t serial_baud;
 	bool read_chip_id;
+	uint32_t verify_addr;
+	uint32_t verify_size;
 	uint32_t probe_timeout;
 	uint32_t reset_attempts;
 	uint32_t reset_delay;
@@ -121,6 +125,8 @@ static struct {
 		.serial = NULL,
 		.serial_baud = DEFAULT_BAUD,
 		.read_chip_id = false,
+		.verify_addr = 0,
+		.verify_size = 0,
 		.probe_timeout = DEFAULT_PROBE_TIMEOUT,
 		.reset_attempts = DEFAULT_RESET_ATTEMPTS,
 		.reset_delay = DEFAULT_RESET_DELAY,
@@ -165,12 +171,14 @@ print_version(void)
 }
 
 static uint32_t read_file(const char *path, uint8_t *buf, uint32_t limit);
+static bool scan_int(char *str, uint32_t *out);
 
 #ifndef WITHOUT_USB
 static bool usb_check(void);
 static bool usb_burn(uint32_t *addrs, char **images, int parts);
 #endif
 
+static bool serial_verify(void);
 static bool serial_burn(uint32_t *addrs, char **images, int parts);
 
 int
@@ -210,6 +218,29 @@ main(int argc, char **argv)
 				const char *name = long_options[long_index].name;
 				if (strcmp(name, "chip-id") == 0) {
 					options.read_chip_id = true;
+					break;
+				} else if (strcmp(name, "verify") == 0) {
+					char *split = strstr(optarg, ":");
+					if (split == NULL) {
+						LOGE("错误: --verify 参数的格式应为 地址:长度 (如: -u 0x00000000:102400)");
+						return -1;
+					}
+
+					char *addr = optarg;
+					char *size = split + 1;
+					split[0] = 0;
+
+					if (!scan_int(addr, &options.verify_addr)) {
+						LOGE("错误: --verify 参数的格式应为 地址:长度 (如: -u 0x00000000:102400)");
+						return -1;
+					}
+
+					if (!scan_int(size, &options.verify_size)) {
+						LOGE("错误: --verify 参数的格式应为 地址:长度 (如: -u 0x00000000:102400)");
+						return -1;
+					}
+
+					options.action = ACTION_VERIFY;
 					break;
 				} else if (strcmp(name, "probe-timeout") == 0) {
 					sscanf(optarg, "%d", &options.probe_timeout);
@@ -282,13 +313,21 @@ main(int argc, char **argv)
 			}
 		}
 #endif
+	} else if (options.action == ACTION_VERIFY) {
+		if (options.protocol == PROTO_SERIAL) {
+			if (serial_verify()) {
+				return 0;
+			} else {
+				return -1;
+			}
+		}
 	}
 
 	uint32_t addrs[20];
 	char *images[20];
 	int i = optind, j = 0;
 	while (i < argc - 1) {
-		if (sscanf(argv[i], "0x%x", &addrs[j]) != 1 && sscanf(argv[i], "%d", &addrs[j]) != 1) {
+		if (!scan_int(argv[i], &addrs[j])) {
 			i++;
 			continue;
 		}
@@ -341,6 +380,20 @@ read_file(const char *path, uint8_t *buf, uint32_t limit)
 	size_t len = fread(buf, 1, limit, f);
 	fclose(f);
 	return (uint32_t)len;
+}
+
+static bool
+scan_int(char *str, uint32_t *out)
+{
+	if (sscanf(str, "0x%x", out) == 1) {
+		return true;
+	}
+
+	if (sscanf(str, "%d", out) == 1) {
+		return true;
+	}
+
+	return false;
 }
 
 static void
@@ -497,6 +550,43 @@ serial_connect(cskburn_serial_device_t *dev)
 	}
 
 	return true;
+}
+
+static bool
+serial_verify(void)
+{
+	bool ret = false;
+	uint32_t delay = options.fail_delay;
+
+	cskburn_serial_init(options.update_high);
+
+	cskburn_serial_device_t *dev = cskburn_serial_open(options.serial);
+	if (dev == NULL) {
+		LOGE("错误: 设备打开失败");
+		goto err_open;
+	}
+
+	if (!serial_connect(dev)) {
+		goto err_enter;
+	}
+
+	uint8_t md5[16] = {0};
+	if (!cskburn_serial_verify(dev, options.verify_addr, options.verify_size, md5)) {
+		LOGE("错误: 无法读取设备");
+		goto err_enter;
+	}
+
+	LOGI("md5: %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", md5[0], md5[1],
+			md5[2], md5[3], md5[4], md5[5], md5[6], md5[7], md5[8], md5[9], md5[10], md5[11],
+			md5[12], md5[13], md5[14], md5[15])
+	delay = DEFAULT_RESET_DELAY;
+	ret = true;
+
+err_enter:
+	cskburn_serial_reset(dev, delay, ret);
+	cskburn_serial_close(&dev);
+err_open:
+	return ret;
 }
 
 static bool

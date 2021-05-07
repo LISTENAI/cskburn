@@ -27,6 +27,7 @@
 #define CMD_SYNC 0x08
 #define CMD_READ_REG 0x0a
 #define CMD_CHANGE_BAUDRATE 0x0f
+#define CMD_SPI_FLASH_MD5 0x13
 
 #define CHECKSUM_MAGIC 0xef
 
@@ -84,6 +85,13 @@ typedef struct {
 	uint32_t baud;
 	uint32_t rev;
 } cmd_change_baud_t;
+
+typedef struct {
+	uint32_t address;
+	uint32_t size;
+	uint32_t rev1;
+	uint32_t rev2;
+} cmd_flash_md5_t;
 
 static bool
 command(cskburn_serial_device_t *dev, uint8_t op, void *in_buf, uint16_t in_len, uint32_t in_chk,
@@ -358,6 +366,37 @@ cmd_flash_finish(cskburn_serial_device_t *dev)
 	};
 
 	return check_command(dev, CMD_FLASH_END, &payload, sizeof(payload), 0, 500);
+}
+
+bool
+cmd_flash_md5sum(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uint8_t *md5)
+{
+	uint8_t ret_buf[STATUS_BYTES_LENGTH + 16];
+	uint16_t ret_len = 0;
+
+	cmd_flash_md5_t payload = {
+			.address = address,
+			.size = size,
+	};
+
+	if (!command(dev, CMD_SPI_FLASH_MD5, &payload, sizeof(payload), 0, NULL, ret_buf, &ret_len,
+				sizeof(ret_buf), 2000)) {
+		return false;
+	}
+
+	if (ret_len < STATUS_BYTES_LENGTH) {
+		LOGD("错误: 串口读取异常");
+		return false;
+	}
+
+	if (ret_buf[0] != 0) {
+		LOGD("错误: 设备返回异常 %02X%02X", ret_buf[0], ret_buf[1]);
+		return false;
+	}
+
+	memcpy(md5, ret_buf + 2, 16);
+
+	return true;
 }
 
 bool
