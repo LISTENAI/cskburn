@@ -85,7 +85,6 @@ typedef enum {
 typedef enum {
 	ACTION_NONE = 0,
 	ACTION_CHECK,
-	ACTION_READ_CHIP_ID,
 } cskburn_action_t;
 
 static struct {
@@ -100,6 +99,7 @@ static struct {
 #endif
 	char *serial;
 	uint32_t serial_baud;
+	bool read_chip_id;
 	uint32_t probe_timeout;
 	uint32_t reset_attempts;
 	uint32_t reset_delay;
@@ -120,6 +120,7 @@ static struct {
 #endif
 		.serial = NULL,
 		.serial_baud = DEFAULT_BAUD,
+		.read_chip_id = false,
 		.probe_timeout = DEFAULT_PROBE_TIMEOUT,
 		.reset_attempts = DEFAULT_RESET_ATTEMPTS,
 		.reset_delay = DEFAULT_RESET_DELAY,
@@ -170,7 +171,6 @@ static bool usb_check(void);
 static bool usb_burn(uint32_t *addrs, char **images, int parts);
 #endif
 
-static bool serial_read_chip_id(void);
 static bool serial_burn(uint32_t *addrs, char **images, int parts);
 
 int
@@ -209,7 +209,7 @@ main(int argc, char **argv)
 			case 0: { /* long-only options */
 				const char *name = long_options[long_index].name;
 				if (strcmp(name, "chip-id") == 0) {
-					options.action = ACTION_READ_CHIP_ID;
+					options.read_chip_id = true;
 					break;
 				} else if (strcmp(name, "probe-timeout") == 0) {
 					sscanf(optarg, "%d", &options.probe_timeout);
@@ -282,14 +282,6 @@ main(int argc, char **argv)
 			}
 		}
 #endif
-	} else if (options.action == ACTION_READ_CHIP_ID) {
-		if (options.protocol == PROTO_SERIAL) {
-			if (serial_read_chip_id()) {
-				return 0;
-			} else {
-				return -1;
-			}
-		}
 	}
 
 	uint32_t addrs[20];
@@ -312,11 +304,6 @@ main(int argc, char **argv)
 
 		i += 2;
 		j += 1;
-	}
-
-	if (j < 1) {
-		LOGE("错误: 你必须指定至少一个烧录地址及文件");
-		return -1;
 	}
 
 	if (options.protocol == PROTO_SERIAL) {
@@ -513,41 +500,6 @@ serial_connect(cskburn_serial_device_t *dev)
 }
 
 static bool
-serial_read_chip_id(void)
-{
-	bool ret = false;
-	uint32_t delay = options.fail_delay;
-
-	cskburn_serial_init(options.update_high);
-
-	cskburn_serial_device_t *dev = cskburn_serial_open(options.serial);
-	if (dev == NULL) {
-		LOGE("错误: 设备打开失败");
-		goto err_open;
-	}
-
-	if (!serial_connect(dev)) {
-		goto err_enter;
-	}
-
-	uint64_t chip_id = 0;
-	if (!cskburn_serial_read_chip_id(dev, &chip_id)) {
-		LOGE("错误: 无法读取设备");
-		goto err_enter;
-	}
-
-	LOGI("chip-id: %016llX", chip_id);
-	delay = DEFAULT_RESET_DELAY;
-	ret = true;
-
-err_enter:
-	cskburn_serial_reset(dev, delay, ret);
-	cskburn_serial_close(&dev);
-err_open:
-	return ret;
-}
-
-static bool
 serial_burn(uint32_t *addrs, char **images, int parts)
 {
 	bool ret = false;
@@ -563,6 +515,16 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 
 	if (!serial_connect(dev)) {
 		goto err_enter;
+	}
+
+	if (options.read_chip_id) {
+		uint64_t chip_id = 0;
+		if (!cskburn_serial_read_chip_id(dev, &chip_id)) {
+			LOGE("错误: 无法读取设备");
+			goto err_enter;
+		}
+
+		LOGI("chip-id: %016llX", chip_id);
 	}
 
 	uint8_t *image_buf = malloc(MAX_IMAGE_SIZE);
