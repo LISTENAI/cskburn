@@ -27,8 +27,8 @@
 #define DEFAULT_PROBE_TIMEOUT 10 * 1000
 #define DEFAULT_RESET_ATTEMPTS 4
 #define DEFAULT_RESET_DELAY 500
-#define DEFAULT_PASS_DELAY 5 * 1000
-#define DEFAULT_FAIL_DELAY 5 * 1000
+#define DEFAULT_PASS_DELAY 500
+#define DEFAULT_FAIL_DELAY 500
 
 static struct option long_options[] = {
 		{"help", no_argument, NULL, 'h'},
