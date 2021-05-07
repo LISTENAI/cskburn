@@ -536,7 +536,7 @@ serial_read_chip_id(void)
 		goto err_enter;
 	}
 
-	LOGI("%016llX", chip_id);
+	LOGI("chip-id: %016llX", chip_id);
 	delay = DEFAULT_RESET_DELAY;
 	ret = true;
 
