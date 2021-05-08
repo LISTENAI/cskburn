@@ -41,6 +41,11 @@ cskburn_serial_open(const char *path)
 	}
 
 	dev->handle = device;
+	dev->req_raw_buf = (uint8_t *)malloc(MAX_REQ_RAW_LEN);
+	dev->req_slip_buf = (uint8_t *)malloc(MAX_REQ_SLIP_LEN);
+	dev->res_slip_buf = (uint8_t *)malloc(MAX_RES_SLIP_LEN);
+	dev->req_hdr = dev->req_raw_buf;
+	dev->req_cmd = dev->req_raw_buf + sizeof(csk_command_t);
 	return dev;
 
 err_open:
@@ -54,6 +59,15 @@ cskburn_serial_close(cskburn_serial_device_t **dev)
 	if (dev != NULL) {
 		if ((*dev)->handle != NULL) {
 			serial_close((serial_dev_t **)&(*dev)->handle);
+		}
+		if ((*dev)->req_raw_buf != NULL) {
+			free((*dev)->req_raw_buf);
+		}
+		if ((*dev)->req_slip_buf != NULL) {
+			free((*dev)->req_slip_buf);
+		}
+		if ((*dev)->res_slip_buf != NULL) {
+			free((*dev)->res_slip_buf);
 		}
 		free(*dev);
 		*dev = NULL;
