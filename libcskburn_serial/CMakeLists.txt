@@ -1,7 +1,7 @@
 project(cskburn_serial)
 
 add_library(
-    cskburn_serial STATIC
+    ${PROJECT_NAME} STATIC
     src/core.c
     src/cmd.c
     src/slip.c
@@ -9,10 +9,10 @@ add_library(
 )
 
 target_include_directories(
-    cskburn_serial PUBLIC
-    "${cskburn_serial_SOURCE_DIR}/include"
+    ${PROJECT_NAME} PUBLIC
+    ${PROJECT_SOURCE_DIR}/include
 )
 
-target_link_libraries(cskburn_serial log)
-target_link_libraries(cskburn_serial portable)
-target_link_libraries(cskburn_serial serial)
+target_link_libraries(${PROJECT_NAME} log)
+target_link_libraries(${PROJECT_NAME} portable)
+target_link_libraries(${PROJECT_NAME} serial)

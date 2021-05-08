@@ -1,7 +1,7 @@
 project(cskburn_usb)
 
 add_library(
-    cskburn_usb STATIC
+    ${PROJECT_NAME} STATIC
     src/core.c
     src/bootrom.c
     src/burner_img.c
@@ -10,17 +10,17 @@ add_library(
 )
 
 target_include_directories(
-    cskburn_usb PUBLIC
-    "${cskburn_usb_SOURCE_DIR}/include"
+    ${PROJECT_NAME} PUBLIC
+    ${PROJECT_SOURCE_DIR}/include
 )
 
-target_link_libraries(cskburn_usb log)
-target_link_libraries(cskburn_usb portable)
+target_link_libraries(${PROJECT_NAME} log)
+target_link_libraries(${PROJECT_NAME} portable)
 
 if(WIN32)
-    target_link_libraries(cskburn_usb usb-win32-compat)
+    target_link_libraries(${PROJECT_NAME} usb-win32-compat)
 else()
     find_package(PkgConfig)
     pkg_search_module(USB REQUIRED IMPORTED_TARGET libusb-1.0)
-    target_link_libraries(cskburn_usb PkgConfig::USB)
+    target_link_libraries(${PROJECT_NAME} PkgConfig::USB)
 endif()

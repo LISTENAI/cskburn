@@ -14,9 +14,9 @@ else()
     endif()
 endif()
 
-add_library(serial STATIC ${SRCS})
+add_library(${PROJECT_NAME} STATIC ${SRCS})
 
 target_include_directories(
-    serial PUBLIC
-    "${serial_SOURCE_DIR}/include"
+    ${PROJECT_NAME} PUBLIC
+    ${PROJECT_SOURCE_DIR}/include
 )

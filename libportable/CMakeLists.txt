@@ -1,8 +1,8 @@
 project(portable)
 
-add_library(portable INTERFACE)
+add_library(${PROJECT_NAME} INTERFACE)
 
 target_include_directories(
-    portable INTERFACE
-    "${portable_SOURCE_DIR}/include"
+    ${PROJECT_NAME} INTERFACE
+    ${PROJECT_SOURCE_DIR}/include
 )

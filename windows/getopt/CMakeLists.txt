@@ -1,11 +1,11 @@
 project(getopt)
 
 add_library(
-    getopt STATIC
+    ${PROJECT_NAME} STATIC
     getopt.c
 )
 
 target_include_directories(
-    getopt PUBLIC
-    "${getopt_SOURCE_DIR}"
+    ${PROJECT_NAME} PUBLIC
+    ${PROJECT_SOURCE_DIR}
 )
