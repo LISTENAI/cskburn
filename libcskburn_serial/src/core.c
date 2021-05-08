@@ -8,6 +8,7 @@
 #include <serial.h>
 #include <cskburn_serial.h>
 
+#include "core.h"
 #include "cmd.h"
 
 #define EFUSE_BASE 0xF1800000

@@ -8,6 +8,7 @@
 #include <serial.h>
 #include <msleep.h>
 
+#include "core.h"
 #include "cmd.h"
 #include "slip.h"
 

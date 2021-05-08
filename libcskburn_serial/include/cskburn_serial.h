@@ -6,9 +6,8 @@
 
 void cskburn_serial_init(bool invert_rts);
 
-typedef struct {
-	void *handle;
-} cskburn_serial_device_t;
+struct _cskburn_serial_device_t;
+typedef struct _cskburn_serial_device_t cskburn_serial_device_t;
 
 cskburn_serial_device_t *cskburn_serial_open(const char *path);
 void cskburn_serial_close(cskburn_serial_device_t **dev);
