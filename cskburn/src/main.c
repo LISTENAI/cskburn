@@ -24,6 +24,7 @@
 #define DEFAULT_BAUD 115200
 #endif
 
+#define DEFAULT_VERIFY_ATTEMPTS 1
 #define DEFAULT_PROBE_TIMEOUT 10 * 1000
 #define DEFAULT_RESET_ATTEMPTS 4
 #define DEFAULT_RESET_DELAY 500
@@ -46,6 +47,7 @@ static struct option long_options[] = {
 #endif
 		{"chip-id", no_argument, NULL, 0},
 		{"verify", required_argument, NULL, 0},
+		{"verify-attempts", required_argument, NULL, 0},
 		{"probe-timeout", required_argument, NULL, 0},
 		{"reset-attempts", required_argument, NULL, 0},
 		{"reset-delay", required_argument, NULL, 0},
@@ -104,6 +106,7 @@ static struct {
 	bool read_chip_id;
 	uint32_t verify_addr;
 	uint32_t verify_size;
+	uint32_t verify_attempts;
 	uint32_t probe_timeout;
 	uint32_t reset_attempts;
 	uint32_t reset_delay;
@@ -127,6 +130,7 @@ static struct {
 		.read_chip_id = false,
 		.verify_addr = 0,
 		.verify_size = 0,
+		.verify_attempts = DEFAULT_VERIFY_ATTEMPTS,
 		.probe_timeout = DEFAULT_PROBE_TIMEOUT,
 		.reset_attempts = DEFAULT_RESET_ATTEMPTS,
 		.reset_delay = DEFAULT_RESET_DELAY,
@@ -241,6 +245,9 @@ main(int argc, char **argv)
 					}
 
 					options.action = ACTION_VERIFY;
+					break;
+				} else if (strcmp(name, "verify-attempts") == 0) {
+					sscanf(optarg, "%d", &options.verify_attempts);
 					break;
 				} else if (strcmp(name, "probe-timeout") == 0) {
 					sscanf(optarg, "%d", &options.probe_timeout);
@@ -576,9 +583,30 @@ serial_verify(void)
 		goto err_enter;
 	}
 
+	if (options.verify_attempts > 1) {
+		uint8_t md5_verify[16] = {0};
+		for (uint32_t i = 0; i < options.verify_attempts - 1; i++) {
+			memset(md5_verify, 0, sizeof(md5_verify));
+			if (!cskburn_serial_verify(dev, options.verify_addr, options.verify_size, md5_verify)) {
+				LOGE("错误: 无法读取设备");
+				goto err_enter;
+			}
+
+			if (memcmp(md5, md5_verify, sizeof(md5)) != 0) {
+				LOGE("错误: 校验不一致 (第 %d 次校验): "
+					 "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+						i + 2, md5_verify[0], md5_verify[1], md5_verify[2], md5_verify[3],
+						md5_verify[4], md5_verify[5], md5_verify[6], md5_verify[7], md5_verify[8],
+						md5_verify[9], md5_verify[10], md5_verify[11], md5_verify[12],
+						md5_verify[13], md5_verify[14], md5_verify[15]);
+				goto err_enter;
+			}
+		}
+	}
+
 	LOGI("md5: %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", md5[0], md5[1],
 			md5[2], md5[3], md5[4], md5[5], md5[6], md5[7], md5[8], md5[9], md5[10], md5[11],
-			md5[12], md5[13], md5[14], md5[15])
+			md5[12], md5[13], md5[14], md5[15]);
 	delay = DEFAULT_RESET_DELAY;
 	ret = true;
 
