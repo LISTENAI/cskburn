@@ -37,18 +37,6 @@ build:linux-arm:
   tags:
     - rpi4b
 
-build:darwin-x64:
-  stage: build
-  script: |
-    export CMAKE_PREFIX_PATH=/usr/local
-    ./build.sh
-    cp out/cskburn/cskburn cskburn-darwin-x64
-  artifacts:
-    paths:
-      - cskburn-darwin-x64
-  tags:
-    - ios
-
 bundle:
   stage: publish
   script: echo
@@ -57,7 +45,6 @@ bundle:
       - cskburn-win32-x64.exe
       - cskburn-linux-x64
       - cskburn-linux-arm
-      - cskburn-darwin-x64
   tags:
     - iflyos-builder
 
