@@ -88,7 +88,6 @@ typedef enum {
 typedef enum {
 	ACTION_NONE = 0,
 	ACTION_CHECK,
-	ACTION_VERIFY,
 } cskburn_action_t;
 
 static struct {
@@ -104,6 +103,7 @@ static struct {
 	char *serial;
 	uint32_t serial_baud;
 	bool read_chip_id;
+	bool verify;
 	uint32_t verify_addr;
 	uint32_t verify_size;
 	uint32_t verify_attempts;
@@ -128,6 +128,7 @@ static struct {
 		.serial = NULL,
 		.serial_baud = DEFAULT_BAUD,
 		.read_chip_id = false,
+		.verify = true,
 		.verify_addr = 0,
 		.verify_size = 0,
 		.verify_attempts = DEFAULT_VERIFY_ATTEMPTS,
@@ -182,7 +183,6 @@ static bool usb_check(void);
 static bool usb_burn(uint32_t *addrs, char **images, int parts);
 #endif
 
-static bool serial_verify(void);
 static bool serial_burn(uint32_t *addrs, char **images, int parts);
 
 int
@@ -244,7 +244,7 @@ main(int argc, char **argv)
 						return -1;
 					}
 
-					options.action = ACTION_VERIFY;
+					options.verify = true;
 					break;
 				} else if (strcmp(name, "verify-attempts") == 0) {
 					sscanf(optarg, "%d", &options.verify_attempts);
@@ -320,14 +320,6 @@ main(int argc, char **argv)
 			}
 		}
 #endif
-	} else if (options.action == ACTION_VERIFY) {
-		if (options.protocol == PROTO_SERIAL) {
-			if (serial_verify()) {
-				return 0;
-			} else {
-				return -1;
-			}
-		}
 	}
 
 	uint32_t addrs[20];
@@ -560,64 +552,6 @@ serial_connect(cskburn_serial_device_t *dev)
 }
 
 static bool
-serial_verify(void)
-{
-	bool ret = false;
-	uint32_t delay = options.fail_delay;
-
-	cskburn_serial_init(options.update_high);
-
-	cskburn_serial_device_t *dev = cskburn_serial_open(options.serial);
-	if (dev == NULL) {
-		LOGE("错误: 设备打开失败");
-		goto err_open;
-	}
-
-	if (!serial_connect(dev)) {
-		goto err_enter;
-	}
-
-	uint8_t md5[16] = {0};
-	if (!cskburn_serial_verify(dev, options.verify_addr, options.verify_size, md5)) {
-		LOGE("错误: 无法读取设备");
-		goto err_enter;
-	}
-
-	if (options.verify_attempts > 1) {
-		uint8_t md5_verify[16] = {0};
-		for (uint32_t i = 0; i < options.verify_attempts - 1; i++) {
-			memset(md5_verify, 0, sizeof(md5_verify));
-			if (!cskburn_serial_verify(dev, options.verify_addr, options.verify_size, md5_verify)) {
-				LOGE("错误: 无法读取设备");
-				goto err_enter;
-			}
-
-			if (memcmp(md5, md5_verify, sizeof(md5)) != 0) {
-				LOGE("错误: 校验不一致 (第 %d 次校验): "
-					 "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
-						i + 2, md5_verify[0], md5_verify[1], md5_verify[2], md5_verify[3],
-						md5_verify[4], md5_verify[5], md5_verify[6], md5_verify[7], md5_verify[8],
-						md5_verify[9], md5_verify[10], md5_verify[11], md5_verify[12],
-						md5_verify[13], md5_verify[14], md5_verify[15]);
-				goto err_enter;
-			}
-		}
-	}
-
-	LOGI("md5: %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", md5[0], md5[1],
-			md5[2], md5[3], md5[4], md5[5], md5[6], md5[7], md5[8], md5[9], md5[10], md5[11],
-			md5[12], md5[13], md5[14], md5[15]);
-	delay = DEFAULT_RESET_DELAY;
-	ret = true;
-
-err_enter:
-	cskburn_serial_reset(dev, delay, ret);
-	cskburn_serial_close(&dev);
-err_open:
-	return ret;
-}
-
-static bool
 serial_burn(uint32_t *addrs, char **images, int parts)
 {
 	bool ret = false;
@@ -643,6 +577,40 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 		}
 
 		LOGI("chip-id: %016llX", chip_id);
+	}
+
+	if (options.verify) {
+		uint8_t md5[16] = {0};
+		if (!cskburn_serial_verify(dev, options.verify_addr, options.verify_size, md5)) {
+			LOGE("错误: 无法读取设备");
+			goto err_enter;
+		}
+
+		if (options.verify_attempts > 1) {
+			uint8_t md5_verify[16] = {0};
+			for (uint32_t i = 0; i < options.verify_attempts - 1; i++) {
+				memset(md5_verify, 0, sizeof(md5_verify));
+				if (!cskburn_serial_verify(
+							dev, options.verify_addr, options.verify_size, md5_verify)) {
+					LOGE("错误: 无法读取设备");
+					goto err_enter;
+				}
+
+				if (memcmp(md5, md5_verify, sizeof(md5)) != 0) {
+					LOGE("错误: 校验不一致 (第 %d 次校验): "
+						 "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+							i + 2, md5_verify[0], md5_verify[1], md5_verify[2], md5_verify[3],
+							md5_verify[4], md5_verify[5], md5_verify[6], md5_verify[7],
+							md5_verify[8], md5_verify[9], md5_verify[10], md5_verify[11],
+							md5_verify[12], md5_verify[13], md5_verify[14], md5_verify[15]);
+					goto err_enter;
+				}
+			}
+		}
+
+		LOGI("md5: %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", md5[0],
+				md5[1], md5[2], md5[3], md5[4], md5[5], md5[6], md5[7], md5[8], md5[9], md5[10],
+				md5[11], md5[12], md5[13], md5[14], md5[15]);
 	}
 
 	uint8_t *image_buf = malloc(MAX_IMAGE_SIZE);
