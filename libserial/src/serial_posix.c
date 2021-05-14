@@ -18,6 +18,11 @@ set_interface_attribs(int fd, int speed)
 	int ret = 0;
 	struct termios tty;
 
+	ret = ioctl(fd, TIOCEXCL);
+	if (ret < 0) {
+		return ret;
+	}
+
 	ret = tcgetattr(fd, &tty);
 	if (ret < 0) {
 		return ret;
