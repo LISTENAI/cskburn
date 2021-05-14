@@ -324,8 +324,7 @@ cmd_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, 
 	// 实测极限烧录速度为 8M/48s，约 170KB/s
 	// 换算可得每 4K-block 的写入耗时为 23.4375ms
 	// 因此写入超时取 100ms
-	// 某些片子可能需要更长的 erase 时间，故取保险值 500ms
-	return check_command(dev, CMD_FLASH_DATA, in_len, checksum(data, data_len), 500);
+	return check_command(dev, CMD_FLASH_DATA, in_len, checksum(data, data_len), 100);
 }
 
 bool
