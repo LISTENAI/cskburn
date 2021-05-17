@@ -66,6 +66,7 @@ bundle:
   stage: publish
   script: echo
   artifacts:
+    name: "${CI_PROJECT_NAME}-${CI_COMMIT_SHORT_SHA}"
     paths:
       - cskburn-win32-x64.exe
       - cskburn-linux-x64
