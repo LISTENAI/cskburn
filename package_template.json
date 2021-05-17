@@ -9,5 +9,7 @@
   },
   "author": "xychen <xychen@listenai.com>",
   "license": "UNLICENSED",
-  "dependencies": {}
+  "dependencies": {
+    "detect-libc": "^1.0.3"
+  }
 }
