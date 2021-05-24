@@ -4,6 +4,7 @@ add_executable(
     ${PROJECT_NAME}
     main.c
     test_slip_decode.c
+    test_slip_encode.c
     ../src/slip.c
 )
 
