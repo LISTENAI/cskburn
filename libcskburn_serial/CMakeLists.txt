@@ -16,3 +16,6 @@ target_include_directories(
 target_link_libraries(${PROJECT_NAME} log)
 target_link_libraries(${PROJECT_NAME} portable)
 target_link_libraries(${PROJECT_NAME} serial)
+
+add_subdirectory(test)
+add_test(NAME ${PROJECT_NAME} COMMAND libcskburn_serial_test)

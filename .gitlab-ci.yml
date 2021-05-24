@@ -5,6 +5,9 @@ stages:
 variables:
   LINUX_BUILDER: "registry.cn-beijing.aliyuncs.com/iflyos-service/linux-builder:latest"
 
+before_script:
+  - git submodule update --init
+
 build:win32-x64:
   stage: build
   script: cmd.exe /c 'chcp 437 && build.bat && cp out\cskburn\Release\cskburn.exe cskburn-win32-x64.exe'

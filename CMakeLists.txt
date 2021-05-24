@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 
 project(CSKBurnKit)
+enable_testing()
 
 if(WIN32)
     add_compile_options("$<$<C_COMPILER_ID:MSVC>:/source-charset:utf-8>")
@@ -20,3 +21,5 @@ if(NOT WITHOUT_USB)
 endif()
 add_subdirectory(libcskburn_serial)
 add_subdirectory(cskburn)
+
+add_subdirectory(unity)
