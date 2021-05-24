@@ -16,6 +16,8 @@
 #define PIN_LO true
 #define PIN_HI false
 
+#define FLASH_BLOCK_TRIES 5
+
 #define TIME_SINCE_MS(start) (uint16_t)((clock() - start) * 1000.0 * 1000.0 / CLOCKS_PER_SEC)
 
 extern uint8_t burner_serial[];
@@ -162,7 +164,7 @@ cskburn_serial_enter(
 static bool
 try_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, uint32_t seq)
 {
-	for (int i = 0; i < 5; i++) {
+	for (int i = 0; i < FLASH_BLOCK_TRIES; i++) {
 		if (cmd_flash_block(dev, data, data_len, seq)) {
 			return true;
 		}

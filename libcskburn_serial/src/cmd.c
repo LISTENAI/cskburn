@@ -34,6 +34,18 @@
 
 #define TIME_SINCE_MS(start) (uint16_t)((clock() - start) * 1000.0 * 1000.0 / CLOCKS_PER_SEC)
 
+// 默认指令超时时间
+#define TIMEOUT_DEFAULT 500
+
+// Flash 写入指令超时时间
+// 实测极限烧录速度为 8M/48s，约 170KB/s
+// 换算可得每 4K-block 的写入耗时为 23.4375ms
+// 因此写入超时取 100ms
+#define TIMEOUT_FLASH_DATA 100
+
+// MD5 计算指令超时时间
+#define TIMEOUT_FLASH_MD5SUM 2000
+
 typedef struct {
 	uint32_t size;
 	uint32_t blocks;
@@ -232,7 +244,7 @@ cmd_read_reg(cskburn_serial_device_t *dev, uint32_t reg, uint32_t *val)
 	*cmd = reg;
 
 	if (!command(dev, CMD_READ_REG, sizeof(reg), CHECKSUM_NONE, val, ret_buf, &ret_len,
-				sizeof(ret_buf), 500)) {
+				sizeof(ret_buf), TIMEOUT_DEFAULT)) {
 		return false;
 	}
 
@@ -260,7 +272,8 @@ cmd_mem_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks, uint
 	cmd->block_size = block_size;
 	cmd->offset = offset;
 
-	return check_command(dev, CMD_MEM_BEGIN, sizeof(cmd_mem_begin_t), CHECKSUM_NONE, 500);
+	return check_command(
+			dev, CMD_MEM_BEGIN, sizeof(cmd_mem_begin_t), CHECKSUM_NONE, TIMEOUT_DEFAULT);
 }
 
 bool
@@ -278,7 +291,7 @@ cmd_mem_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, ui
 
 	uint32_t in_len = sizeof(cmd_mem_block_t) + data_len;
 
-	return check_command(dev, CMD_MEM_DATA, in_len, checksum(data, data_len), 500);
+	return check_command(dev, CMD_MEM_DATA, in_len, checksum(data, data_len), TIMEOUT_DEFAULT);
 }
 
 bool
@@ -289,7 +302,8 @@ cmd_mem_finish(cskburn_serial_device_t *dev)
 	cmd->option = OPTION_REBOOT;
 	cmd->address = 0;
 
-	return check_command(dev, CMD_MEM_END, sizeof(cmd_mem_finish_t), CHECKSUM_NONE, 500);
+	return check_command(
+			dev, CMD_MEM_END, sizeof(cmd_mem_finish_t), CHECKSUM_NONE, TIMEOUT_DEFAULT);
 }
 
 bool
@@ -303,7 +317,8 @@ cmd_flash_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks, ui
 	cmd->block_size = block_size;
 	cmd->offset = offset;
 
-	return check_command(dev, CMD_FLASH_BEGIN, sizeof(cmd_flash_begin_t), CHECKSUM_NONE, 500);
+	return check_command(
+			dev, CMD_FLASH_BEGIN, sizeof(cmd_flash_begin_t), CHECKSUM_NONE, TIMEOUT_DEFAULT);
 }
 
 bool
@@ -321,10 +336,7 @@ cmd_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, 
 
 	uint32_t in_len = sizeof(cmd_flash_block_t) + data_len;
 
-	// 实测极限烧录速度为 8M/48s，约 170KB/s
-	// 换算可得每 4K-block 的写入耗时为 23.4375ms
-	// 因此写入超时取 100ms
-	return check_command(dev, CMD_FLASH_DATA, in_len, checksum(data, data_len), 100);
+	return check_command(dev, CMD_FLASH_DATA, in_len, checksum(data, data_len), TIMEOUT_FLASH_DATA);
 }
 
 bool
@@ -335,7 +347,8 @@ cmd_flash_finish(cskburn_serial_device_t *dev)
 	cmd->option = OPTION_REBOOT;
 	cmd->address = 0;
 
-	return check_command(dev, CMD_FLASH_END, sizeof(cmd_flash_finish_t), CHECKSUM_NONE, 500);
+	return check_command(
+			dev, CMD_FLASH_END, sizeof(cmd_flash_finish_t), CHECKSUM_NONE, TIMEOUT_DEFAULT);
 }
 
 bool
@@ -350,7 +363,7 @@ cmd_flash_md5sum(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, 
 	cmd->size = size;
 
 	if (!command(dev, CMD_SPI_FLASH_MD5, sizeof(cmd_flash_md5_t), CHECKSUM_NONE, NULL, ret_buf,
-				&ret_len, sizeof(ret_buf), 2000)) {
+				&ret_len, sizeof(ret_buf), TIMEOUT_FLASH_MD5SUM)) {
 		return false;
 	}
 
@@ -377,7 +390,7 @@ cmd_change_baud(cskburn_serial_device_t *dev, uint32_t baud)
 	cmd->baud = baud;
 
 	if (!command(dev, CMD_CHANGE_BAUDRATE, sizeof(cmd_change_baud_t), CHECKSUM_NONE, NULL, NULL,
-				NULL, 0, 500)) {
+				NULL, 0, TIMEOUT_DEFAULT)) {
 		return false;
 	}
 
