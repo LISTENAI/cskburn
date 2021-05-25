@@ -316,7 +316,9 @@ burner_burn(void *handle, uint32_t addr, uint8_t *image, uint32_t len,
 
 			if (xferred != sizeof(resp)) {
 				wait++;
-				on_progress(-wait, len);
+				if (on_progress != NULL) {
+					on_progress(-wait, len);
+				}
 				msleep(1000);
 				continue;
 			}

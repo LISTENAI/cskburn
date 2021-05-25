@@ -36,6 +36,7 @@ static struct option long_options[] = {
 		{"version", no_argument, NULL, 'V'},
 		{"verbose", no_argument, NULL, 'v'},
 		{"trace", no_argument, NULL, 0},
+		{"no-progress", no_argument, NULL, 0},
 		{"wait", no_argument, NULL, 'w'},
 #ifndef WITHOUT_USB
 		{"usb", required_argument, NULL, 'u'},
@@ -94,6 +95,7 @@ typedef enum {
 } cskburn_action_t;
 
 static struct {
+	bool progress;
 	bool wait;
 	bool repeat;
 	cskburn_protocol_t protocol;
@@ -122,6 +124,7 @@ static struct {
 	uint32_t burner_len;
 	bool update_high;
 } options = {
+		.progress = true,
 		.wait = false,
 #ifndef WITHOUT_USB
 		.repeat = false,
@@ -285,6 +288,9 @@ main(int argc, char **argv)
 					break;
 				} else if (strcmp(name, "trace") == 0) {
 					set_log_level(LOGLEVEL_TRACE);
+					break;
+				} else if (strcmp(name, "no-progress") == 0) {
+					options.progress = false;
 					break;
 				} else {
 					print_help(argv[0]);
@@ -513,7 +519,8 @@ usb_burn(uint32_t *addrs, char **images, int parts)
 
 		LOGI("正在烧录分区 %d/%d… (0x%08X, %.2f KB)", i + 1, parts, addrs[i],
 				(float)image_len / 1024.0f);
-		if (!cskburn_usb_write(dev, addrs[i], image_buf, image_len, print_progress)) {
+		if (!cskburn_usb_write(dev, addrs[i], image_buf, image_len,
+					options.progress ? print_progress : NULL)) {
 			LOGE("错误: 无法烧录分区 %d", i + 1);
 			goto err_write;
 		}
@@ -648,7 +655,8 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 
 		LOGI("正在烧录分区 %d/%d… (0x%08X, %.2f KB)", i + 1, parts, addrs[i],
 				(float)image_len / 1024.0f);
-		if (!cskburn_serial_write(dev, addrs[i], image_buf, image_len, print_progress)) {
+		if (!cskburn_serial_write(dev, addrs[i], image_buf, image_len,
+					options.progress ? print_progress : NULL)) {
 			LOGE("错误: 无法烧录分区 %d", i + 1);
 			goto err_write;
 		}
