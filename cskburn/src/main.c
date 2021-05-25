@@ -35,6 +35,7 @@ static struct option long_options[] = {
 		{"help", no_argument, NULL, 'h'},
 		{"version", no_argument, NULL, 'V'},
 		{"verbose", no_argument, NULL, 'v'},
+		{"trace", no_argument, NULL, 0},
 		{"wait", no_argument, NULL, 'w'},
 #ifndef WITHOUT_USB
 		{"usb", required_argument, NULL, 'u'},
@@ -281,6 +282,9 @@ main(int argc, char **argv)
 					break;
 				} else if (strcmp(name, "update-high") == 0) {
 					options.update_high = true;
+					break;
+				} else if (strcmp(name, "trace") == 0) {
+					set_log_level(LOGLEVEL_TRACE);
 					break;
 				} else {
 					print_help(argv[0]);
