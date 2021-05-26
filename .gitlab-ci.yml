@@ -45,7 +45,7 @@ build:linux-arm:
   stage: build
   script: |
     docker build -f Dockerfile.debian -t cskburn-debian .
-    docker run --rm --user 999:995 -v $PWD:/project cskburn-debian ./test.sh
+    docker run --rm --user $(id -u gitlab-runner):$(id -g gitlab-runner) -v $PWD:/project cskburn-debian ./test.sh
     cp out/cskburn/cskburn cskburn-linux-arm
   artifacts:
     paths:
@@ -57,7 +57,7 @@ build:linux-arm-musl:
   stage: build
   script: |
     docker build -f Dockerfile.alpine -t cskburn-alpine .
-    docker run --rm --user 999:995 -v $PWD:/project cskburn-alpine ./test.sh
+    docker run --rm --user $(id -u gitlab-runner):$(id -g gitlab-runner) -v $PWD:/project cskburn-alpine ./test.sh
     cp out/cskburn/cskburn cskburn-linux-arm-musl
   artifacts:
     paths:
