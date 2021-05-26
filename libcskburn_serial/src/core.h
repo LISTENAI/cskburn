@@ -5,11 +5,6 @@
 
 struct _cskburn_serial_device_t {
 	void *handle;
-	void *req_hdr;
-	void *req_cmd;
-	uint8_t *req_raw_buf;
-	uint8_t *req_slip_buf;
-	uint8_t *res_slip_buf;
 };
 
 #endif  // __LIB_CSKBURN_SERIAL_CORE__

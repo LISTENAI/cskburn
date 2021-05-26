@@ -5,32 +5,8 @@
 #include <stdint.h>
 #include <cskburn_serial.h>
 
-typedef struct {
-	uint8_t direction;
-	uint8_t command;
-	uint16_t size;
-	uint32_t checksum;
-} csk_command_t;
-
-typedef struct {
-	uint8_t direction;
-	uint8_t command;
-	uint16_t size;
-	uint32_t value;
-} csk_response_t;
-
 #define RAM_BLOCK_SIZE 0x800
 #define FLASH_BLOCK_SIZE 0x1000
-
-#define STATUS_BYTES_LEN 2
-
-#define MAX_REQ_COMMAND_LEN (sizeof(csk_command_t) + sizeof(uint32_t) * 4)
-#define MAX_REQ_PAYLOAD_LEN (FLASH_BLOCK_SIZE)
-#define MAX_REQ_RAW_LEN (MAX_REQ_COMMAND_LEN + MAX_REQ_PAYLOAD_LEN)
-#define MAX_REQ_SLIP_LEN (MAX_REQ_RAW_LEN * 2)
-
-#define MAX_RES_READ_LEN (512)
-#define MAX_RES_SLIP_LEN (MAX_RES_READ_LEN * 2)
 
 #define BLOCKS(size, block_size) ((size + block_size - 1) / block_size)
 
