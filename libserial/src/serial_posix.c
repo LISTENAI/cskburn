@@ -125,9 +125,7 @@ serial_read(serial_dev_t *dev, void *buf, size_t count)
 int32_t
 serial_write(serial_dev_t *dev, const void *buf, size_t count)
 {
-	int32_t wrote = write(dev->fd, buf, count);
-	tcdrain(dev->fd);
-	return wrote;
+	return write(dev->fd, buf, count);
 }
 
 bool
