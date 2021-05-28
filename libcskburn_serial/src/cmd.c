@@ -184,7 +184,6 @@ command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_c
 			goto exit;
 		}
 	} while (TIME_SINCE_MS(start) < timeout);
-	LOGD("错误: 串口读取超时");
 
 exit:
 	return ret;
