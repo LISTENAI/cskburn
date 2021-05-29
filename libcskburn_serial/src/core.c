@@ -162,10 +162,11 @@ cskburn_serial_enter(
 }
 
 static bool
-try_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, uint32_t seq)
+try_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, uint32_t seq,
+		uint32_t *next_seq)
 {
 	for (int i = 0; i < FLASH_BLOCK_TRIES; i++) {
-		if (cmd_flash_block(dev, data, data_len, seq)) {
+		if (cmd_flash_block(dev, data, data_len, seq, next_seq)) {
 			return true;
 		}
 	}
@@ -178,7 +179,6 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image
 {
 	uint32_t offset, length;
 	uint32_t blocks = BLOCKS(len, FLASH_BLOCK_SIZE);
-	int32_t wrote = 0;
 
 	uint64_t t1 = time_monotonic();
 
@@ -186,7 +186,8 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image
 		return false;
 	}
 
-	for (uint32_t i = 0; i < blocks; i++) {
+	uint32_t i = 0;
+	while (i < blocks) {
 		offset = FLASH_BLOCK_SIZE * i;
 		length = FLASH_BLOCK_SIZE;
 
@@ -194,13 +195,17 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image
 			length = len - offset;
 		}
 
-		if (!try_flash_block(dev, image + offset, length, i)) {
+		uint32_t next = 0;
+		if (!try_flash_block(dev, image + offset, length, i, &next)) {
 			return false;
 		}
+		if (next != i + 1) {
+			LOGD("指针由 %d 跳至 %d", i, next);
+		}
+		i = next;
 
-		wrote += length;
 		if (on_progress != NULL) {
-			on_progress(wrote, len);
+			on_progress(offset + length, len);
 		}
 	}
 
