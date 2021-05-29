@@ -41,8 +41,9 @@
 // 实测极限烧录速度为 8M/48s，约 170KB/s
 // 换算可得每 4K-block 的写入耗时为 23.4375ms
 // 因此写入超时取 100ms
-// 某些片子可能需要更长的 erase 时间，故取保险值 500ms
-#define TIMEOUT_FLASH_DATA 800
+// 当 erase 阻塞导致队列满时，burner 会延迟 100ms 返回 0x0A，故取 500ms 保险值
+// 取值过小会导致正常返回和重试返回叠加，seq 错位
+#define TIMEOUT_FLASH_DATA 500
 
 // MD5 计算指令超时时间
 #define TIMEOUT_FLASH_MD5SUM 2000

@@ -16,7 +16,7 @@
 #define PIN_LO true
 #define PIN_HI false
 
-#define FLASH_BLOCK_TRIES 3
+#define FLASH_BLOCK_TRIES 5
 
 #define TIME_SINCE_MS(start) (uint16_t)((clock() - start) * 1000.0 * 1000.0 / CLOCKS_PER_SEC)
 
