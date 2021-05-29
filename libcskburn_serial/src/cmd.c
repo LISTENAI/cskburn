@@ -91,8 +91,7 @@ typedef struct {
 
 static bool
 command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_chk,
-		uint32_t *out_val, uint8_t *out_buf, uint16_t *out_len, uint16_t out_limit,
-		uint16_t timeout)
+		uint32_t *out_val, void *out_buf, uint16_t *out_len, uint16_t out_limit, uint16_t timeout)
 {
 	bool ret = false;
 
@@ -190,28 +189,31 @@ exit:
 	return ret;
 }
 
-static bool
+static uint8_t
 check_command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_chk,
-		uint16_t timeout)
+		uint32_t *out_val, uint16_t timeout)
 {
-	uint8_t tmp_buf[STATUS_BYTES_LEN];
-	uint16_t tmp_len = 0;
+	struct {
+		uint8_t error;
+		uint8_t code;
+	} ret = {0};
+	uint16_t ret_len = 0;
 
-	if (!command(dev, op, in_len, in_chk, NULL, tmp_buf, &tmp_len, sizeof(tmp_buf), timeout)) {
-		return false;
+	if (!command(dev, op, in_len, in_chk, out_val, &ret, &ret_len, sizeof(ret), timeout)) {
+		return 0xFF;
 	}
 
-	if (tmp_len < STATUS_BYTES_LEN) {
+	if (ret_len < sizeof(ret)) {
 		LOGD("错误: 串口读取异常");
-		return false;
+		return 0xFF;
 	}
 
-	if (tmp_buf[0] != 0) {
-		LOGD("错误: 设备返回异常 %02X%02X", tmp_buf[0], tmp_buf[1]);
-		return false;
+	if (ret.error) {
+		LOGD("错误: 设备返回异常 0x%02X", ret.code);
+		return ret.code;
+	} else {
+		return 0x00;
 	}
-
-	return true;
 }
 
 static uint32_t
@@ -245,22 +247,7 @@ cmd_read_reg(cskburn_serial_device_t *dev, uint32_t reg, uint32_t *val)
 	uint32_t *cmd = (uint32_t *)dev->req_cmd;
 	*cmd = reg;
 
-	if (!command(dev, CMD_READ_REG, sizeof(reg), CHECKSUM_NONE, val, ret_buf, &ret_len,
-				sizeof(ret_buf), TIMEOUT_DEFAULT)) {
-		return false;
-	}
-
-	if (ret_len < STATUS_BYTES_LEN) {
-		LOGD("错误: 串口读取异常");
-		return false;
-	}
-
-	if (ret_buf[0] != 0) {
-		LOGD("错误: 设备返回异常 %02X%02X", ret_buf[0], ret_buf[1]);
-		return false;
-	}
-
-	return true;
+	return !check_command(dev, CMD_READ_REG, sizeof(reg), CHECKSUM_NONE, val, TIMEOUT_DEFAULT);
 }
 
 bool
@@ -274,8 +261,8 @@ cmd_mem_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks, uint
 	cmd->block_size = block_size;
 	cmd->offset = offset;
 
-	return check_command(
-			dev, CMD_MEM_BEGIN, sizeof(cmd_mem_begin_t), CHECKSUM_NONE, TIMEOUT_DEFAULT);
+	return !check_command(
+			dev, CMD_MEM_BEGIN, sizeof(cmd_mem_begin_t), CHECKSUM_NONE, NULL, TIMEOUT_DEFAULT);
 }
 
 bool
@@ -293,7 +280,8 @@ cmd_mem_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, ui
 
 	uint32_t in_len = sizeof(cmd_mem_block_t) + data_len;
 
-	return check_command(dev, CMD_MEM_DATA, in_len, checksum(data, data_len), TIMEOUT_DEFAULT);
+	return !check_command(
+			dev, CMD_MEM_DATA, in_len, checksum(data, data_len), NULL, TIMEOUT_DEFAULT);
 }
 
 bool
@@ -304,8 +292,8 @@ cmd_mem_finish(cskburn_serial_device_t *dev)
 	cmd->option = OPTION_REBOOT;
 	cmd->address = 0;
 
-	return check_command(
-			dev, CMD_MEM_END, sizeof(cmd_mem_finish_t), CHECKSUM_NONE, TIMEOUT_DEFAULT);
+	return !check_command(
+			dev, CMD_MEM_END, sizeof(cmd_mem_finish_t), CHECKSUM_NONE, NULL, TIMEOUT_DEFAULT);
 }
 
 bool
@@ -319,8 +307,8 @@ cmd_flash_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks, ui
 	cmd->block_size = block_size;
 	cmd->offset = offset;
 
-	return check_command(
-			dev, CMD_FLASH_BEGIN, sizeof(cmd_flash_begin_t), CHECKSUM_NONE, TIMEOUT_DEFAULT);
+	return !check_command(
+			dev, CMD_FLASH_BEGIN, sizeof(cmd_flash_begin_t), CHECKSUM_NONE, NULL, TIMEOUT_DEFAULT);
 }
 
 bool
@@ -338,7 +326,8 @@ cmd_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, 
 
 	uint32_t in_len = sizeof(cmd_flash_block_t) + data_len;
 
-	return check_command(dev, CMD_FLASH_DATA, in_len, checksum(data, data_len), TIMEOUT_FLASH_DATA);
+	return !check_command(
+			dev, CMD_FLASH_DATA, in_len, checksum(data, data_len), NULL, TIMEOUT_FLASH_DATA);
 }
 
 bool
@@ -349,8 +338,8 @@ cmd_flash_finish(cskburn_serial_device_t *dev)
 	cmd->option = OPTION_REBOOT;
 	cmd->address = 0;
 
-	return check_command(
-			dev, CMD_FLASH_END, sizeof(cmd_flash_finish_t), CHECKSUM_NONE, TIMEOUT_DEFAULT);
+	return !check_command(
+			dev, CMD_FLASH_END, sizeof(cmd_flash_finish_t), CHECKSUM_NONE, NULL, TIMEOUT_DEFAULT);
 }
 
 bool
