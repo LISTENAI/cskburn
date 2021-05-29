@@ -200,16 +200,17 @@ check_command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_
 	uint16_t ret_len = 0;
 
 	if (!command(dev, op, in_len, in_chk, out_val, &ret, &ret_len, sizeof(ret), timeout)) {
+		LOGD("错误: 指令 %02X 响应超时", op);
 		return 0xFF;
 	}
 
 	if (ret_len < sizeof(ret)) {
-		LOGD("错误: 串口读取异常");
+		LOGD("错误: 指令 %02X 串口读取异常", op);
 		return 0xFF;
 	}
 
 	if (ret.error) {
-		LOGD("错误: 设备返回异常 0x%02X", ret.code);
+		LOGD("错误: 指令 %02X 设备返回异常 0x%02X", op, ret.code);
 		return ret.code;
 	} else {
 		return 0x00;
@@ -328,6 +329,10 @@ cmd_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, 
 
 	uint8_t ret = check_command(
 			dev, CMD_FLASH_DATA, in_len, checksum(data, data_len), NULL, TIMEOUT_FLASH_DATA);
+
+	if (ret != 0x00) {
+		LOGD("错误: 数据块 %d 写失败: %02X", seq, ret);
+	}
 
 	if (ret == 0x0A) {
 		msleep(500);
