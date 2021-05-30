@@ -114,6 +114,7 @@ command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_c
 	int32_t r;
 	uint64_t start;
 
+	serial_discard_input(dev->handle);
 	serial_discard_output(dev->handle);
 
 	start = time_monotonic();
@@ -137,6 +138,7 @@ command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_c
 		}
 	} while (TIME_SINCE_MS(start) < timeout);
 	if (bytes_wrote < req_slip_len) {
+		LOGD("错误: 指令 %02X 发送超时", op);
 		goto exit;
 	}
 
@@ -223,8 +225,7 @@ check_command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_
 	uint16_t ret_len = 0;
 
 	if (!command(dev, op, in_len, in_chk, out_val, &ret, &ret_len, sizeof(ret), timeout)) {
-		LOGD("错误: 指令 %02X 响应超时", op);
-		return 0xFF;
+		return 0xFE;
 	}
 
 	if (ret_len < sizeof(ret)) {
