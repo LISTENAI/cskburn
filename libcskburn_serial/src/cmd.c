@@ -35,7 +35,10 @@
 #define TIME_SINCE_MS(start) (uint16_t)((clock() - start) * 1000.0 * 1000.0 / CLOCKS_PER_SEC)
 
 // 默认指令超时时间
-#define TIMEOUT_DEFAULT 500
+#define TIMEOUT_DEFAULT 1000
+
+// Mem 写入指令超时时间
+#define TIMEOUT_MEM_DATA 2000
 
 // Flash 写入指令超时时间
 // 实测极限烧录速度为 8M/48s，约 170KB/s
@@ -43,7 +46,7 @@
 // 因此写入超时取 100ms
 // 当 erase 阻塞导致队列满时，burner 会延迟 100ms 返回 0x0A，故取 500ms 保险值
 // 取值过小会导致正常返回和重试返回叠加，seq 错位
-#define TIMEOUT_FLASH_DATA 1000
+#define TIMEOUT_FLASH_DATA 2000
 
 // MD5 计算指令超时时间
 #define TIMEOUT_FLASH_MD5SUM 2000
@@ -110,34 +113,55 @@ command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_c
 
 	uint32_t req_slip_len = slip_encode(dev->req_raw_buf, dev->req_slip_buf, req_raw_len);
 
-#if TRACE_SLIP
-	LOG_TRACE("Write %d bytes", req_slip_len);
-	LOG_DUMP(dev->req_slip_buf, req_slip_len);
-#endif
+	int32_t r;
+	clock_t start;
 
-	if (serial_write(dev->handle, dev->req_slip_buf, req_slip_len) <= 0) {
-		goto exit;
-	}
+	serial_discard_output(dev->handle);
 
-	clock_t start = clock();
+	start = clock();
+	uint32_t bytes_wrote = 0;
 	do {
-		int32_t res_slip_len = serial_read(dev->handle, dev->res_slip_buf, MAX_RES_READ_LEN);
-		if (res_slip_len < 0) {
-			goto exit;
-		}
-		if (res_slip_len == 0) {
+		r = serial_write(dev->handle, dev->req_slip_buf + bytes_wrote, req_slip_len - bytes_wrote);
+		if (r <= 0) {
+			msleep(10);
 			continue;
 		}
 
 #if TRACE_SLIP
-		LOG_TRACE("Read %d bytes", res_slip_len);
-		LOG_DUMP(dev->res_slip_buf, res_slip_len);
+		LOG_TRACE("Wrote %d bytes in %d ms", r, TIME_SINCE_MS(start));
+		LOG_DUMP(dev->req_slip_buf + bytes_wrote, r);
 #endif
 
-		uint32_t res_slip_offset = 0;
-		while (res_slip_offset < (uint32_t)res_slip_len) {
+		bytes_wrote += r;
+
+		if (bytes_wrote >= req_slip_len) {
+			break;
+		}
+	} while (TIME_SINCE_MS(start) < timeout);
+	if (bytes_wrote < req_slip_len) {
+		goto exit;
+	}
+
+	start = clock();
+	uint32_t bytes_read = 0;
+	uint32_t res_slip_offset = 0;
+	do {
+		r = serial_read(dev->handle, dev->res_slip_buf + bytes_read, MAX_RES_READ_LEN - bytes_read);
+		if (r <= 0) {
+			msleep(10);
+			continue;
+		}
+
+#if TRACE_SLIP
+		LOG_TRACE("Read %d bytes in %d ms", r, TIME_SINCE_MS(start));
+		LOG_DUMP(dev->res_slip_buf + bytes_read, r);
+#endif
+
+		bytes_read += r;
+
+		while (res_slip_offset < bytes_read) {
 			uint8_t *res_raw_ptr = dev->res_slip_buf + res_slip_offset;
-			uint32_t res_slip_limit = res_slip_len - res_slip_offset;
+			uint32_t res_slip_limit = bytes_read - res_slip_offset;
 
 			uint32_t res_raw_len = 0;
 			uint32_t res_slip_step = slip_decode(res_raw_ptr, &res_raw_len, res_slip_limit);
@@ -186,6 +210,7 @@ command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_c
 	} while (TIME_SINCE_MS(start) < timeout);
 
 exit:
+	serial_discard_input(dev->handle);
 	return ret;
 }
 
@@ -282,7 +307,7 @@ cmd_mem_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, ui
 	uint32_t in_len = sizeof(cmd_mem_block_t) + data_len;
 
 	return !check_command(
-			dev, CMD_MEM_DATA, in_len, checksum(data, data_len), NULL, TIMEOUT_DEFAULT);
+			dev, CMD_MEM_DATA, in_len, checksum(data, data_len), NULL, TIMEOUT_MEM_DATA);
 }
 
 bool
@@ -393,7 +418,7 @@ cmd_change_baud(cskburn_serial_device_t *dev, uint32_t baud)
 	cmd->baud = baud;
 
 	if (!command(dev, CMD_CHANGE_BAUDRATE, sizeof(cmd_change_baud_t), CHECKSUM_NONE, NULL, NULL,
-				NULL, 0, TIMEOUT_DEFAULT)) {
+				NULL, 0, 1000)) {
 		return false;
 	}
 

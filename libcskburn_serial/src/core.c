@@ -166,6 +166,9 @@ try_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, 
 		uint32_t *next_seq)
 {
 	for (int i = 0; i < FLASH_BLOCK_TRIES; i++) {
+		if (i > 0) {
+			LOGD("第 %d 次重试写入数据块 %d", i, seq);
+		}
 		if (cmd_flash_block(dev, data, data_len, seq, next_seq)) {
 			return true;
 		}

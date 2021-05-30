@@ -86,7 +86,7 @@ serial_open(const char *path)
 {
 	int fd, ret;
 
-	fd = open(path, O_RDWR | O_NOCTTY | O_SYNC);
+	fd = open(path, O_RDWR | O_NOCTTY | O_NONBLOCK);
 	if (fd < 0) {
 		return NULL;
 	}
@@ -126,6 +126,18 @@ int32_t
 serial_write(serial_dev_t *dev, const void *buf, size_t count)
 {
 	return write(dev->fd, buf, count);
+}
+
+void
+serial_discard_input(serial_dev_t *dev)
+{
+	tcflush(dev->fd, TCIFLUSH);
+}
+
+void
+serial_discard_output(serial_dev_t *dev)
+{
+	tcflush(dev->fd, TCOFLUSH);
 }
 
 bool
