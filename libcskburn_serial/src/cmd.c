@@ -29,6 +29,7 @@
 #define CMD_READ_REG 0x0a
 #define CMD_CHANGE_BAUDRATE 0x0f
 #define CMD_SPI_FLASH_MD5 0x13
+#define CMD_FLASH_MD5_CHALLENGE 0xF2
 
 #define CHECKSUM_MAGIC 0xef
 #define CHECKSUM_NONE 0
@@ -333,7 +334,7 @@ cmd_mem_finish(cskburn_serial_device_t *dev)
 
 bool
 cmd_flash_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks, uint32_t block_size,
-		uint32_t offset)
+		uint32_t offset, uint8_t *md5)
 {
 	cmd_flash_begin_t *cmd = (cmd_flash_begin_t *)dev->req_cmd;
 	memset(cmd, 0, sizeof(cmd_flash_begin_t));
@@ -342,8 +343,13 @@ cmd_flash_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks, ui
 	cmd->block_size = block_size;
 	cmd->offset = offset;
 
+	uint8_t *req_data = (uint8_t *)dev->req_cmd + sizeof(cmd_flash_begin_t);
+	memcpy(req_data, md5, MD5_LEN);
+
+	uint32_t in_len = sizeof(cmd_flash_block_t) + MD5_LEN;
+
 	return !check_command(
-			dev, CMD_FLASH_BEGIN, sizeof(cmd_flash_begin_t), CHECKSUM_NONE, NULL, TIMEOUT_DEFAULT);
+			dev, CMD_FLASH_BEGIN, in_len, checksum(md5, MD5_LEN), NULL, TIMEOUT_DEFAULT);
 }
 
 bool
@@ -417,6 +423,13 @@ cmd_flash_md5sum(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, 
 	memcpy(md5, ret_buf + 2, 16);
 
 	return true;
+}
+
+bool
+cmd_flash_md5_challenge(cskburn_serial_device_t *dev)
+{
+	return !check_command(
+			dev, CMD_FLASH_MD5_CHALLENGE, 0, CHECKSUM_NONE, NULL, TIMEOUT_FLASH_MD5SUM);
 }
 
 bool

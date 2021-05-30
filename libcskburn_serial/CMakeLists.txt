@@ -5,6 +5,7 @@ add_library(
     src/core.c
     src/cmd.c
     src/slip.c
+    src/mbedtls_md5.c
     src/burner_img.c
 )
 

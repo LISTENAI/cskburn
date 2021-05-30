@@ -9,6 +9,7 @@
 
 #include "core.h"
 #include "cmd.h"
+#include "mbedtls_md5.h"
 
 #define EFUSE_BASE 0xF1800000
 
@@ -159,6 +160,18 @@ cskburn_serial_enter(
 }
 
 static bool
+try_flash_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks, uint32_t block_size,
+		uint32_t offset, uint8_t *md5)
+{
+	for (int i = 0; i < FLASH_BLOCK_TRIES; i++) {
+		if (cmd_flash_begin(dev, size, blocks, block_size, offset, md5)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+static bool
 try_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, uint32_t seq,
 		uint32_t *next_seq)
 {
@@ -182,7 +195,12 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image
 
 	uint64_t t1 = time_monotonic();
 
-	if (!cmd_flash_begin(dev, len, blocks, FLASH_BLOCK_SIZE, addr)) {
+	uint8_t md5[MD5_LEN];
+	if (mbedtls_md5_ret(image, len, md5) != 0) {
+		return false;
+	}
+
+	if (!try_flash_begin(dev, len, blocks, FLASH_BLOCK_SIZE, addr, md5)) {
 		return false;
 	}
 
@@ -207,6 +225,11 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image
 		if (on_progress != NULL) {
 			on_progress(offset + length, len);
 		}
+	}
+
+	if (!cmd_flash_md5_challenge(dev)) {
+		LOGD("错误: MD5 校验失败");
+		return false;
 	}
 
 	uint64_t t2 = time_monotonic();
