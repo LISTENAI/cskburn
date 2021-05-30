@@ -14,4 +14,6 @@ uint64_t time_monotonic();
 
 #endif  // POSIX
 
+#define TIME_SINCE_MS(start) (uint16_t)(time_monotonic() - start)
+
 #endif  // __LIB_PORTABLE_TIME_MONOTONIC__

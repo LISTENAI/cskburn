@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 
 #include <log.h>
 #include <msleep.h>
@@ -17,8 +16,6 @@
 #define PIN_HI false
 
 #define FLASH_BLOCK_TRIES 5
-
-#define TIME_SINCE_MS(start) (uint16_t)((clock() - start) * 1000.0 * 1000.0 / CLOCKS_PER_SEC)
 
 extern uint8_t burner_serial[];
 extern uint32_t burner_serial_len;
@@ -79,7 +76,7 @@ cskburn_serial_close(cskburn_serial_device_t **dev)
 static bool
 try_sync(cskburn_serial_device_t *dev, int timeout)
 {
-	clock_t start = clock();
+	uint64_t start = time_monotonic();
 	do {
 		if (cmd_sync(dev, 100)) {
 			return true;

@@ -2,11 +2,11 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
-#include <time.h>
 
 #include <log.h>
 #include <serial.h>
 #include <msleep.h>
+#include <time_monotonic.h>
 
 #include "core.h"
 #include "cmd.h"
@@ -32,13 +32,11 @@
 #define CHECKSUM_MAGIC 0xef
 #define CHECKSUM_NONE 0
 
-#define TIME_SINCE_MS(start) (uint16_t)((clock() - start) * 1000.0 * 1000.0 / CLOCKS_PER_SEC)
-
 // 默认指令超时时间
-#define TIMEOUT_DEFAULT 1000
+#define TIMEOUT_DEFAULT 200
 
 // Mem 写入指令超时时间
-#define TIMEOUT_MEM_DATA 2000
+#define TIMEOUT_MEM_DATA 500
 
 // Flash 写入指令超时时间
 // 实测极限烧录速度为 8M/48s，约 170KB/s
@@ -46,10 +44,10 @@
 // 因此写入超时取 100ms
 // 当 erase 阻塞导致队列满时，burner 会延迟 100ms 返回 0x0A，故取 500ms 保险值
 // 取值过小会导致正常返回和重试返回叠加，seq 错位
-#define TIMEOUT_FLASH_DATA 2000
+#define TIMEOUT_FLASH_DATA 1000
 
 // MD5 计算指令超时时间
-#define TIMEOUT_FLASH_MD5SUM 2000
+#define TIMEOUT_FLASH_MD5SUM 5000
 
 typedef struct {
 	uint32_t size;
@@ -114,11 +112,11 @@ command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_c
 	uint32_t req_slip_len = slip_encode(dev->req_raw_buf, dev->req_slip_buf, req_raw_len);
 
 	int32_t r;
-	clock_t start;
+	uint64_t start;
 
 	serial_discard_output(dev->handle);
 
-	start = clock();
+	start = time_monotonic();
 	uint32_t bytes_wrote = 0;
 	do {
 		r = serial_write(dev->handle, dev->req_slip_buf + bytes_wrote, req_slip_len - bytes_wrote);
@@ -127,8 +125,8 @@ command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_c
 			continue;
 		}
 
-#if TRACE_SLIP
 		LOG_TRACE("Wrote %d bytes in %d ms", r, TIME_SINCE_MS(start));
+#if TRACE_SLIP
 		LOG_DUMP(dev->req_slip_buf + bytes_wrote, r);
 #endif
 
@@ -142,7 +140,7 @@ command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_c
 		goto exit;
 	}
 
-	start = clock();
+	start = time_monotonic();
 	uint32_t bytes_read = 0;
 	uint32_t res_slip_offset = 0;
 	do {
@@ -152,8 +150,8 @@ command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_c
 			continue;
 		}
 
-#if TRACE_SLIP
 		LOG_TRACE("Read %d bytes in %d ms", r, TIME_SINCE_MS(start));
+#if TRACE_SLIP
 		LOG_DUMP(dev->res_slip_buf + bytes_read, r);
 #endif
 
