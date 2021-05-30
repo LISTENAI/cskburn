@@ -265,9 +265,6 @@ cmd_sync(cskburn_serial_device_t *dev, uint16_t timeout)
 bool
 cmd_read_reg(cskburn_serial_device_t *dev, uint32_t reg, uint32_t *val)
 {
-	uint8_t ret_buf[STATUS_BYTES_LEN];
-	uint16_t ret_len = 0;
-
 	uint32_t *cmd = (uint32_t *)dev->req_cmd;
 	*cmd = reg;
 

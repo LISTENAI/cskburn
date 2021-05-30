@@ -107,6 +107,18 @@ serial_write(serial_dev_t *dev, const void *buf, size_t count)
 	}
 }
 
+void
+serial_discard_input(serial_dev_t *dev)
+{
+	// no-op on Windows
+}
+
+void
+serial_discard_output(serial_dev_t *dev)
+{
+	// no-op on Windows
+}
+
 bool
 serial_set_rts(serial_dev_t *dev, bool val)
 {
