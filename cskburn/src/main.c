@@ -50,7 +50,6 @@ static struct option long_options[] = {
 		{"chip-id", no_argument, NULL, 0},
 		{"verify", required_argument, NULL, 0},
 		{"verify-attempts", required_argument, NULL, 0},
-		{"verify-max-fails", required_argument, NULL, 0},
 		{"probe-timeout", required_argument, NULL, 0},
 		{"reset-attempts", required_argument, NULL, 0},
 		{"reset-delay", required_argument, NULL, 0},
@@ -111,7 +110,6 @@ static struct {
 	uint32_t verify_addr;
 	uint32_t verify_size;
 	uint32_t verify_attempts;
-	uint32_t verify_max_fails;
 	uint32_t probe_timeout;
 	uint32_t reset_attempts;
 	uint32_t reset_delay;
@@ -138,7 +136,6 @@ static struct {
 		.verify_addr = 0,
 		.verify_size = 0,
 		.verify_attempts = DEFAULT_VERIFY_ATTEMPTS,
-		.verify_max_fails = 1,
 		.probe_timeout = DEFAULT_PROBE_TIMEOUT,
 		.reset_attempts = DEFAULT_RESET_ATTEMPTS,
 		.reset_delay = DEFAULT_RESET_DELAY,
@@ -255,9 +252,6 @@ main(int argc, char **argv)
 					break;
 				} else if (strcmp(name, "verify-attempts") == 0) {
 					sscanf(optarg, "%d", &options.verify_attempts);
-					break;
-				} else if (strcmp(name, "verify-max-fails") == 0) {
-					sscanf(optarg, "%d", &options.verify_max_fails);
 					break;
 				} else if (strcmp(name, "probe-timeout") == 0) {
 					sscanf(optarg, "%d", &options.probe_timeout);
@@ -604,18 +598,13 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 		}
 
 		if (options.verify_attempts > 1) {
-			uint32_t fails = 0;
 			uint8_t md5_verify[16] = {0};
 			for (uint32_t i = 0; i < options.verify_attempts - 1; i++) {
 				memset(md5_verify, 0, sizeof(md5_verify));
 				if (!cskburn_serial_verify(
 							dev, options.verify_addr, options.verify_size, md5_verify)) {
 					LOGE("错误: 无法读取设备");
-					if (fails >= options.verify_max_fails) {
-						goto err_enter;
-					} else {
-						continue;
-					}
+					goto err_enter;
 				}
 
 				if (memcmp(md5, md5_verify, sizeof(md5)) != 0) {
@@ -625,10 +614,7 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 							md5_verify[4], md5_verify[5], md5_verify[6], md5_verify[7],
 							md5_verify[8], md5_verify[9], md5_verify[10], md5_verify[11],
 							md5_verify[12], md5_verify[13], md5_verify[14], md5_verify[15]);
-					fails++;
-					if (fails >= options.verify_max_fails) {
-						goto err_enter;
-					}
+					goto err_enter;
 				}
 			}
 		}
