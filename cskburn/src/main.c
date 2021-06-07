@@ -134,7 +134,7 @@ static struct {
 		.serial = NULL,
 		.serial_baud = DEFAULT_BAUD,
 		.read_chip_id = false,
-		.verify = false,
+		.verify = true,
 		.verify_addr = 0,
 		.verify_size = 0,
 		.verify_attempts = DEFAULT_VERIFY_ATTEMPTS,
