@@ -51,7 +51,6 @@ static struct option long_options[] = {
 		{"verify", required_argument, NULL, 0},
 		{"verify-attempts", required_argument, NULL, 0},
 		{"verify-max-fails", required_argument, NULL, 0},
-		{"verify-all", no_argument, NULL, 0},
 		{"probe-timeout", required_argument, NULL, 0},
 		{"reset-attempts", required_argument, NULL, 0},
 		{"reset-delay", required_argument, NULL, 0},
@@ -113,7 +112,6 @@ static struct {
 	uint32_t verify_size;
 	uint32_t verify_attempts;
 	uint32_t verify_max_fails;
-	bool verify_all;
 	uint32_t probe_timeout;
 	uint32_t reset_attempts;
 	uint32_t reset_delay;
@@ -141,7 +139,6 @@ static struct {
 		.verify_size = 0,
 		.verify_attempts = DEFAULT_VERIFY_ATTEMPTS,
 		.verify_max_fails = 1,
-		.verify_all = false,
 		.probe_timeout = DEFAULT_PROBE_TIMEOUT,
 		.reset_attempts = DEFAULT_RESET_ATTEMPTS,
 		.reset_delay = DEFAULT_RESET_DELAY,
@@ -261,9 +258,6 @@ main(int argc, char **argv)
 					break;
 				} else if (strcmp(name, "verify-max-fails") == 0) {
 					sscanf(optarg, "%d", &options.verify_max_fails);
-					break;
-				} else if (strcmp(name, "verify-all") == 0) {
-					options.verify_all = true;
 					break;
 				} else if (strcmp(name, "probe-timeout") == 0) {
 					sscanf(optarg, "%d", &options.probe_timeout);
@@ -659,17 +653,6 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 					options.progress ? print_progress : NULL)) {
 			LOGE("错误: 无法烧录分区 %d", i + 1);
 			goto err_write;
-		}
-
-		if (options.verify_all) {
-			uint8_t md5[16] = {0};
-			if (!cskburn_serial_verify(dev, addrs[i], image_len, md5)) {
-				LOGE("错误: 无法读取设备");
-				goto err_enter;
-			}
-			LOGI("md5: %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", md5[0],
-					md5[1], md5[2], md5[3], md5[4], md5[5], md5[6], md5[7], md5[8], md5[9], md5[10],
-					md5[11], md5[12], md5[13], md5[14], md5[15]);
 		}
 	}
 
