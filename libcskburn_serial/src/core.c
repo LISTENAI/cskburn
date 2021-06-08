@@ -186,6 +186,17 @@ try_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, 
 	return false;
 }
 
+static bool
+try_flash_md5_challenge(cskburn_serial_device_t *dev)
+{
+	for (int i = 0; i < FLASH_BLOCK_TRIES; i++) {
+		if (cmd_flash_md5_challenge(dev)) {
+			return true;
+		}
+	}
+	return false;
+}
+
 bool
 cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image, uint32_t len,
 		void (*on_progress)(int32_t wrote_bytes, uint32_t total_bytes))
@@ -227,7 +238,7 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image
 		}
 	}
 
-	if (!cmd_flash_md5_challenge(dev)) {
+	if (!try_flash_md5_challenge(dev)) {
 		LOGD("错误: MD5 校验失败");
 		return false;
 	}
