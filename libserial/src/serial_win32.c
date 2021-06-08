@@ -86,7 +86,7 @@ serial_set_speed(serial_dev_t *dev, uint32_t speed)
 }
 
 int32_t
-serial_read(serial_dev_t *dev, void *buf, size_t count)
+serial_read(serial_dev_t *dev, void *buf, size_t count, uint64_t timeout)
 {
 	size_t read = 0;
 	if (ReadFile(dev->handle, buf, count, &read, NULL)) {
@@ -97,7 +97,7 @@ serial_read(serial_dev_t *dev, void *buf, size_t count)
 }
 
 int32_t
-serial_write(serial_dev_t *dev, const void *buf, size_t count)
+serial_write(serial_dev_t *dev, const void *buf, size_t count, uint64_t timeout)
 {
 	size_t wrote = 0;
 	if (WriteFile(dev->handle, buf, count, &wrote, NULL)) {

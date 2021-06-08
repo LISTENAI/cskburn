@@ -122,7 +122,8 @@ command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_c
 	start = time_monotonic();
 	uint32_t bytes_wrote = 0;
 	do {
-		r = serial_write(dev->handle, dev->req_slip_buf + bytes_wrote, req_slip_len - bytes_wrote);
+		r = serial_write(
+				dev->handle, dev->req_slip_buf + bytes_wrote, req_slip_len - bytes_wrote, timeout);
 #if !defined(_WIN32) && !defined(_WIN64)
 		if (r == -1 && errno != EAGAIN) {
 			LOGD("错误: 指令 %02X 串口写入异常: %d (%s)", op, errno, strerror(errno));
@@ -154,7 +155,8 @@ command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_c
 	uint32_t bytes_read = 0;
 	uint32_t res_slip_offset = 0;
 	do {
-		r = serial_read(dev->handle, dev->res_slip_buf + bytes_read, MAX_RES_READ_LEN - bytes_read);
+		r = serial_read(dev->handle, dev->res_slip_buf + bytes_read, MAX_RES_READ_LEN - bytes_read,
+				timeout);
 #if !defined(_WIN32) && !defined(_WIN64)
 		if (r == -1 && errno != EAGAIN) {
 			LOGD("错误: 指令 %02X 串口读取异常: %d (%s)", op, errno, strerror(errno));
