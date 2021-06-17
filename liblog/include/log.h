@@ -13,25 +13,36 @@ int log_level;
 
 void set_log_level(int level);
 
-#define LOGE(format, ...)                                                             \
-	do {                                                                              \
-		if (log_level <= LOGLEVEL_ERROR) fprintf(stderr, format "\n", ##__VA_ARGS__); \
+#define LOGE(format, ...)                                \
+	do {                                                 \
+		if (log_level <= LOGLEVEL_ERROR) {               \
+			fprintf(stderr, format "\n", ##__VA_ARGS__); \
+			fflush(stderr);                              \
+		}                                                \
 	} while (0);
 
-#define LOGI(format, ...)                                                            \
-	do {                                                                             \
-		if (log_level <= LOGLEVEL_INFO) fprintf(stdout, format "\n", ##__VA_ARGS__); \
+#define LOGI(format, ...)                                \
+	do {                                                 \
+		if (log_level <= LOGLEVEL_INFO) {                \
+			fprintf(stdout, format "\n", ##__VA_ARGS__); \
+			fflush(stdout);                              \
+		}                                                \
 	} while (0);
 
-#define LOGD(format, ...)                                                             \
-	do {                                                                              \
-		if (log_level <= LOGLEVEL_DEBUG) fprintf(stdout, format "\n", ##__VA_ARGS__); \
+#define LOGD(format, ...)                                \
+	do {                                                 \
+		if (log_level <= LOGLEVEL_DEBUG) {               \
+			fprintf(stdout, format "\n", ##__VA_ARGS__); \
+			fflush(stdout);                              \
+		}                                                \
 	} while (0);
 
 #define LOG_TRACE(format, ...)                                                     \
 	do {                                                                           \
-		if (log_level <= LOGLEVEL_TRACE)                                           \
+		if (log_level <= LOGLEVEL_TRACE) {                                         \
 			fprintf(stdout, "\033[0;36m[TRACE] " format "\033[0m\n", __VA_ARGS__); \
+			fflush(stdout);                                                        \
+		}                                                                          \
 	} while (0);
 
 #define LOG_DUMP(data, len)                                         \
@@ -43,6 +54,7 @@ void set_log_level(int level);
 					fprintf(stdout, " %02X", ((uint8_t *)data)[j]); \
 				}                                                   \
 				fprintf(stdout, "\033[0m\n");                       \
+				fflush(stdout);                                     \
 			}                                                       \
 	} while (0);
 

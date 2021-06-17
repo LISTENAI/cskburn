@@ -184,9 +184,6 @@ static bool serial_burn(uint32_t *addrs, char **images, int parts);
 int
 main(int argc, char **argv)
 {
-	setvbuf(stdout, NULL, _IOLBF, BUFSIZ);
-	setvbuf(stderr, NULL, _IOLBF, BUFSIZ);
-
 	set_log_level(LOGLEVEL_INFO);
 
 	int long_index = -1;
