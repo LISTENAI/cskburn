@@ -14,7 +14,9 @@
 #include <cskburn_serial.h>
 
 #define MAX_IMAGE_SIZE (20 * 1024 * 1024)
+#define MAX_VERIFY_PARTS 20
 #define ENTER_TRIES 5
+#define MD5_SIZE 16
 
 #define DEFAULT_BAUD 3000000
 
@@ -98,9 +100,11 @@ static struct {
 	char *serial;
 	uint32_t serial_baud;
 	bool read_chip_id;
-	bool verify;
-	uint32_t verify_addr;
-	uint32_t verify_size;
+	uint16_t verify_count;
+	struct {
+		uint32_t addr;
+		uint32_t size;
+	} verify_parts[MAX_VERIFY_PARTS];
 	uint32_t probe_timeout;
 	uint32_t reset_attempts;
 	uint32_t reset_delay;
@@ -123,9 +127,7 @@ static struct {
 		.serial = NULL,
 		.serial_baud = DEFAULT_BAUD,
 		.read_chip_id = false,
-		.verify = true,
-		.verify_addr = 0,
-		.verify_size = 0,
+		.verify_count = 0,
 		.probe_timeout = DEFAULT_PROBE_TIMEOUT,
 		.reset_attempts = DEFAULT_RESET_ATTEMPTS,
 		.reset_delay = DEFAULT_RESET_DELAY,
@@ -218,6 +220,11 @@ main(int argc, char **argv)
 					options.read_chip_id = true;
 					break;
 				} else if (strcmp(name, "verify") == 0) {
+					if (options.verify_count >= MAX_VERIFY_PARTS) {
+						LOGE("错误: 最多仅支持同时校验 %d 个分区", MAX_VERIFY_PARTS);
+						return -1;
+					}
+
 					char *split = strstr(optarg, ":");
 					if (split == NULL) {
 						LOGE("错误: --verify 参数的格式应为 地址:长度 (如: -u 0x00000000:102400)");
@@ -228,17 +235,19 @@ main(int argc, char **argv)
 					char *size = split + 1;
 					split[0] = 0;
 
-					if (!scan_int(addr, &options.verify_addr)) {
+					uint16_t index = options.verify_count;
+
+					if (!scan_int(addr, &options.verify_parts[index].addr)) {
 						LOGE("错误: --verify 参数的格式应为 地址:长度 (如: -u 0x00000000:102400)");
 						return -1;
 					}
 
-					if (!scan_int(size, &options.verify_size)) {
+					if (!scan_int(size, &options.verify_parts[index].size)) {
 						LOGE("错误: --verify 参数的格式应为 地址:长度 (如: -u 0x00000000:102400)");
 						return -1;
 					}
 
-					options.verify = true;
+					options.verify_count++;
 					break;
 				} else if (strcmp(name, "probe-timeout") == 0) {
 					sscanf(optarg, "%d", &options.probe_timeout);
@@ -412,6 +421,14 @@ print_progress(int32_t wrote_bytes, uint32_t total_bytes)
 	}
 }
 
+static void
+md5_to_str(char *buf, uint8_t *md5)
+{
+	sprintf(buf, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", md5[0], md5[1],
+			md5[2], md5[3], md5[4], md5[5], md5[6], md5[7], md5[8], md5[9], md5[10], md5[11],
+			md5[12], md5[13], md5[14], md5[15]);
+}
+
 #ifndef WITHOUT_USB
 static bool
 usb_check(void)
@@ -577,16 +594,19 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 		LOGI("chip-id: %016llX", chip_id);
 	}
 
-	if (options.verify) {
-		uint8_t md5[16] = {0};
-		if (!cskburn_serial_verify(dev, options.verify_addr, options.verify_size, md5)) {
-			LOGE("错误: 无法读取设备");
-			goto err_enter;
+	if (options.verify_count > 0) {
+		uint8_t md5[MD5_SIZE] = {0};
+		char md5_str[MD5_SIZE * 2 + 1] = {0};
+		for (int i = 0; i < options.verify_count; i++) {
+			uint32_t addr = options.verify_parts[i].addr;
+			uint32_t size = options.verify_parts[i].size;
+			if (!cskburn_serial_verify(dev, addr, size, md5)) {
+				LOGE("错误: 无法读取设备");
+				goto err_enter;
+			}
+			md5_to_str(md5_str, md5);
+			LOGI("md5 (0x%08X-0x%08X): %s", addr, addr + size, md5_str);
 		}
-
-		LOGI("md5: %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", md5[0],
-				md5[1], md5[2], md5[3], md5[4], md5[5], md5[6], md5[7], md5[8], md5[9], md5[10],
-				md5[11], md5[12], md5[13], md5[14], md5[15]);
 	}
 
 	uint8_t *image_buf = malloc(MAX_IMAGE_SIZE);
