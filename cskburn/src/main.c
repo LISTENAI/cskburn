@@ -16,13 +16,7 @@
 #define MAX_IMAGE_SIZE (20 * 1024 * 1024)
 #define ENTER_TRIES 5
 
-#if defined(_WIN32) || defined(_WIN64)
 #define DEFAULT_BAUD 3000000
-#elif defined(__APPLE__) || defined(__linux__)
-#define DEFAULT_BAUD 3840000
-#else
-#define DEFAULT_BAUD 115200
-#endif
 
 #define DEFAULT_PROBE_TIMEOUT 10 * 1000
 #define DEFAULT_RESET_ATTEMPTS 4
