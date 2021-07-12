@@ -46,7 +46,7 @@
 // 因此写入超时取 100ms
 // 当 erase 阻塞导致队列满时，burner 会延迟 100ms 返回 0x0A，故取 500ms 保险值
 // 取值过小会导致正常返回和重试返回叠加，seq 错位
-#define TIMEOUT_FLASH_DATA 1000
+#define TIMEOUT_FLASH_DATA 1200
 
 // MD5 计算指令超时时间
 #define TIMEOUT_FLASH_MD5SUM 5000
