@@ -35,10 +35,10 @@
 #define CHECKSUM_NONE 0
 
 // 默认指令超时时间
-#define TIMEOUT_DEFAULT 200
+#define TIMEOUT_DEFAULT 500
 
 // Mem 写入指令超时时间
-#define TIMEOUT_MEM_DATA 500
+#define TIMEOUT_MEM_DATA 800
 
 // Flash 写入指令超时时间
 // 实测极限烧录速度为 8M/48s，约 170KB/s
