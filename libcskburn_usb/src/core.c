@@ -89,6 +89,10 @@ cskburn_usb_open(int16_t bus, int16_t address)
 		goto err_open;
 	}
 
+#if ARCH_LINUX
+	libusb_set_auto_detach_kernel_driver(handle, 1);
+#endif // ARCH_LINUX
+
 	libusb_set_configuration(handle, 1);
 	libusb_claim_interface(handle, 0);
 	libusb_set_interface_alt_setting(handle, 0, 0);

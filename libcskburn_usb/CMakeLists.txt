@@ -23,4 +23,6 @@ else()
     find_package(PkgConfig)
     pkg_search_module(USB REQUIRED IMPORTED_TARGET libusb-1.0)
     target_link_libraries(${PROJECT_NAME} PkgConfig::USB)
+
+    target_compile_options(${PROJECT_NAME} PRIVATE -DARCH_LINUX)
 endif()
