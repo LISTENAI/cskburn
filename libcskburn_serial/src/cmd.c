@@ -378,7 +378,7 @@ cmd_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, 
 	}
 
 	if (ret == 0x0A) {
-		msleep(500);
+		msleep(250);
 	}
 
 	return !ret;
