@@ -82,7 +82,7 @@ typedef cmd_mem_finish_t cmd_flash_finish_t;
 
 typedef struct {
 	uint32_t baud;
-	uint32_t rev;
+	uint32_t old_baud;
 } cmd_change_baud_t;
 
 typedef struct {
@@ -435,11 +435,12 @@ cmd_flash_md5_challenge(cskburn_serial_device_t *dev)
 }
 
 bool
-cmd_change_baud(cskburn_serial_device_t *dev, uint32_t baud)
+cmd_change_baud(cskburn_serial_device_t *dev, uint32_t baud, uint32_t old_baud)
 {
 	cmd_change_baud_t *cmd = (cmd_change_baud_t *)dev->req_cmd;
 	memset(cmd, 0, sizeof(cmd_change_baud_t));
 	cmd->baud = baud;
+	cmd->old_baud = old_baud;
 
 	if (!command(dev, CMD_CHANGE_BAUDRATE, sizeof(cmd_change_baud_t), CHECKSUM_NONE, NULL, NULL,
 				NULL, 0, 1000)) {
