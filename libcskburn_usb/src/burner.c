@@ -214,7 +214,7 @@ burner_flash_write(void *handle, uint32_t addr, uint32_t len, uint32_t flag)
 	return false;
 }
 
-static bool
+bool
 burner_sync(void *handle, int retries)
 {
 	burner_resp_common_t resp = {0};
