@@ -30,7 +30,7 @@ cskburn_serial_init(bool invert_rts)
 }
 
 cskburn_serial_device_t *
-cskburn_serial_open(const char *path)
+cskburn_serial_open(const char *path, uint32_t chip)
 {
 	cskburn_serial_device_t *dev =
 			(cskburn_serial_device_t *)malloc(sizeof(cskburn_serial_device_t));
@@ -46,6 +46,7 @@ cskburn_serial_open(const char *path)
 	dev->res_slip_buf = (uint8_t *)malloc(MAX_RES_SLIP_LEN);
 	dev->req_hdr = dev->req_raw_buf;
 	dev->req_cmd = dev->req_raw_buf + sizeof(csk_command_t);
+	dev->chip = chip;
 	return dev;
 
 err_open:
@@ -110,36 +111,39 @@ bool
 cskburn_serial_enter(
 		cskburn_serial_device_t *dev, uint32_t baud_rate, uint8_t *burner, uint32_t len)
 {
-	if (len == 0) {
-		burner = burner_serial;
-		len = burner_serial_len;
-	}
-
-	uint32_t offset, length;
-	uint32_t blocks = BLOCKS(len, RAM_BLOCK_SIZE);
-
-	if (!cmd_mem_begin(dev, len, blocks, RAM_BLOCK_SIZE, 0)) {
-		return false;
-	}
-
-	for (uint32_t i = 0; i < blocks; i++) {
-		offset = RAM_BLOCK_SIZE * i;
-		length = RAM_BLOCK_SIZE;
-
-		if (offset + length > len) {
-			length = len - offset;
+	uint32_t chip = dev->chip;
+	if (chip == 3 || chip == 4) {
+		if (len == 0) {
+			burner = burner_serial;
+			len = burner_serial_len;
 		}
 
-		if (!cmd_mem_block(dev, burner + offset, length, i)) {
+		uint32_t offset, length;
+		uint32_t blocks = BLOCKS(len, RAM_BLOCK_SIZE);
+
+		if (!cmd_mem_begin(dev, len, blocks, RAM_BLOCK_SIZE, 0)) {
 			return false;
 		}
-	}
 
-	if (!cmd_mem_finish(dev)) {
-		return false;
-	}
+		for (uint32_t i = 0; i < blocks; i++) {
+			offset = RAM_BLOCK_SIZE * i;
+			length = RAM_BLOCK_SIZE;
 
-	msleep(500);
+			if (offset + length > len) {
+				length = len - offset;
+			}
+
+			if (!cmd_mem_block(dev, burner + offset, length, i)) {
+				return false;
+			}
+		}
+
+		if (!cmd_mem_finish(dev)) {
+			return false;
+		}
+
+		msleep(500);
+	}
 
 	if (!try_sync(dev, 2000)) {
 		LOGD("错误: 无法识别设备");
@@ -201,6 +205,7 @@ bool
 cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image, uint32_t len,
 		void (*on_progress)(int32_t wrote_bytes, uint32_t total_bytes))
 {
+	uint32_t chip = dev->chip;
 	uint32_t offset, length;
 	uint32_t blocks = BLOCKS(len, FLASH_BLOCK_SIZE);
 
@@ -228,18 +233,31 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image
 		if (!try_flash_block(dev, image + offset, length, i, &next)) {
 			return false;
 		}
-		if (next != i + 1) {
-			LOGD("指针由 %d 跳至 %d", i, next);
+		if (chip == 6) {
+			i++;
+		} else {
+			if (next != i + 1) {
+				LOGD("指针由 %d 跳至 %d", i, next);
+			}
+			i = next;
 		}
-		i = next;
 
 		if (on_progress != NULL) {
 			on_progress(offset + length, len);
 		}
 	}
 
-	if (!try_flash_md5_challenge(dev)) {
+	if (chip != 6 && !try_flash_md5_challenge(dev)) {
 		LOGD("错误: MD5 校验失败");
+		return false;
+	}
+
+	if (chip == 6) {
+		for (int i = 0; i < FLASH_BLOCK_TRIES; i++) {
+			if (cmd_flash_finish(dev)) {
+				return true;
+			}
+		}
 		return false;
 	}
 

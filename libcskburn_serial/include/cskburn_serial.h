@@ -9,7 +9,7 @@ void cskburn_serial_init(bool invert_rts);
 struct _cskburn_serial_device_t;
 typedef struct _cskburn_serial_device_t cskburn_serial_device_t;
 
-cskburn_serial_device_t *cskburn_serial_open(const char *path);
+cskburn_serial_device_t *cskburn_serial_open(const char *pat, uint32_t chip);
 void cskburn_serial_close(cskburn_serial_device_t **dev);
 
 bool cskburn_serial_connect(
@@ -23,6 +23,8 @@ bool cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *
 
 bool cskburn_serial_verify(
 		cskburn_serial_device_t *dev, uint32_t addr, uint32_t size, uint8_t *md5);
+
+bool cskburn_serial_finish(cskburn_serial_device_t *dev);
 
 bool cskburn_serial_read_chip_id(cskburn_serial_device_t *dev, uint64_t *chip_id);
 
