@@ -146,7 +146,7 @@ cskburn_serial_enter(
 		return false;
 	}
 
-	if (!cmd_change_baud(dev, baud_rate)) {
+	if (!cmd_change_baud(dev, baud_rate, 115200)) {
 		LOGD("错误: 无法设置串口速率");
 		return false;
 	}

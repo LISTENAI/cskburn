@@ -126,6 +126,10 @@ cskburn_usb_enter(cskburn_usb_device_t *dev, uint8_t *burner, uint32_t len)
 		len = burner_usb_len;
 	}
 
+	if (burner_sync(dev->handle, 10)) {
+		return true;
+	}
+
 	if (!bootrom_load(dev->handle, burner, len)) {
 		return false;
 	}
@@ -146,4 +150,10 @@ cskburn_usb_write(cskburn_usb_device_t *dev, uint32_t addr, uint8_t *image, uint
 		void (*on_progress)(int32_t wrote_bytes, uint32_t total_bytes))
 {
 	return burner_burn(dev->handle, addr, image, len, on_progress);
+}
+
+bool
+cskburn_usb_show_done(cskburn_usb_device_t *dev)
+{
+	return burner_show_done(dev->handle, 3);
 }

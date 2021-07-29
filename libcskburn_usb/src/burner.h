@@ -9,4 +9,8 @@ typedef void (*burner_burn_progress_cb)(int32_t wrote_bytes, uint32_t total_byte
 bool burner_burn(void *handle, uint32_t addr, uint8_t *image, uint32_t len,
 		burner_burn_progress_cb on_progress);
 
+bool burner_sync(void *handle, int retries);
+
+bool burner_show_done(void *handle, int retries);
+
 #endif  // __LIB_CSKBURN_USB_BURNER__

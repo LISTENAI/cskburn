@@ -20,4 +20,6 @@ bool cskburn_usb_enter(cskburn_usb_device_t *dev, uint8_t *burner, uint32_t len)
 bool cskburn_usb_write(cskburn_usb_device_t *dev, uint32_t addr, uint8_t *image, uint32_t len,
 		void (*on_progress)(int32_t wrote_bytes, uint32_t total_bytes));
 
+bool cskburn_usb_show_done(cskburn_usb_device_t *dev);
+
 #endif  // __LIB_CSKBURN_USB__
