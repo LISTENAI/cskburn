@@ -345,10 +345,13 @@ cmd_flash_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks, ui
 	cmd->block_size = block_size;
 	cmd->offset = offset;
 
-	uint8_t *req_data = (uint8_t *)dev->req_cmd + sizeof(cmd_flash_begin_t);
-	memcpy(req_data, md5, MD5_LEN);
+	uint32_t in_len = sizeof(cmd_flash_block_t);
 
-	uint32_t in_len = sizeof(cmd_flash_block_t) + MD5_LEN;
+	if (dev->chip != 6) {
+		uint8_t *req_data = (uint8_t *)dev->req_cmd + sizeof(cmd_flash_begin_t);
+		memcpy(req_data, md5, MD5_LEN);
+		in_len += MD5_LEN;
+	}
 
 	return !check_command(
 			dev, CMD_FLASH_BEGIN, in_len, checksum(md5, MD5_LEN), NULL, TIMEOUT_DEFAULT);
@@ -393,7 +396,7 @@ cmd_flash_finish(cskburn_serial_device_t *dev)
 	cmd->address = 0;
 
 	return !check_command(
-			dev, CMD_FLASH_END, sizeof(cmd_flash_finish_t), CHECKSUM_NONE, NULL, TIMEOUT_DEFAULT);
+			dev, CMD_FLASH_END, sizeof(uint32_t), CHECKSUM_NONE, NULL, TIMEOUT_DEFAULT);
 }
 
 bool

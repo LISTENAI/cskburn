@@ -26,6 +26,8 @@
 #define DEFAULT_PASS_DELAY 500
 #define DEFAULT_FAIL_DELAY 500
 
+#define DEFAULT_CHIP 4
+
 static struct option long_options[] = {
 		{"help", no_argument, NULL, 'h'},
 		{"version", no_argument, NULL, 'V'},
@@ -33,6 +35,7 @@ static struct option long_options[] = {
 		{"trace", no_argument, NULL, 0},
 		{"no-progress", no_argument, NULL, 0},
 		{"wait", no_argument, NULL, 'w'},
+		{"chip", required_argument, NULL, 'C'},
 #ifndef WITHOUT_USB
 		{"usb", required_argument, NULL, 'u'},
 #endif
@@ -57,6 +60,7 @@ static struct option long_options[] = {
 static const char option_string[] = {
 		"hVv"
 		"w"
+		"C:"
 #ifndef WITHOUT_USB
 		"u:"
 		"R"
@@ -92,6 +96,7 @@ static struct {
 	bool repeat;
 	cskburn_protocol_t protocol;
 	cskburn_action_t action;
+	uint32_t chip;
 #ifndef WITHOUT_USB
 	char *usb;
 	int16_t usb_bus;
@@ -117,6 +122,7 @@ static struct {
 } options = {
 		.progress = true,
 		.wait = false,
+		.chip = 4,
 #ifndef WITHOUT_USB
 		.repeat = false,
 		.action = ACTION_NONE,
@@ -159,6 +165,7 @@ print_help(const char *progname)
 #ifndef WITHOUT_USB
 	LOGI("  -R, --repeat\t\t\t\t循环等待设备插入，并自动开始烧录");
 	LOGI("  -c, --check\t\t\t\t检查设备是否插入 (不进行烧录)");
+	LOGI("  -C, --chip\t\t\t\t指定芯片系列，支持3/4/6，默认为 %d", DEFAULT_CHIP);
 #endif
 	LOGI("");
 	LOGI("用例:");
@@ -213,6 +220,14 @@ main(int argc, char **argv)
 				break;
 			case 'c':
 				options.action = ACTION_CHECK;
+				break;
+			case 'C':
+				sscanf(optarg, "%d", &options.chip);
+				if (options.chip != 6 && options.chip != 4 && options.chip != 3) {
+					LOGE("错误: chip 只支持 3 | 4 | 6");
+					return -1;
+				}
+				if (options.chip == 3) options.chip = 4;
 				break;
 			case 0: { /* long-only options */
 				const char *name = long_options[long_index].name;
@@ -306,6 +321,10 @@ main(int argc, char **argv)
 		LOGE("错误: 必须指定一个串口设备 (如: -s %s)", example_serial_dev);
 		return -1;
 #else
+		if (options.chip == 6) {
+			LOGE("错误: 6 系列芯片不支持 USB 烧录");
+			return -1;
+		}
 		if (options.usb != NULL && strcmp(options.usb, "-") != 0) {
 			if (sscanf(options.usb, "%hu:%hu\n", &options.usb_bus, &options.usb_addr) != 2) {
 				LOGE("错误: -u/--usb 参数的格式应为 <总线>:<设备> (如: -u 020:004)");
@@ -576,7 +595,7 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 
 	cskburn_serial_init(options.update_high);
 
-	cskburn_serial_device_t *dev = cskburn_serial_open(options.serial);
+	cskburn_serial_device_t *dev = cskburn_serial_open(options.serial, options.chip);
 	if (dev == NULL) {
 		LOGE("错误: 设备打开失败");
 		goto err_open;

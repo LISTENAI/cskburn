@@ -10,6 +10,7 @@ struct _cskburn_serial_device_t {
 	uint8_t *req_raw_buf;
 	uint8_t *req_slip_buf;
 	uint8_t *res_slip_buf;
+	uint32_t chip;
 };
 
 #endif  // __LIB_CSKBURN_SERIAL_CORE__
