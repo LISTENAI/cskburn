@@ -11,4 +11,6 @@ bool burner_burn(void *handle, uint32_t addr, uint8_t *image, uint32_t len,
 
 bool burner_sync(void *handle, int retries);
 
+bool burner_show_done(void *handle, int retries);
+
 #endif  // __LIB_CSKBURN_USB_BURNER__

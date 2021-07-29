@@ -151,3 +151,9 @@ cskburn_usb_write(cskburn_usb_device_t *dev, uint32_t addr, uint8_t *image, uint
 {
 	return burner_burn(dev->handle, addr, image, len, on_progress);
 }
+
+bool
+cskburn_usb_show_done(cskburn_usb_device_t *dev)
+{
+	return burner_show_done(dev->handle, 3);
+}

@@ -239,6 +239,31 @@ burner_sync(void *handle, int retries)
 	return false;
 }
 
+bool
+burner_show_done(void *handle, int retries)
+{
+	burner_resp_common_t resp = {0};
+
+	burner_cmd_common_t cmd = {
+			.cmdcode = CMD_CODE_H2D_SHOW_DONE,
+	};
+
+	for (int i = 0; i < retries; i++) {
+		if (!burner_transmit(handle, &cmd, sizeof(cmd), &resp)) {
+			return false;
+		}
+		if (resp.respcode == RESP_CODE_BUSY) {
+			msleep(200);
+		}
+		if ((resp.respcode == RESP_CODE_SUCCESS || resp.respcode == RESP_CODE_READY) &&
+				(resp.cmdorg == cmd.cmdcode || resp.cmdorg == CMD_CODE_ANY)) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 static bool
 burner_get_result(void *handle, uint8_t cmdcode, int timeout)
 {

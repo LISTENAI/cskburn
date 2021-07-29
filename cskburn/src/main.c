@@ -518,6 +518,8 @@ usb_burn(uint32_t *addrs, char **images, int parts)
 		}
 	}
 
+	cskburn_usb_show_done(dev);
+
 	LOGI("烧录完成");
 	ret = true;
 
