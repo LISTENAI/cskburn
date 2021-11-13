@@ -2,3 +2,7 @@
 	path = unity
 	url = https://github.com/ThrowTheSwitch/Unity
 	branch = master
+[submodule "third/libusb/libusb"]
+	path = third/libusb/libusb
+	url = https://github.com/libusb/libusb.git
+	branch = master

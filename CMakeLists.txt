@@ -11,6 +11,8 @@ if(WIN32)
     if(NOT WITHOUT_USB)
         add_subdirectory(windows/libusb-win32-compat)
     endif()
+else()
+    add_subdirectory(third/libusb)
 endif()
 
 add_subdirectory(liblog)
