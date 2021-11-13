@@ -1,0 +1,115 @@
+name: build
+
+on:
+  push:
+    branches: '*'
+    tags: 'v*.*'
+  pull_request:
+
+jobs:
+  build-posix:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        include:
+          - { name: linux, os: ubuntu-latest }
+          - { name: darwin, os: macos-latest }
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Install dependencies
+        if: ${{ matrix.name == 'linux' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libudev-dev
+
+      - name: Build
+        run: |
+          cmake -B build
+          cmake --build build --config Release
+          ctest --test-dir build --build-config Release --output-on-failure
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: cskburn-${{ matrix.name }}-x64
+          path: build/cskburn/cskburn
+          if-no-files-found: error
+
+  build-win32:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        include:
+          - { name: win32, os: windows-latest }
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+
+      - name: Build
+        run: |
+          chcp 437
+          cmake -B build
+          cmake --build build --config Release
+          ctest --test-dir build --build-config Release --output-on-failure
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: cskburn-${{ matrix.name }}-x64
+          path: build\cskburn\Release\cskburn.exe
+          if-no-files-found: error
+
+  build-docker:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - { name: arm, arch: armv7, distro: buster }
+          - { name: arm64, arch: aarch64, distro: buster }
+          - { name: arm-musl, arch: armv7, distro: alpine_latest }
+          - { name: arm64-musl, arch: aarch64, distro: alpine_latest }
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Build
+        uses: uraimo/run-on-arch-action@v2.1.1
+        with:
+          arch: ${{ matrix.arch }}
+          distro: ${{ matrix.distro }}
+          githubToken: ${{ github.token }}
+          install: |
+            case "${{ matrix.distro }}" in
+              buster)
+                apt-get update -q -y
+                apt-get install -q -y git build-essential cmake pkg-config libudev-dev
+                ;;
+              alpine_latest*)
+                apk update
+                apk add git cmake make g++ libtool musl-dev linux-headers pkgconfig eudev-dev
+                ;;
+            esac
+          run: |
+            cmake -B build
+            cmake --build build --config Release
+            ctest --test-dir build --build-config Release --output-on-failure
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: cskburn-linux-${{ matrix.name }}
+          path: build/cskburn/cskburn
+          if-no-files-found: error

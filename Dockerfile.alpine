@@ -3,8 +3,7 @@ FROM alpine:3.11
 RUN mkdir -p /project
 WORKDIR /project
 
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories && \
-    apk update
+RUN apk update
 
 RUN apk --no-cache add \
     bash \
