@@ -1,2 +1,2 @@
 @ECHO OFF
-rmdir /Q /S out
+rmdir /Q /S build

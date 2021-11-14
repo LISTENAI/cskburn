@@ -10,4 +10,3 @@
 
 * GCC
 * CMake
-* libusb

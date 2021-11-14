@@ -1,8 +1,0 @@
-#!/usr/bin/env node
-const { spawn } = require('child_process');
-const { CSKBURN } = require('./');
-const args = process.argv.slice(2);
-spawn(CSKBURN, args, {
-    argv0: 'cskburn',
-    stdio: 'inherit',
-}).on('close', process.exit.bind(process));

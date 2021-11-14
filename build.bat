@@ -1,5 +1,3 @@
 @ECHO OFF
-IF NOT EXIST out mkdir out
-pushd out
-cmake .. && cmake --build . --config Release
-popd
+cmake -B build
+cmake --build build --config Release

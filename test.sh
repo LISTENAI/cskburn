@@ -1,5 +1,4 @@
 #!/bin/bash
-mkdir -p out
-pushd out > /dev/null
-cmake .. && cmake --build . && ctest --output-on-failure
-popd > /dev/null
+cmake -B build
+cmake --build build --config Release
+ctest --test-dir build --build-config Release --output-on-failure
