@@ -13,8 +13,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - { name: linux, os: ubuntu-latest }
-          - { name: darwin, os: macos-latest }
+          - { name: linux-x64, os: ubuntu-latest }
+          - { name: darwin-x64, os: macos-latest }
 
     steps:
       - uses: actions/checkout@v2
@@ -34,7 +34,37 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: cskburn-${{ matrix.name }}-x64
+          name: cskburn-${{ matrix.name }}
+          path: build/cskburn/cskburn
+          if-no-files-found: error
+
+  build-silicon:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        include:
+          - { name: darwin-arm64, os: macos-latest }
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Setup Ninja
+        uses: ashutoshvarma/setup-ninja@master
+
+      - name: Build
+        run: |
+          export CFLAGS='-target arm64-apple-macos'
+          cmake -G Ninja -B build
+          cmake --build build --config Release
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: cskburn-${{ matrix.name }}
           path: build/cskburn/cskburn
           if-no-files-found: error
 
@@ -44,7 +74,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - { name: win32, os: windows-latest }
+          - { name: win32-x64, os: windows-latest }
 
     steps:
       - uses: actions/checkout@v2
@@ -71,7 +101,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: cskburn-${{ matrix.name }}-x64
+          name: cskburn-${{ matrix.name }}
           path: build/cskburn/cskburn.exe
           if-no-files-found: error
 
@@ -81,10 +111,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - { name: arm, arch: armv7, distro: buster }
-          - { name: arm64, arch: aarch64, distro: buster }
-          - { name: arm-musl, arch: armv7, distro: alpine_latest }
-          - { name: arm64-musl, arch: aarch64, distro: alpine_latest }
+          - { name: linux-arm, arch: armv7, distro: buster }
+          - { name: linux-arm64, arch: aarch64, distro: buster }
+          - { name: linux-arm-musl, arch: armv7, distro: alpine_latest }
+          - { name: linux-arm64-musl, arch: aarch64, distro: alpine_latest }
 
     steps:
       - uses: actions/checkout@v2
@@ -117,7 +147,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: cskburn-linux-${{ matrix.name }}
+          name: cskburn-${{ matrix.name }}
           path: build/cskburn/cskburn
           if-no-files-found: error
 
