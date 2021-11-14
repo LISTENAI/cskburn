@@ -8,12 +8,7 @@ add_executable(
 target_link_libraries(${PROJECT_NAME} log)
 target_link_libraries(${PROJECT_NAME} portable)
 
-if(WITHOUT_USB)
-    target_compile_options(${PROJECT_NAME} PRIVATE -DWITHOUT_USB)
-else()
-    target_link_libraries(${PROJECT_NAME} cskburn_usb)
-endif()
-
+target_link_libraries(${PROJECT_NAME} cskburn_usb)
 target_link_libraries(${PROJECT_NAME} cskburn_serial)
 
 execute_process(COMMAND git describe --tags --abbrev=0 OUTPUT_VARIABLE GIT_TAG OUTPUT_STRIP_TRAILING_WHITESPACE)

@@ -6,3 +6,7 @@
 	path = third/libusb/libusb
 	url = https://github.com/libusb/libusb.git
 	branch = v1.0.24
+[submodule "third/libusb-win32/libusb-win32"]
+	path = third/libusb-win32/libusb-win32
+	url = https://github.com/mcuee/libusb-win32.git
+	branch = snapshot_1.2.7.3
