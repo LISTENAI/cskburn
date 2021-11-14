@@ -22,12 +22,6 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Install dependencies
-        if: ${{ matrix.name == 'linux' }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libudev-dev
-
       - name: Build
         run: |
           cmake -B build
@@ -95,11 +89,11 @@ jobs:
             case "${{ matrix.distro }}" in
               buster)
                 apt-get update -q -y
-                apt-get install -q -y git build-essential cmake pkg-config libudev-dev
+                apt-get install -q -y git build-essential cmake
                 ;;
               alpine_latest*)
                 apk update
-                apk add git cmake make g++ libtool musl-dev linux-headers pkgconfig eudev-dev
+                apk add git cmake make g++ libtool musl-dev linux-headers
                 ;;
             esac
           run: |

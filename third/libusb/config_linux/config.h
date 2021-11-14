@@ -11,7 +11,7 @@
 #define ENABLE_LOGGING 1
 
 /* Define to 1 if you have the <asm/types.h> header file. */
-/* #undef HAVE_ASM_TYPES_H */
+#define HAVE_ASM_TYPES_H 1
 
 /* Define to 1 if you have the `clock_gettime' function. */
 #define HAVE_CLOCK_GETTIME 1
@@ -46,7 +46,7 @@
 /* #undef HAVE_IOKIT_USB_IOUSBHOSTFAMILYDEFINITIONS_H */
 
 /* Define to 1 if you have the `udev' library (-ludev). */
-#define HAVE_LIBUDEV 1
+/* #undef HAVE_LIBUDEV */
 
 /* Define to 1 if you have the <memory.h> header file. */
 #define HAVE_MEMORY_H 1

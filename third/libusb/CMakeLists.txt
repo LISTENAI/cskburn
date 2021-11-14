@@ -23,7 +23,7 @@ if(APPLE)
     set(OS_SRC ${OS_DARWIN_SRC})
 elseif(UNIX)
     set(OS_SRC ${OS_LINUX_SRC})
-    list(APPEND OS_SRC os/linux_udev.c)
+    list(APPEND OS_SRC os/linux_netlink.c)
 endif()
 
 set(SOURCES
@@ -56,11 +56,6 @@ if(APPLE)
     target_link_libraries(${PROJECT_NAME} "-framework Security")
 elseif(UNIX)
     target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_SOURCE_DIR}/config_linux)
-
-    find_package(PkgConfig)
-    pkg_search_module(UDev REQUIRED IMPORTED_TARGET libudev)
-    target_link_libraries(${PROJECT_NAME} PUBLIC PkgConfig::UDev)
-
     find_package(Threads REQUIRED)
     target_link_libraries(${PROJECT_NAME} PUBLIC Threads::Threads)
 endif()
