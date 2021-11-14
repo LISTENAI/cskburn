@@ -22,9 +22,12 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Setup Ninja
+        uses: ashutoshvarma/setup-ninja@master
+
       - name: Build
         run: |
-          cmake -B build
+          cmake -G Ninja -B build
           cmake --build build --config Release
           ctest --test-dir build --build-config Release --output-on-failure
 
@@ -54,8 +57,6 @@ jobs:
           msystem: MINGW64
           install: >-
             git
-            zip
-            make
             mingw-w64-x86_64-toolchain
             mingw-w64-x86_64-cmake
             mingw-w64-x86_64-ninja
@@ -63,7 +64,7 @@ jobs:
       - name: Build
         shell: msys2 {0}
         run: |
-          cmake -B build -G Ninja
+          cmake -G Ninja -B build
           cmake --build build --config Release
           ctest --test-dir build --build-config Release --output-on-failure
 
@@ -101,15 +102,15 @@ jobs:
             case "${{ matrix.distro }}" in
               buster)
                 apt-get update -q -y
-                apt-get install -q -y git build-essential cmake
+                apt-get install -q -y git build-essential cmake ninja-build
                 ;;
               alpine_latest*)
                 apk update
-                apk add git cmake make g++ libtool musl-dev linux-headers
+                apk add git cmake make ninja g++ libtool musl-dev linux-headers
                 ;;
             esac
           run: |
-            cmake -B build
+            cmake -G Ninja -B build
             cmake --build build --config Release
             ctest --test-dir build --build-config Release --output-on-failure
 
@@ -133,6 +134,9 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Setup Ninja
+        uses: ashutoshvarma/setup-ninja@master
+
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
         with:
@@ -141,7 +145,7 @@ jobs:
 
       - name: Build
         run: |
-          cmake -B build \
+          cmake -G Ninja -B build \
             -DCMAKE_SYSTEM_NAME=Android \
             -DCMAKE_ANDROID_ARCH_ABI=${{ matrix.abi }} \
             -DCMAKE_ANDROID_NDK=${{ steps.setup-ndk.outputs.ndk-path }}

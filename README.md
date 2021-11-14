@@ -31,7 +31,7 @@ cskburn
 ## 编译
 
 ```sh
-cmake -B build
+cmake -G Ninja -B build
 cmake --build build --config Release
 ```
 
@@ -39,13 +39,20 @@ cmake --build build --config Release
 
 #### Windows
 
-* Visual Studio 16 2019
+* MSYS2 MinGW64
 * CMake
+* Ninja
 
 #### Linux/macOS
 
-* GCC
 * CMake
+* Ninja
+
+#### Android
+
+* Android NDK r22b
+* CMake
+* Ninja
 
 ## 协议
 
