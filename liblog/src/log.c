@@ -1,7 +1,9 @@
 #include <log.h>
 
+int csk_log_level;
+
 void
 set_log_level(int level)
 {
-	log_level = level;
+	csk_log_level = level;
 }
