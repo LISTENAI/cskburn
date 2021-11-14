@@ -4,10 +4,6 @@ project(CSKBurnKit)
 enable_testing()
 
 if(WIN32)
-    add_compile_options("$<$<C_COMPILER_ID:MSVC>:/source-charset:utf-8>")
-    add_compile_options("$<$<CONFIG:Release>:/MT>")
-    add_subdirectory(windows/getopt)
-
     if(NOT WITHOUT_USB)
         add_subdirectory(windows/libusb-win32-compat)
     endif()

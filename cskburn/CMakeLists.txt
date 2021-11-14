@@ -8,10 +8,6 @@ add_executable(
 target_link_libraries(${PROJECT_NAME} log)
 target_link_libraries(${PROJECT_NAME} portable)
 
-if(WIN32)
-    target_link_libraries(${PROJECT_NAME} getopt)
-endif()
-
 if(WITHOUT_USB)
     target_compile_options(${PROJECT_NAME} PRIVATE -DWITHOUT_USB)
 else()
