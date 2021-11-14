@@ -5,4 +5,4 @@
 [submodule "third/libusb/libusb"]
 	path = third/libusb/libusb
 	url = https://github.com/libusb/libusb.git
-	branch = master
+	branch = v1.0.24
