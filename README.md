@@ -1,7 +1,7 @@
 cskburn
 ==========
 
-[![license][license-img]][license-url] [![issues][issues-img]][issues-url] [![stars][stars-img]][stars-url] [![commits][commits-img]][commits-url]
+[![release][release-img]][release-url] [![downloads][downloads-img]][downloads-url] [![license][license-img]][license-url] [![issues][issues-img]][issues-url] [![stars][stars-img]][stars-url] [![commits][commits-img]][commits-url]
 
 聆思 CSK 系列芯片烧录工具，[串口 OTA 协议](https://docs.listenai.com/AIsolution/dsp/firmware_development/OTA_service#5-ota%E5%8D%8F%E8%AE%AE)的一个跨平台参考实现。
 
@@ -58,6 +58,10 @@ cmake --build build --config Release
 
 [Apache-2.0 License](LICENSE)
 
+[release-img]: https://img.shields.io/github/v/release/LISTENAI/cskburn?style=flat-square
+[release-url]: https://github.com/LISTENAI/cskburn/releases/latest
+[downloads-img]: https://img.shields.io/github/downloads/LISTENAI/cskburn/total?style=flat-square
+[downloads-url]: https://github.com/LISTENAI/cskburn/releases
 [license-img]: https://img.shields.io/github/license/LISTENAI/cskburn?style=flat-square
 [license-url]: LICENSE
 [issues-img]: https://img.shields.io/github/issues/LISTENAI/cskburn?style=flat-square
