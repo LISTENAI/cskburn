@@ -26,5 +26,9 @@ if(FEATURE_MD5_CHALLENGE)
     target_compile_options(${PROJECT_NAME} PRIVATE -DFEATURE_MD5_CHALLENGE)
 endif()
 
+if(FEATURE_SEQ_QUEST)
+    target_compile_options(${PROJECT_NAME} PRIVATE -DFEATURE_SEQ_QUEST)
+endif()
+
 add_subdirectory(test)
 add_test(NAME ${PROJECT_NAME} COMMAND libcskburn_serial_test)

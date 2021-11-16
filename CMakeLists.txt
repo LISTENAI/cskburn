@@ -4,6 +4,7 @@ project(CSKBurnKit)
 enable_testing()
 
 set(FEATURE_MD5_CHALLENGE 1 GLOBAL)
+set(FEATURE_SEQ_QUEST 1 GLOBAL)
 
 if(WIN32)
     add_subdirectory(third/libusb-win32)

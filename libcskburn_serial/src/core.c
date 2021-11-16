@@ -240,14 +240,14 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image
 		if (!try_flash_block(dev, image + offset, length, i, &next)) {
 			return false;
 		}
-		if (chip == 6) {
-			i++;
-		} else {
-			if (next != i + 1) {
-				LOGD("指针由 %d 跳至 %d", i, next);
-			}
-			i = next;
+#ifdef FEATURE_SEQ_QUEST
+		if (next != i + 1) {
+			LOGD("指针由 %d 跳至 %d", i, next);
 		}
+		i = next;
+#else  // FEATURE_SEQ_QUEST
+		i++;
+#endif  // FEATURE_SEQ_QUEST
 
 		if (on_progress != NULL) {
 			on_progress(offset + length, len);
