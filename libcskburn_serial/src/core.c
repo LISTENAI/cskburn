@@ -9,7 +9,10 @@
 
 #include "core.h"
 #include "cmd.h"
+
+#ifdef FEATURE_MD5_CHALLENGE
 #include "mbedtls_md5.h"
+#endif  // FEATURE_MD5_CHALLENGE
 
 #define EFUSE_BASE 0xF1800000
 
@@ -190,6 +193,7 @@ try_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, 
 	return false;
 }
 
+#ifdef FEATURE_MD5_CHALLENGE
 static bool
 try_flash_md5_challenge(cskburn_serial_device_t *dev)
 {
@@ -200,6 +204,7 @@ try_flash_md5_challenge(cskburn_serial_device_t *dev)
 	}
 	return false;
 }
+#endif  // FEATURE_MD5_CHALLENGE
 
 bool
 cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image, uint32_t len,
@@ -212,9 +217,11 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image
 	uint64_t t1 = time_monotonic();
 
 	uint8_t md5[MD5_LEN];
+#ifdef FEATURE_MD5_CHALLENGE
 	if (mbedtls_md5_ret(image, len, md5) != 0) {
 		return false;
 	}
+#endif  // FEATURE_MD5_CHALLENGE
 
 	if (!try_flash_begin(dev, len, blocks, FLASH_BLOCK_SIZE, addr, md5)) {
 		return false;
@@ -247,10 +254,12 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image
 		}
 	}
 
-	if (chip != 6 && !try_flash_md5_challenge(dev)) {
+#ifdef FEATURE_MD5_CHALLENGE
+	if (!try_flash_md5_challenge(dev)) {
 		LOGD("错误: MD5 校验失败");
 		return false;
 	}
+#endif  // FEATURE_MD5_CHALLENGE
 
 	if (chip == 6) {
 		for (int i = 0; i < FLASH_BLOCK_TRIES; i++) {
