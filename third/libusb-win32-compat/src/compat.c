@@ -115,6 +115,13 @@ libusb_set_interface_alt_setting(
 }
 
 int
+libusb_set_auto_detach_kernel_driver(libusb_device_handle *dev_handle, int enable)
+{
+	// do nothing
+	return 0;
+}
+
+int
 libusb_bulk_transfer(libusb_device_handle *dev_handle, unsigned char endpoint, unsigned char *data,
 		int length, int *actual_length, unsigned int timeout)
 {

@@ -46,4 +46,6 @@ int libusb_release_interface(libusb_device_handle *dev_handle, int interface_num
 int libusb_set_interface_alt_setting(
 		libusb_device_handle *dev_handle, int interface_number, int alternate_setting);
 
+int libusb_set_auto_detach_kernel_driver(libusb_device_handle *dev_handle, int enable);
+
 #endif
