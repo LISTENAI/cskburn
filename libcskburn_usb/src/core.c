@@ -77,6 +77,7 @@ cskburn_usb_wait(int16_t bus, int16_t address, int timeout)
 cskburn_usb_device_t *
 cskburn_usb_open(int16_t bus, int16_t address)
 {
+	int ret;
 	cskburn_usb_device_t *dev = (cskburn_usb_device_t *)malloc(sizeof(cskburn_usb_device_t));
 
 	libusb_device *device = find_device(bus, address);
@@ -90,8 +91,12 @@ cskburn_usb_open(int16_t bus, int16_t address)
 	}
 
 	libusb_set_auto_detach_kernel_driver(handle, 1);
-	libusb_set_configuration(handle, 1);
-	libusb_claim_interface(handle, 0);
+	if ((ret = libusb_set_configuration(handle, 1)) != 0) {
+		LOGD("错误: 设置配置失败: %d", ret);
+	}
+	if ((ret = libusb_claim_interface(handle, 0)) != 0) {
+		LOGD("错误: 设置接口失败: %d", ret);
+	}
 	libusb_set_interface_alt_setting(handle, 0, 0);
 
 	dev->handle = handle;
