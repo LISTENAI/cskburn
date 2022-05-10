@@ -109,6 +109,7 @@ cskburn_usb_close(cskburn_usb_device_t **dev)
 {
 	if (dev != NULL) {
 		if ((*dev)->handle != NULL) {
+			libusb_release_interface((*dev)->handle, 0);
 			libusb_close((*dev)->handle);
 			(*dev)->handle = NULL;
 		}

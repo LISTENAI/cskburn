@@ -41,6 +41,8 @@ int libusb_set_configuration(libusb_device_handle *dev_handle, int configuration
 int libusb_get_configuration(libusb_device_handle *dev, int *config);
 
 int libusb_claim_interface(libusb_device_handle *dev_handle, int interface_number);
+int libusb_release_interface(libusb_device_handle *dev_handle, int interface_number);
+
 int libusb_set_interface_alt_setting(
 		libusb_device_handle *dev_handle, int interface_number, int alternate_setting);
 

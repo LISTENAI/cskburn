@@ -102,6 +102,12 @@ libusb_claim_interface(libusb_device_handle *dev_handle, int interface_number)
 }
 
 int
+libusb_release_interface(libusb_device_handle *dev_handle, int interface_number)
+{
+	return usb_release_interface(dev_handle, interface_number);
+}
+
+int
 libusb_set_interface_alt_setting(
 		libusb_device_handle *dev_handle, int interface_number, int alternate_setting)
 {
