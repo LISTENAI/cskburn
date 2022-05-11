@@ -178,6 +178,7 @@ jobs:
                 ;;
             esac
           run: |
+            git config --global --add safe.directory $PWD
             cmake -G Ninja -B build
             cmake --build build --config Release
             ctest --test-dir build --build-config Release --output-on-failure
