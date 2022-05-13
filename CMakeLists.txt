@@ -7,6 +7,7 @@ enable_testing()
 # set(FEATURE_SEQ_QUEST 1 GLOBAL)
 
 if(WIN32)
+    add_compile_options(-fexec-charset=GBK)
     add_subdirectory(third/libusb-win32)
     add_subdirectory(third/libusb-win32-compat)
 else()
