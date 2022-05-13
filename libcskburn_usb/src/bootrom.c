@@ -12,6 +12,8 @@
 
 #define DATA_BUF_SIZE 2048
 
+#define COMMAND_TIMEOUT 500
+
 typedef enum {
 	BOOTROM_READ_VERSION = 0x01,
 	BOOTROM_MEM_BEGIN = 0x05,
@@ -112,7 +114,7 @@ send_mem_command(void *handle, uint8_t *buf, uint32_t data_len)
 			(bootrom_command_data_status_t *)(resp + sizeof(bootrom_command_req_t));
 
 	ret = libusb_bulk_transfer(
-			handle, EP_ADDR_DATA_OUT, (unsigned char *)buf, data_len, &xferred, 200);
+			handle, EP_ADDR_DATA_OUT, (unsigned char *)buf, data_len, &xferred, COMMAND_TIMEOUT);
 
 	if (ret != 0) {
 		LOGD("错误: USB 数据写入失败: %d", ret);
@@ -124,8 +126,8 @@ send_mem_command(void *handle, uint8_t *buf, uint32_t data_len)
 		return false;
 	}
 
-	ret = libusb_bulk_transfer(
-			handle, EP_ADDR_CMD_RESP_IN, (unsigned char *)&resp, sizeof(resp), &xferred, 200);
+	ret = libusb_bulk_transfer(handle, EP_ADDR_CMD_RESP_IN, (unsigned char *)&resp, sizeof(resp),
+			&xferred, COMMAND_TIMEOUT);
 
 	if (ret != 0) {
 		LOGD("错误: USB 数据读取失败: %d", ret);
