@@ -21,12 +21,14 @@
 extern uint8_t burner_serial[];
 extern uint32_t burner_serial_len;
 
+static int init_flags = 0;
 static bool rts_active = SERIAL_LOW;
 
 void
-cskburn_serial_init(bool invert_rts)
+cskburn_serial_init(int flags)
 {
-	rts_active = invert_rts ? SERIAL_HIGH : SERIAL_LOW;
+	init_flags = flags;
+	rts_active = (flags & FLAG_INVERT_RTS) ? SERIAL_HIGH : SERIAL_LOW;
 }
 
 cskburn_serial_device_t *
@@ -90,7 +92,22 @@ try_sync(cskburn_serial_device_t *dev, int timeout)
 bool
 cskburn_serial_connect(cskburn_serial_device_t *dev, uint32_t reset_delay, uint32_t probe_timeout)
 {
-	if (reset_delay > 0) {
+	if (init_flags & FLAG_RESET_NANOKIT) {
+		// BOOT=HIGH, RESET=HIGH
+		serial_set_dtr(dev->handle, SERIAL_HIGH);
+		serial_set_rts(dev->handle, SERIAL_HIGH);
+
+		msleep(10);
+
+		// BOOT=HIGH, RESET=LOW
+		serial_set_rts(dev->handle, SERIAL_LOW);
+
+		msleep(50);
+
+		// BOOT=LOW, RESET=HIGH
+		serial_set_dtr(dev->handle, SERIAL_LOW);
+		serial_set_rts(dev->handle, SERIAL_HIGH);
+	} else if (reset_delay > 0) {
 		serial_set_dtr(dev->handle, SERIAL_HIGH);  // RESET=HIGH
 		serial_set_rts(dev->handle, !rts_active);  // UPDATE=HIGH
 
@@ -304,18 +321,30 @@ cskburn_serial_read_chip_id(cskburn_serial_device_t *dev, uint64_t *chip_id)
 bool
 cskburn_serial_reset(cskburn_serial_device_t *dev, uint32_t delay, bool ok)
 {
-	if (ok) {
-		serial_set_rts(dev->handle, SERIAL_LOW);  // UPDATE=LOW, LED=GREEN
+	if (init_flags & FLAG_RESET_NANOKIT) {
+		// BOOT=HIGH, RESET=LOW
+		serial_set_dtr(dev->handle, SERIAL_HIGH);
+		serial_set_rts(dev->handle, SERIAL_LOW);
+
+		msleep(50);
+
+		// BOOT=HIGH, RESET=HIGH
+		serial_set_dtr(dev->handle, SERIAL_HIGH);
+		serial_set_rts(dev->handle, SERIAL_HIGH);
 	} else {
-		serial_set_rts(dev->handle, SERIAL_HIGH);  // UPDATE=HIGH, LED=RED
+		if (ok) {
+			serial_set_rts(dev->handle, SERIAL_LOW);  // UPDATE=LOW, LED=GREEN
+		} else {
+			serial_set_rts(dev->handle, SERIAL_HIGH);  // UPDATE=HIGH, LED=RED
+		}
+
+		serial_set_dtr(dev->handle, SERIAL_LOW);  // RESET=LOW
+
+		msleep(delay);
+
+		serial_set_dtr(dev->handle, SERIAL_HIGH);  // RESET=HIGH
+		serial_set_rts(dev->handle, !rts_active);  // UPDATE=HIGH
 	}
-
-	serial_set_dtr(dev->handle, SERIAL_LOW);  // RESET=LOW
-
-	msleep(delay);
-
-	serial_set_dtr(dev->handle, SERIAL_HIGH);  // RESET=HIGH
-	serial_set_rts(dev->handle, !rts_active);  // UPDATE=HIGH
 
 	return true;
 }
