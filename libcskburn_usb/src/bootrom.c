@@ -112,7 +112,7 @@ send_mem_command(void *handle, uint8_t *buf, uint32_t data_len)
 			(bootrom_command_data_status_t *)(resp + sizeof(bootrom_command_req_t));
 
 	ret = libusb_bulk_transfer(
-			handle, EP_ADDR_DATA_OUT, (unsigned char *)buf, data_len, &xferred, 0);
+			handle, EP_ADDR_DATA_OUT, (unsigned char *)buf, data_len, &xferred, 200);
 
 	if (ret != 0) {
 		LOGD("错误: USB 数据写入失败: %d", ret);
@@ -125,7 +125,7 @@ send_mem_command(void *handle, uint8_t *buf, uint32_t data_len)
 	}
 
 	ret = libusb_bulk_transfer(
-			handle, EP_ADDR_CMD_RESP_IN, (unsigned char *)&resp, sizeof(resp), &xferred, 0);
+			handle, EP_ADDR_CMD_RESP_IN, (unsigned char *)&resp, sizeof(resp), &xferred, 200);
 
 	if (ret != 0) {
 		LOGD("错误: USB 数据读取失败: %d", ret);
