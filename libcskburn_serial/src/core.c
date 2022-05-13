@@ -16,20 +16,17 @@
 
 #define EFUSE_BASE 0xF1800000
 
-#define PIN_LO true
-#define PIN_HI false
-
 #define FLASH_BLOCK_TRIES 5
 
 extern uint8_t burner_serial[];
 extern uint32_t burner_serial_len;
 
-static bool rts_inverted = false;
+static bool rts_active = SERIAL_LOW;
 
 void
 cskburn_serial_init(bool invert_rts)
 {
-	rts_inverted = invert_rts;
+	rts_active = invert_rts ? SERIAL_HIGH : SERIAL_LOW;
 }
 
 cskburn_serial_device_t *
@@ -94,17 +91,17 @@ bool
 cskburn_serial_connect(cskburn_serial_device_t *dev, uint32_t reset_delay, uint32_t probe_timeout)
 {
 	if (reset_delay > 0) {
-		serial_set_dtr(dev->handle, PIN_HI);  // RESET=HIGH
-		serial_set_rts(dev->handle, rts_inverted ? PIN_LO : PIN_HI);  // UPDATE=HIGH
+		serial_set_dtr(dev->handle, SERIAL_HIGH);  // RESET=HIGH
+		serial_set_rts(dev->handle, !rts_active);  // UPDATE=HIGH
 
 		msleep(10);
 
-		serial_set_dtr(dev->handle, PIN_LO);  // RESET=LOW
-		serial_set_rts(dev->handle, rts_inverted ? PIN_HI : PIN_LO);  // UPDATE=LOW
+		serial_set_dtr(dev->handle, SERIAL_LOW);  // RESET=LOW
+		serial_set_rts(dev->handle, rts_active);  // UPDATE=LOW
 
 		msleep(reset_delay);
 
-		serial_set_dtr(dev->handle, PIN_HI);  // RESET=HIGH
+		serial_set_dtr(dev->handle, SERIAL_HIGH);  // RESET=HIGH
 	}
 
 	return try_sync(dev, probe_timeout);
@@ -308,17 +305,17 @@ bool
 cskburn_serial_reset(cskburn_serial_device_t *dev, uint32_t delay, bool ok)
 {
 	if (ok) {
-		serial_set_rts(dev->handle, PIN_LO);  // UPDATE=LOW, LED=GREEN
+		serial_set_rts(dev->handle, SERIAL_LOW);  // UPDATE=LOW, LED=GREEN
 	} else {
-		serial_set_rts(dev->handle, PIN_HI);  // UPDATE=HIGH, LED=RED
+		serial_set_rts(dev->handle, SERIAL_HIGH);  // UPDATE=HIGH, LED=RED
 	}
 
-	serial_set_dtr(dev->handle, PIN_LO);  // RESET=LOW
+	serial_set_dtr(dev->handle, SERIAL_LOW);  // RESET=LOW
 
 	msleep(delay);
 
-	serial_set_dtr(dev->handle, PIN_HI);  // RESET=HIGH
-	serial_set_rts(dev->handle, rts_inverted ? PIN_LO : PIN_HI);  // UPDATE=HIGH
+	serial_set_dtr(dev->handle, SERIAL_HIGH);  // RESET=HIGH
+	serial_set_rts(dev->handle, !rts_active);  // UPDATE=HIGH
 
 	return true;
 }
