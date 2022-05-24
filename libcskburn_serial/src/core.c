@@ -332,18 +332,12 @@ cskburn_serial_reset(cskburn_serial_device_t *dev, uint32_t delay, bool ok)
 		serial_set_dtr(dev->handle, SERIAL_HIGH);
 		serial_set_rts(dev->handle, SERIAL_HIGH);
 	} else {
-		if (ok) {
-			serial_set_rts(dev->handle, SERIAL_LOW);  // UPDATE=LOW, LED=GREEN
-		} else {
-			serial_set_rts(dev->handle, SERIAL_HIGH);  // UPDATE=HIGH, LED=RED
-		}
-
+		serial_set_rts(dev->handle, !rts_active);  // UPDATE=HIGH
 		serial_set_dtr(dev->handle, SERIAL_LOW);  // RESET=LOW
 
 		msleep(delay);
 
 		serial_set_dtr(dev->handle, SERIAL_HIGH);  // RESET=HIGH
-		serial_set_rts(dev->handle, !rts_active);  // UPDATE=HIGH
 	}
 
 	return true;
