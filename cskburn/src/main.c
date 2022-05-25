@@ -13,7 +13,7 @@
 #endif
 #include <cskburn_serial.h>
 
-#define MAX_IMAGE_SIZE (20 * 1024 * 1024)
+#define MAX_IMAGE_SIZE (32 * 1024 * 1024)
 #define MAX_VERIFY_PARTS 20
 #define ENTER_TRIES 5
 #define MD5_SIZE 16
