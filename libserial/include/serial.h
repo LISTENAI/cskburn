@@ -40,4 +40,11 @@ bool serial_set_rts(serial_dev_t *dev, bool active);
  */
 bool serial_set_dtr(serial_dev_t *dev, bool active);
 
+typedef struct {
+	uint16_t vendor_id;
+	uint16_t product_id;
+} serial_usb_info_t;
+
+bool serial_get_usb_info(serial_dev_t *dev, serial_usb_info_t *info);
+
 #endif  // __LIB_SERIAL__

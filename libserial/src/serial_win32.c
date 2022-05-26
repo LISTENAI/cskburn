@@ -1,7 +1,10 @@
 #include <serial.h>
 #include <windows.h>
 
+#include "usb_info.h"
+
 struct _serial_dev_t {
+	const char *path;
 	HANDLE handle;
 	OVERLAPPED overlapped_read;
 	OVERLAPPED overlapped_write;
@@ -66,6 +69,7 @@ serial_open(const char *path)
 	}
 
 	serial_dev_t *dev = (serial_dev_t *)malloc(sizeof(serial_dev_t));
+	dev->path = path;
 	dev->handle = handle;
 
 	SecureZeroMemory(&dev->overlapped_read, sizeof(OVERLAPPED));
@@ -181,4 +185,10 @@ serial_set_dtr(serial_dev_t *dev, bool val)
 	} else {
 		return EscapeCommFunction(dev->handle, CLRDTR) != 0;
 	}
+}
+
+bool
+serial_get_usb_info(serial_dev_t *dev, serial_usb_info_t *info)
+{
+	return get_usb_info(dev->path, info);
 }

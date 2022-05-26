@@ -8,8 +8,10 @@
 #include <sys/ioctl.h>
 
 #include "set_baud.h"
+#include "usb_info.h"
 
 struct _serial_dev_t {
+	const char *path;
 	int fd;
 };
 
@@ -98,6 +100,7 @@ serial_open(const char *path)
 	}
 
 	serial_dev_t *dev = (serial_dev_t *)malloc(sizeof(serial_dev_t));
+	dev->path = path;
 	dev->fd = fd;
 
 	return dev;
@@ -179,4 +182,10 @@ bool
 serial_set_dtr(serial_dev_t *dev, bool val)
 {
 	return set_modem_control(dev->fd, TIOCM_DTR, val);
+}
+
+bool
+serial_get_usb_info(serial_dev_t *dev, serial_usb_info_t *info)
+{
+	return get_usb_info(dev->path, info);
 }
