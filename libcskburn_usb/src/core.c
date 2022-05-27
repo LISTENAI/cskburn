@@ -1,14 +1,14 @@
+#include "core.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <log.h>
-#include <libusb.h>
-#include <msleep.h>
-#include <cskburn_usb.h>
-
-#include "core.h"
 #include "bootrom.h"
 #include "burner.h"
+#include "cskburn_usb.h"
+#include "libusb.h"
+#include "log.h"
+#include "msleep.h"
 
 extern uint8_t burner_usb[];
 extern uint32_t burner_usb_len;
@@ -92,10 +92,10 @@ cskburn_usb_open(int16_t bus, int16_t address)
 
 	libusb_set_auto_detach_kernel_driver(handle, 1);
 	if ((ret = libusb_set_configuration(handle, 1)) != 0) {
-		LOGD("错误: 设置配置失败: %d", ret);
+		LOGD("DEBUG: Failed configuring device: %d", ret);
 	}
 	if ((ret = libusb_claim_interface(handle, 0)) != 0) {
-		LOGD("错误: 设置接口失败: %d", ret);
+		LOGD("DEBUG: Failed setting interface: %d", ret);
 	}
 	libusb_set_interface_alt_setting(handle, 0, 0);
 
@@ -141,7 +141,7 @@ cskburn_usb_enter(cskburn_usb_device_t *dev, uint8_t *burner, uint32_t len)
 
 	int tmp = 0;
 	if (libusb_get_configuration(dev->handle, &tmp) != 0) {
-		LOGD("错误: 设备未响应");
+		LOGD("DEBUG: Device not responding");
 		return false;
 	}
 

@@ -11,6 +11,6 @@ ContinuationIndentWidth: 8
 DerivePointerAlignment: false
 IndentWidth: 4
 PointerAlignment: Right
-SortIncludes: false
+SortIncludes: true
 TabWidth: 4
 UseTab: ForContinuationAndIndentation

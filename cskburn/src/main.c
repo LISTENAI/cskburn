@@ -1,17 +1,18 @@
+#include <errno.h>
+#include <getopt.h>
+#include <libgen.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
-#include <getopt.h>
-#include <errno.h>
 #include <string.h>
 
-#include <log.h>
-#include <msleep.h>
-#include <exists.h>
+#include "exists.h"
+#include "log.h"
+#include "msleep.h"
 #ifndef WITHOUT_USB
-#include <cskburn_usb.h>
+#include "cskburn_usb.h"
 #endif
-#include <cskburn_serial.h>
+#include "cskburn_serial.h"
 
 #define MAX_IMAGE_SIZE (32 * 1024 * 1024)
 #define MAX_VERIFY_PARTS 20
@@ -150,28 +151,29 @@ static struct {
 static void
 print_help(const char *progname)
 {
-	LOGI("用法: %s [<选项>] <地址1> <文件1> [<地址2> <文件2>...]", progname);
+	LOGI("Usage: %s [<options>] <addr1> <file1> [<addr2> <file2>...]", basename((char *)progname));
 	LOGI("");
-	LOGI("烧录选项:");
+	LOGI("Burning options:");
 #ifndef WITHOUT_USB
-	LOGI("  -u, --usb (-|<总线>:<设备>)\t\t使用指定 USB 设备烧录。传 - 表示自动选取第一个 CSK "
-		 "设备");
+	LOGI("  -u, --usb (-|<bus>:<device>)\tburn with specified USB device. Pass \"-\" to select "
+		 "first CSK device automatically");
 #endif
-	LOGI("  -s, --serial <端口>\t\t\t使用指定串口设备 (如 %s) 烧录", example_serial_dev);
+	LOGI("  -s, --serial <port>\t\tburn with specified serial device (e.g. %s)",
+			example_serial_dev);
 	LOGI("");
-	LOGI("其它选项:");
-	LOGI("  -h, --help\t\t\t\t显示帮助");
-	LOGI("  -V, --version\t\t\t\t显示版本号");
-	LOGI("  -v, --verbose\t\t\t\t显示详细日志");
-	LOGI("  -w, --wait\t\t\t\t等待设备插入，并自动开始烧录");
-	LOGI("  -b, --baud\t\t\t\t串口烧录所使用的波特率 (默认为 %d)", DEFAULT_BAUD);
+	LOGI("Other options:");
+	LOGI("  -h, --help\t\t\tshow help");
+	LOGI("  -V, --version\t\t\tshow version");
+	LOGI("  -v, --verbose\t\t\tprint verbose log");
+	LOGI("  -w, --wait\t\t\twait for device presence and start burning");
+	LOGI("  -b, --baud\t\t\tbaud rate used for serial burning (default: %d)", DEFAULT_BAUD);
 #ifndef WITHOUT_USB
-	LOGI("  -R, --repeat\t\t\t\t循环等待设备插入，并自动开始烧录");
-	LOGI("  -c, --check\t\t\t\t检查设备是否插入 (不进行烧录)");
-	LOGI("  -C, --chip\t\t\t\t指定芯片系列，支持3/4/6，默认为 %d", DEFAULT_CHIP);
+	LOGI("  -R, --repeat\t\t\trepeatly wait for device presence and start burning");
+	LOGI("  -c, --check\t\t\tcheck for device presence (without burning)");
+	LOGI("  -C, --chip\t\t\tchip family, acceptable values: 3/4/6 (default: %d)", DEFAULT_CHIP);
 #endif
 	LOGI("");
-	LOGI("用例:");
+	LOGI("Example:");
 	LOGI("  cskburn -w 0x0 flashboot.bin 0x10000 master.bin 0x100000 respack.bin");
 }
 
@@ -227,7 +229,7 @@ main(int argc, char **argv)
 			case 'C':
 				sscanf(optarg, "%d", &options.chip);
 				if (options.chip != 6 && options.chip != 4 && options.chip != 3) {
-					LOGE("错误: chip 只支持 3 | 4 | 6");
+					LOGE("ERROR: Only 3, 4 or 6 of chip is supported");
 					return -1;
 				}
 				if (options.chip == 3) options.chip = 4;
@@ -239,13 +241,15 @@ main(int argc, char **argv)
 					break;
 				} else if (strcmp(name, "verify") == 0) {
 					if (options.verify_count >= MAX_VERIFY_PARTS) {
-						LOGE("错误: 最多仅支持同时校验 %d 个分区", MAX_VERIFY_PARTS);
+						LOGE("ERROR: Only up to %d partitions can be verified at the same time",
+								MAX_VERIFY_PARTS);
 						return -1;
 					}
 
 					char *split = strstr(optarg, ":");
 					if (split == NULL) {
-						LOGE("错误: --verify 参数的格式应为 地址:长度 (如: -u 0x00000000:102400)");
+						LOGE("ERROR: Argument of --verify should be addr:size (e.g. -u "
+							 "0x00000000:102400)");
 						return -1;
 					}
 
@@ -256,12 +260,14 @@ main(int argc, char **argv)
 					uint16_t index = options.verify_count;
 
 					if (!scan_int(addr, &options.verify_parts[index].addr)) {
-						LOGE("错误: --verify 参数的格式应为 地址:长度 (如: -u 0x00000000:102400)");
+						LOGE("ERROR: Argument of --verify should be addr:size (e.g. -u "
+							 "0x00000000:102400)");
 						return -1;
 					}
 
 					if (!scan_int(size, &options.verify_parts[index].size)) {
-						LOGE("错误: --verify 参数的格式应为 地址:长度 (如: -u 0x00000000:102400)");
+						LOGE("ERROR: Argument of --verify should be addr:size (e.g. -u "
+							 "0x00000000:102400)");
 						return -1;
 					}
 
@@ -324,16 +330,16 @@ main(int argc, char **argv)
 		options.protocol = PROTO_SERIAL;
 	} else {
 #ifdef WITHOUT_USB
-		LOGE("错误: 必须指定一个串口设备 (如: -s %s)", example_serial_dev);
+		LOGE("ERROR: A port of serial device should be specified (e.g. -s %s)", example_serial_dev);
 		return -1;
 #else
 		if (options.chip == 6) {
-			LOGE("错误: 6 系列芯片不支持 USB 烧录");
+			LOGE("ERROR: USB burning is not support by chip family 6");
 			return -1;
 		}
 		if (options.usb != NULL && strcmp(options.usb, "-") != 0) {
 			if (sscanf(options.usb, "%hu:%hu\n", &options.usb_bus, &options.usb_addr) != 2) {
-				LOGE("错误: -u/--usb 参数的格式应为 <总线>:<设备> (如: -u 020:004)");
+				LOGE("ERROR: Argument of -u/--usb should be <bus>:<device> (e.g. -u 020:004)");
 				return -1;
 			}
 		}
@@ -365,11 +371,11 @@ main(int argc, char **argv)
 		images[j] = argv[i + 1];
 
 		if (!exists(images[j])) {
-			LOGE("错误: 分区 %d 的文件不存在: %s", j + 1, images[j]);
+			LOGE("ERROR: File for partition %d not found: %s", j + 1, images[j]);
 			return -1;
 		}
 
-		LOGI("分区 %d: 0x%08X %s", j + 1, addrs[j], images[j]);
+		LOGI("Partition %d: 0x%08X %s", j + 1, addrs[j], images[j]);
 
 		i += 2;
 		j += 1;
@@ -403,7 +409,7 @@ read_file(const char *path, uint8_t *buf, uint32_t limit)
 {
 	FILE *f = fopen(path, "rb");
 	if (f == NULL) {
-		LOGE("错误: 文件打开失败: %s", strerror(errno));
+		LOGE("ERROR: Failed opening file: %s", strerror(errno));
 		return 0;
 	}
 
@@ -430,7 +436,7 @@ static void
 print_progress(int32_t wrote_bytes, uint32_t total_bytes)
 {
 	if (wrote_bytes < 0) {
-		printf("正在擦除");
+		printf("Erasing");
 		for (int i = 0; i <= -wrote_bytes; i++) {
 			printf(".");
 		}
@@ -461,7 +467,7 @@ usb_check(void)
 	bool ret = false;
 
 	if (!cskburn_usb_init()) {
-		LOGE("错误: 初始化失败");
+		LOGE("ERROR: USB initialize failed");
 		goto exit;
 	}
 
@@ -483,7 +489,7 @@ usb_burn(uint32_t *addrs, char **images, int parts)
 	bool ret = false;
 
 	if (!cskburn_usb_init()) {
-		LOGE("错误: 初始化失败");
+		LOGE("ERROR: USB initialize failed");
 		goto err_init;
 	}
 
@@ -493,18 +499,18 @@ usb_burn(uint32_t *addrs, char **images, int parts)
 			if (w == 0) {
 				w = 1;
 			} else if (w == 1) {
-				LOGI("正在等待设备接入…");
+				LOGI("Waiting for device...");
 				w = 2;
 			}
 		}
 	}
 
-	LOGI("正在进入烧录模式…");
+	LOGI("Entering update mode...");
 	cskburn_usb_device_t *dev;
 	for (int i = 0; i < ENTER_TRIES; i++) {
 		if ((dev = cskburn_usb_open(options.usb_bus, options.usb_addr)) == NULL) {
 			if (i == ENTER_TRIES - 1) {
-				LOGE("错误: 设备打开失败");
+				LOGE("ERROR: Failed opening device");
 				goto err_open;
 			} else {
 				msleep(2000);
@@ -514,7 +520,7 @@ usb_burn(uint32_t *addrs, char **images, int parts)
 		msleep(500);
 		if (!cskburn_usb_enter(dev, options.burner_buf, options.burner_len)) {
 			if (i == ENTER_TRIES - 1) {
-				LOGE("错误: 无法进入烧录模式");
+				LOGE("ERROR: Failed entering update mode");
 				goto err_enter;
 			} else {
 				cskburn_usb_close(&dev);
@@ -530,22 +536,22 @@ usb_burn(uint32_t *addrs, char **images, int parts)
 	for (int i = 0; i < parts; i++) {
 		image_len = read_file(images[i], image_buf, MAX_IMAGE_SIZE);
 		if (image_len == 0) {
-			LOGE("错误: 无法读取 %s", images[i]);
+			LOGE("ERROR: Failed reading %s", images[i]);
 			goto err_enter;
 		}
 
-		LOGI("正在烧录分区 %d/%d… (0x%08X, %.2f KB)", i + 1, parts, addrs[i],
+		LOGI("Burning partition %d/%d... (0x%08X, %.2f KB)", i + 1, parts, addrs[i],
 				(float)image_len / 1024.0f);
 		if (!cskburn_usb_write(dev, addrs[i], image_buf, image_len,
 					options.progress ? print_progress : NULL)) {
-			LOGE("错误: 无法烧录分区 %d", i + 1);
+			LOGE("ERROR: Failed burning partition %d", i + 1);
 			goto err_write;
 		}
 	}
 
 	cskburn_usb_show_done(dev);
 
-	LOGI("烧录完成");
+	LOGI("Finished");
 	ret = true;
 
 err_write:
@@ -567,20 +573,20 @@ serial_connect(cskburn_serial_device_t *dev)
 		uint32_t probe_timeout = i == 0 ? 100 : options.probe_timeout;
 		if (!cskburn_serial_connect(dev, reset_delay, probe_timeout)) {
 			if (i == 0) {
-				LOGI("正在等待设备接入…");
+				LOGI("Waiting for device...");
 			}
 			if (!options.wait && i == options.reset_attempts) {
-				LOGE("错误: 设备打开失败");
+				LOGE("ERROR: Failed opening device");
 				return false;
 			} else {
 				continue;
 			}
 		}
-		LOGI("正在进入烧录模式…");
+		LOGI("Entering update mode...");
 		if (!cskburn_serial_enter(
 					dev, options.serial_baud, options.burner_buf, options.burner_len)) {
 			if (!options.wait && i == options.reset_attempts) {
-				LOGE("错误: 无法进入烧录模式");
+				LOGE("ERROR: Failed entering update mode");
 				return false;
 			} else {
 				msleep(2000);
@@ -606,7 +612,7 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 
 	cskburn_serial_device_t *dev = cskburn_serial_open(options.serial, options.chip);
 	if (dev == NULL) {
-		LOGE("错误: 设备打开失败");
+		LOGE("ERROR: Failed opening device");
 		goto err_open;
 	}
 
@@ -617,7 +623,7 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 	if (options.read_chip_id) {
 		uint64_t chip_id = 0;
 		if (!cskburn_serial_read_chip_id(dev, &chip_id)) {
-			LOGE("错误: 无法读取设备");
+			LOGE("ERROR: Failed reading device");
 			goto err_enter;
 		}
 
@@ -631,7 +637,7 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 			uint32_t addr = options.verify_parts[i].addr;
 			uint32_t size = options.verify_parts[i].size;
 			if (!cskburn_serial_verify(dev, addr, size, md5)) {
-				LOGE("错误: 无法读取设备");
+				LOGE("ERROR: Failed reading device");
 				goto err_enter;
 			}
 			md5_to_str(md5_str, md5);
@@ -644,20 +650,20 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 	for (int i = 0; i < parts; i++) {
 		image_len = read_file(images[i], image_buf, MAX_IMAGE_SIZE);
 		if (image_len == 0) {
-			LOGE("错误: 无法读取 %s", images[i]);
+			LOGE("ERROR: Failed reading %s", images[i]);
 			goto err_enter;
 		}
 
-		LOGI("正在烧录分区 %d/%d… (0x%08X, %.2f KB)", i + 1, parts, addrs[i],
+		LOGI("Burning partition %d/%d... (0x%08X, %.2f KB)", i + 1, parts, addrs[i],
 				(float)image_len / 1024.0f);
 		if (!cskburn_serial_write(dev, addrs[i], image_buf, image_len,
 					options.progress ? print_progress : NULL)) {
-			LOGE("错误: 无法烧录分区 %d", i + 1);
+			LOGE("ERROR: Failed burning partition %d", i + 1);
 			goto err_write;
 		}
 	}
 
-	LOGI("烧录完成");
+	LOGI("Finished");
 	delay = options.pass_delay;
 	ret = true;
 

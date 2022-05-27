@@ -1,17 +1,17 @@
-#include <stdio.h>
-#include <stdint.h>
-#include <string.h>
-#include <stdlib.h>
-#include <errno.h>
+#include "cmd.h"
 
-#include <log.h>
-#include <serial.h>
-#include <msleep.h>
-#include <time_monotonic.h>
+#include <errno.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "core.h"
-#include "cmd.h"
+#include "log.h"
+#include "msleep.h"
+#include "serial.h"
 #include "slip.h"
+#include "time_monotonic.h"
 
 #define TRACE_DATA 0
 #define TRACE_SLIP 0
@@ -128,7 +128,7 @@ command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_c
 				dev->handle, dev->req_slip_buf + bytes_wrote, req_slip_len - bytes_wrote, timeout);
 #if !defined(_WIN32) && !defined(_WIN64)
 		if (r == -1 && errno != EAGAIN) {
-			LOGD("错误: 指令 %02X 串口写入异常: %d (%s)", op, errno, strerror(errno));
+			LOGD("DEBUG: Failed writing command %02X: %d (%s)", op, errno, strerror(errno));
 			goto exit;
 		}
 #endif  // !WIN32 && !WIN64
@@ -149,7 +149,7 @@ command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_c
 		}
 	} while (TIME_SINCE_MS(start) < timeout);
 	if (bytes_wrote < req_slip_len) {
-		LOGD("错误: 指令 %02X 发送超时", op);
+		LOGD("DEBUG: Timeout sending command %02X", op);
 		goto exit;
 	}
 
@@ -161,7 +161,7 @@ command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_c
 				timeout);
 #if !defined(_WIN32) && !defined(_WIN64)
 		if (r == -1 && errno != EAGAIN) {
-			LOGD("错误: 指令 %02X 串口读取异常: %d (%s)", op, errno, strerror(errno));
+			LOGD("DEBUG: Failed reading command %02X: %d (%s)", op, errno, strerror(errno));
 			goto exit;
 		}
 #endif  // !WIN32 && !WIN64
@@ -247,12 +247,12 @@ check_command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_
 	}
 
 	if (ret_len < sizeof(ret)) {
-		LOGD("错误: 指令 %02X 串口读取异常", op);
+		LOGD("DEBUG: Interrupted serial read of command %02X", op);
 		return 0xFF;
 	}
 
 	if (ret.error) {
-		LOGD("错误: 指令 %02X 设备返回异常 0x%02X", op, ret.code);
+		LOGD("DEBUG: Unexpected device response of command %02X: 0x%02X", op, ret.code);
 		return ret.code;
 	} else {
 		return 0x00;
@@ -382,7 +382,7 @@ cmd_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, 
 			dev, CMD_FLASH_DATA, in_len, checksum(data, data_len), next_seq, TIMEOUT_FLASH_DATA);
 
 	if (ret != 0x00) {
-		LOGD("错误: 数据块 %d 写失败: %02X", seq, ret);
+		LOGD("DEBUG: Failed writing block %d: %02X", seq, ret);
 	}
 
 	if (ret == 0x0A) {
@@ -421,12 +421,12 @@ cmd_flash_md5sum(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, 
 	}
 
 	if (ret_len < STATUS_BYTES_LEN) {
-		LOGD("错误: 串口读取异常");
+		LOGD("DEBUG: Interrupted serial read");
 		return false;
 	}
 
 	if (ret_buf[0] != 0) {
-		LOGD("错误: 设备返回异常 %02X%02X", ret_buf[0], ret_buf[1]);
+		LOGD("DEBUG: Unexpected device response: %02X%02X", ret_buf[0], ret_buf[1]);
 		return false;
 	}
 

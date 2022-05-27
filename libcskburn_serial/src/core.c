@@ -1,14 +1,14 @@
+#include "core.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <log.h>
-#include <msleep.h>
-#include <time_monotonic.h>
-#include <serial.h>
-#include <cskburn_serial.h>
-
-#include "core.h"
 #include "cmd.h"
+#include "cskburn_serial.h"
+#include "log.h"
+#include "msleep.h"
+#include "serial.h"
+#include "time_monotonic.h"
 
 #ifdef FEATURE_MD5_CHALLENGE
 #include "mbedtls_md5.h"
@@ -163,17 +163,17 @@ cskburn_serial_enter(
 	}
 
 	if (!try_sync(dev, 2000)) {
-		LOGD("错误: 无法识别设备");
+		LOGD("DEBUG: Device not recognized");
 		return false;
 	}
 
 	if (!cmd_change_baud(dev, baud_rate, 115200)) {
-		LOGD("错误: 无法设置串口速率");
+		LOGD("DEBUG: Failed changing baud rate");
 		return false;
 	}
 
 	if (!try_sync(dev, 2000)) {
-		LOGD("错误: 无法连接设备");
+		LOGD("DEBUG: Device not synced after baud rate change");
 		return false;
 	}
 
@@ -198,7 +198,7 @@ try_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, 
 {
 	for (int i = 0; i < FLASH_BLOCK_TRIES; i++) {
 		if (i > 0) {
-			LOGD("第 %d 次重试写入数据块 %d", i, seq);
+			LOGD("DEBUG: Attempts %d writing block %d", i, seq);
 		}
 		if (cmd_flash_block(dev, data, data_len, seq, next_seq)) {
 			return true;
@@ -256,7 +256,7 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image
 		}
 #ifdef FEATURE_SEQ_QUEST
 		if (next != i + 1) {
-			LOGD("指针由 %d 跳至 %d", i, next);
+			LOGD("DEBUG: Pointer jumped from %d to %d", i, next);
 		}
 		i = next;
 #else  // FEATURE_SEQ_QUEST
@@ -270,7 +270,7 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image
 
 #ifdef FEATURE_MD5_CHALLENGE
 	if (!try_flash_md5_challenge(dev)) {
-		LOGD("错误: MD5 校验失败");
+		LOGD("DEBUG: MD5 challenge failed");
 		return false;
 	}
 #endif  // FEATURE_MD5_CHALLENGE
@@ -288,7 +288,7 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image
 
 	uint32_t spent = (uint32_t)((t2 - t1) / 1000);
 	float speed = (float)(blocks * FLASH_BLOCK_SIZE) / 1024.0f / (float)spent;
-	LOGD("耗时 %d s, 速度 %.2f KB/s", spent, speed);
+	LOGD("Time used %d s, speed %.2f KB/s", spent, speed);
 
 	msleep(500);
 

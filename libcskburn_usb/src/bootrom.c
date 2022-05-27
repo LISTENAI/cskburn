@@ -1,14 +1,14 @@
+#include "bootrom.h"
+
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
-#include <libusb.h>
-
-#include <log.h>
-#include <msleep.h>
 
 #include "core.h"
-#include "bootrom.h"
+#include "libusb.h"
+#include "log.h"
+#include "msleep.h"
 
 #define DATA_BUF_SIZE 2048
 
@@ -117,12 +117,12 @@ send_mem_command(void *handle, uint8_t *buf, uint32_t data_len)
 			handle, EP_ADDR_DATA_OUT, (unsigned char *)buf, data_len, &xferred, COMMAND_TIMEOUT);
 
 	if (ret != 0) {
-		LOGD("错误: USB 数据写入失败: %d", ret);
+		LOGD("DEBUG: USB write failed: %d", ret);
 		return false;
 	}
 
 	if ((uint32_t)xferred < data_len) {
-		LOGD("错误: USB 数据写入中断");
+		LOGD("DEBUG: USB write interrupted");
 		return false;
 	}
 
@@ -130,22 +130,22 @@ send_mem_command(void *handle, uint8_t *buf, uint32_t data_len)
 			&xferred, COMMAND_TIMEOUT);
 
 	if (ret != 0) {
-		LOGD("错误: USB 数据读取失败: %d", ret);
+		LOGD("DEBUG: USB read failed: %d", ret);
 		return false;
 	}
 
 	if (xferred < sizeof(resp)) {
-		LOGD("错误: USB 数据读取中断");
+		LOGD("DEBUG: USB read interrupted");
 		return false;
 	}
 
 	if (data_status->error >= 0xF0) {
-		LOGD("错误: 设备返回致命错误: %02X", data_status->error);
+		LOGD("DEBUG: Device died with error: %02X", data_status->error);
 		return false;
 	}
 
 	if (data_status->error != 0) {
-		LOGD("错误: 设备返回错误: %02X", data_status->error);
+		LOGD("DEBUG: Error responsed from device: %02X", data_status->error);
 		return false;
 	}
 
@@ -231,7 +231,7 @@ bootrom_load(void *handle, uint8_t *burner, uint32_t len)
 	uint8_t *buf = malloc(buf_len);
 
 	if (!bootrom_mem_begin(handle, buf, buf_len, len)) {
-		LOGD("错误: MEM_BEGIN 发送失败");
+		LOGD("DEBUG: Failed sending MEM_BEGIN");
 		goto err;
 	}
 
@@ -245,7 +245,7 @@ bootrom_load(void *handle, uint8_t *burner, uint32_t len)
 		}
 
 		if (!bootrom_mem_data(handle, buf, buf_len, burner + xferred, packet_len, seq)) {
-			LOGD("错误: MEM_DATA 发送失败");
+			LOGD("DEBUG: Failed sending MEM_DATA");
 			goto err;
 		}
 
@@ -260,7 +260,7 @@ bootrom_load(void *handle, uint8_t *burner, uint32_t len)
 	}
 
 	if (!bootrom_mem_end(handle, buf, buf_len)) {
-		LOGD("错误: MEM_END 发送失败");
+		LOGD("DEBUG: Failed sending MEM_END");
 		goto err;
 	}
 

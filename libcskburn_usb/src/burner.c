@@ -1,15 +1,15 @@
-#include <stdio.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <string.h>
-#include <libusb.h>
+#include "burner.h"
 
-#include <log.h>
-#include <msleep.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
 
 #include "core.h"
-#include "burner.h"
 #include "crc64.h"
+#include "libusb.h"
+#include "log.h"
+#include "msleep.h"
 
 #define IMG_DATA_BUF_SIZE 4096  // bytes
 #define RETRY_COMMAND_COUNT 3
@@ -117,12 +117,12 @@ burner_transmit(void *handle, void *data, uint32_t len, burner_resp_common_t *re
 			handle, EP_ADDR_CMD_RESP_OUT, (unsigned char *)data, len, &xferred, CR_OUT_TIMEOUT_MS);
 
 	if (ret != 0) {
-		LOGD("错误: USB 数据写入失败: %d", ret);
+		LOGD("DEBUG: USB write failed: %d", ret);
 		return false;
 	}
 
 	if ((uint32_t)xferred < len) {
-		LOGD("错误: USB 数据写入中断");
+		LOGD("DEBUG: USB write interrupted");
 		return false;
 	}
 
@@ -130,7 +130,7 @@ burner_transmit(void *handle, void *data, uint32_t len, burner_resp_common_t *re
 			sizeof(burner_resp_common_t), &xferred, CR_IN_TIMEOUT_MS);
 
 	if (ret != 0) {
-		LOGD("错误: USB 数据读取失败: %d", ret);
+		LOGD("DEBUG: USB read failed: %d", ret);
 		return false;
 	}
 
@@ -142,12 +142,12 @@ burner_transmit(void *handle, void *data, uint32_t len, burner_resp_common_t *re
 	}
 
 	if (resp->respcode == RESP_CODE_FAILED) {
-		LOGD("错误: 指令执行失败");
+		LOGD("DEBUG: Command failed");
 		uint8_t err[128] = {0};
 		libusb_bulk_transfer(
 				handle, EP_ADDR_CMD_RESP_IN, err, resp->errdesc_len, &xferred, CR_IN_TIMEOUT_MS);
 		if (xferred <= resp->errdesc_len) {
-			LOGD("设备返回: %s", err);
+			LOGD("DEBUG: Device response: %s", err);
 		}
 		return false;
 	}
@@ -298,13 +298,13 @@ burner_burn(void *handle, uint32_t addr, uint8_t *image, uint32_t len,
 		burner_burn_progress_cb on_progress)
 {
 	if (!burner_sync(handle, 10)) {
-		LOGD("错误: 设备未响应");
+		LOGD("DEBUG: Device not responding");
 		return false;
 	}
 
 	uint64_t crc64 = calc_crc64(image, len);
 	if (!burner_set_crc64(handle, crc64, FLAG_VERIFY)) {
-		LOGD("错误: 向设备传输 CRC64 失败");
+		LOGD("DEBUG: Failed sending CRC64 to device");
 		return false;
 	}
 
@@ -325,12 +325,12 @@ burner_burn(void *handle, uint32_t addr, uint8_t *image, uint32_t len,
 				handle, EP_ADDR_DATA_OUT, image + wrote, slice, &xferred, DATA_OUT_TIMEOUT_MS);
 
 		if (ret != 0) {
-			LOGD("错误: USB 数据写入失败: %d", ret);
+			LOGD("DEBUG: USB write failed: %d", ret);
 			return false;
 		}
 
 		if ((uint32_t)xferred < slice) {
-			LOGD("错误: USB 数据写入中断");
+			LOGD("DEBUG: USB write interrupted");
 			return false;
 		}
 
@@ -349,7 +349,7 @@ burner_burn(void *handle, uint32_t addr, uint8_t *image, uint32_t len,
 			}
 
 			if (!burner_sync(handle, 3)) {
-				LOGD("错误: 设备未响应");
+				LOGD("DEBUG: Device not responding");
 				return false;
 			}
 
@@ -357,13 +357,13 @@ burner_burn(void *handle, uint32_t addr, uint8_t *image, uint32_t len,
 		}
 
 		if (resp.respcode != RESP_CODE_READY) {
-			LOGD("错误: 烧写失败");
+			LOGD("DEBUG: Burn failed");
 			if (resp.respcode == RESP_CODE_FAILED) {
 				uint8_t err[128] = {0};
 				libusb_bulk_transfer(handle, EP_ADDR_CMD_RESP_IN, err, resp.errdesc_len, &xferred,
 						CR_IN_TIMEOUT_MS);
 				if (xferred <= resp.errdesc_len) {
-					LOGD("设备返回: %s", err);
+					LOGD("DEBUG: Device response: %s", err);
 				}
 			}
 			return false;
@@ -382,7 +382,7 @@ burner_burn(void *handle, uint32_t addr, uint8_t *image, uint32_t len,
 	max_wait_ms *= 2;  // for verify
 
 	if (!burner_get_result(handle, CMD_CODE_H2D_FLASH_WRITE, max_wait_ms)) {
-		LOGD("错误: 分区烧录失败");
+		LOGD("DEBUG: Partition burn failed");
 		return false;
 	}
 
