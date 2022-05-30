@@ -141,13 +141,13 @@ serial_write(serial_dev_t *dev, const void *buf, size_t count, uint64_t timeout)
 void
 serial_discard_input(serial_dev_t *dev)
 {
-	// no-op on Windows
+	PurgeComm(dev->handle, PURGE_RXCLEAR | PURGE_RXABORT);
 }
 
 void
 serial_discard_output(serial_dev_t *dev)
 {
-	// no-op on Windows
+	PurgeComm(dev->handle, PURGE_TXCLEAR | PURGE_TXABORT);
 }
 
 bool
