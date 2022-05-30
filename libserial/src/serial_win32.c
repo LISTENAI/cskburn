@@ -5,7 +5,32 @@ struct _serial_dev_t {
 	HANDLE handle;
 	OVERLAPPED overlapped_read;
 	OVERLAPPED overlapped_write;
+	bool rts;
+	bool dtr;
 };
+
+static bool
+configure_port(HANDLE handle, DWORD baud_rate)
+{
+	DCB dcb = {0};
+	SecureZeroMemory(&dcb, sizeof(DCB));
+	dcb.DCBlength = sizeof(DCB);
+
+	if (GetCommState(handle, &dcb) == 0) {
+		return false;
+	}
+
+	dcb.BaudRate = baud_rate;
+	dcb.ByteSize = 8;
+	dcb.Parity = NOPARITY;
+	dcb.StopBits = ONESTOPBIT;
+
+	if (SetCommState(handle, &dcb) == 0) {
+		return false;
+	}
+
+	return true;
+}
 
 serial_dev_t *
 serial_open(const char *path)
@@ -22,20 +47,8 @@ serial_open(const char *path)
 		return NULL;
 	}
 
-	DCB dcb = {0};
-	SecureZeroMemory(&dcb, sizeof(DCB));
-	dcb.DCBlength = sizeof(DCB);
-
-	if (GetCommState(handle, &dcb) == 0) {
-		return NULL;
-	}
-
-	dcb.BaudRate = CBR_115200;  //  baud rate
-	dcb.ByteSize = 8;  //  data size, xmit and rcv
-	dcb.Parity = NOPARITY;  //  parity bit
-	dcb.StopBits = ONESTOPBIT;  //  stop bit
-
-	if (SetCommState(handle, &dcb) == 0) {
+	if (!configure_port(handle, CBR_115200)) {
+		CloseHandle(handle);
 		return NULL;
 	}
 
@@ -77,17 +90,15 @@ serial_close(serial_dev_t **dev)
 bool
 serial_set_speed(serial_dev_t *dev, uint32_t speed)
 {
-	DCB dcb = {0};
-	SecureZeroMemory(&dcb, sizeof(DCB));
-	dcb.DCBlength = sizeof(DCB);
-
-	if (GetCommState(dev->handle, &dcb) == 0) {
+	if (!configure_port(dev->handle, speed)) {
 		return false;
 	}
 
-	dcb.BaudRate = speed;
+	if (!serial_set_dtr(dev, dev->dtr)) {
+		return false;
+	}
 
-	if (SetCommState(dev->handle, &dcb) == 0) {
+	if (!serial_set_rts(dev, dev->rts)) {
 		return false;
 	}
 
@@ -153,6 +164,7 @@ serial_discard_output(serial_dev_t *dev)
 bool
 serial_set_rts(serial_dev_t *dev, bool val)
 {
+	dev->rts = val;
 	if (val) {
 		return EscapeCommFunction(dev->handle, SETRTS) != 0;
 	} else {
@@ -163,6 +175,7 @@ serial_set_rts(serial_dev_t *dev, bool val)
 bool
 serial_set_dtr(serial_dev_t *dev, bool val)
 {
+	dev->dtr = val;
 	if (val) {
 		return EscapeCommFunction(dev->handle, SETDTR) != 0;
 	} else {
