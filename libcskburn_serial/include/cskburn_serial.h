@@ -5,7 +5,6 @@
 #include <stdint.h>
 
 #define FLAG_INVERT_RTS (1 << 0)
-#define FLAG_RESET_NANOKIT (1 << 1)
 
 void cskburn_serial_init(int flags);
 

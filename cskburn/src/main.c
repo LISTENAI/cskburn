@@ -55,7 +55,7 @@ static struct option long_options[] = {
 		{"fail-delay", required_argument, NULL, 0},
 		{"burner", required_argument, NULL, 0},
 		{"update-high", no_argument, NULL, 0},
-		{"reset-nanokit", no_argument, NULL, 0},
+		{"reset-nanokit", no_argument, NULL, 0},  // 不再需要，但是留着以便向后兼容
 		{0, 0, NULL, 0},
 };
 
@@ -121,7 +121,6 @@ static struct {
 	uint8_t *burner_buf;
 	uint32_t burner_len;
 	bool update_high;
-	bool reset_nanokit;
 } options = {
 		.progress = true,
 		.wait = false,
@@ -145,7 +144,6 @@ static struct {
 		.burner = NULL,
 		.burner_len = 0,
 		.update_high = false,
-		.reset_nanokit = false,
 };
 
 static void
@@ -295,7 +293,7 @@ main(int argc, char **argv)
 					options.update_high = true;
 					break;
 				} else if (strcmp(name, "reset-nanokit") == 0) {
-					options.reset_nanokit = true;
+					LOGI("WARNING: --reset-nanokit is no longer needed");
 					break;
 				} else if (strcmp(name, "trace") == 0) {
 					set_log_level(LOGLEVEL_TRACE);
@@ -607,7 +605,6 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 
 	int flags = 0;
 	if (options.update_high) flags |= FLAG_INVERT_RTS;
-	if (options.reset_nanokit) flags |= FLAG_RESET_NANOKIT;
 	cskburn_serial_init(flags);
 
 	cskburn_serial_device_t *dev = cskburn_serial_open(options.serial, options.chip);

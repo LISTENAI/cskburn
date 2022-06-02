@@ -92,22 +92,7 @@ try_sync(cskburn_serial_device_t *dev, int timeout)
 bool
 cskburn_serial_connect(cskburn_serial_device_t *dev, uint32_t reset_delay, uint32_t probe_timeout)
 {
-	if (init_flags & FLAG_RESET_NANOKIT) {
-		// BOOT=HIGH, RESET=HIGH
-		serial_set_dtr(dev->handle, SERIAL_HIGH);
-		serial_set_rts(dev->handle, SERIAL_HIGH);
-
-		msleep(10);
-
-		// BOOT=HIGH, RESET=LOW
-		serial_set_rts(dev->handle, SERIAL_LOW);
-
-		msleep(50);
-
-		// BOOT=LOW, RESET=HIGH
-		serial_set_dtr(dev->handle, SERIAL_LOW);
-		serial_set_rts(dev->handle, SERIAL_HIGH);
-	} else if (reset_delay > 0) {
+	if (reset_delay > 0) {
 		serial_set_dtr(dev->handle, SERIAL_HIGH);  // RESET=HIGH
 		serial_set_rts(dev->handle, !rts_active);  // UPDATE=HIGH
 
@@ -321,24 +306,12 @@ cskburn_serial_read_chip_id(cskburn_serial_device_t *dev, uint64_t *chip_id)
 bool
 cskburn_serial_reset(cskburn_serial_device_t *dev, uint32_t delay, bool ok)
 {
-	if (init_flags & FLAG_RESET_NANOKIT) {
-		// BOOT=HIGH, RESET=LOW
-		serial_set_dtr(dev->handle, SERIAL_HIGH);
-		serial_set_rts(dev->handle, SERIAL_LOW);
+	serial_set_rts(dev->handle, !rts_active);  // UPDATE=HIGH
+	serial_set_dtr(dev->handle, SERIAL_LOW);  // RESET=LOW
 
-		msleep(50);
+	msleep(delay);
 
-		// BOOT=HIGH, RESET=HIGH
-		serial_set_dtr(dev->handle, SERIAL_HIGH);
-		serial_set_rts(dev->handle, SERIAL_HIGH);
-	} else {
-		serial_set_rts(dev->handle, !rts_active);  // UPDATE=HIGH
-		serial_set_dtr(dev->handle, SERIAL_LOW);  // RESET=LOW
-
-		msleep(delay);
-
-		serial_set_dtr(dev->handle, SERIAL_HIGH);  // RESET=HIGH
-	}
+	serial_set_dtr(dev->handle, SERIAL_HIGH);  // RESET=HIGH
 
 	return true;
 }
