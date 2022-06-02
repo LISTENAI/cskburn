@@ -59,12 +59,14 @@ serial_open(const char *path)
 	SecureZeroMemory(&timeouts, sizeof(COMMTIMEOUTS));
 
 	if (GetCommTimeouts(handle, &timeouts) == 0) {
+		CloseHandle(handle);
 		return NULL;
 	}
 
 	timeouts.ReadIntervalTimeout = 1;
 
 	if (SetCommTimeouts(handle, &timeouts) == 0) {
+		CloseHandle(handle);
 		return NULL;
 	}
 
