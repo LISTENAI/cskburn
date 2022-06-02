@@ -96,11 +96,11 @@ serial_set_speed(serial_dev_t *dev, uint32_t speed)
 		return false;
 	}
 
-	if (!serial_set_dtr(dev, dev->dtr)) {
+	if (!serial_set_rts(dev, dev->rts)) {
 		return false;
 	}
 
-	if (!serial_set_rts(dev, dev->rts)) {
+	if (!serial_set_dtr(dev, dev->dtr)) {
 		return false;
 	}
 

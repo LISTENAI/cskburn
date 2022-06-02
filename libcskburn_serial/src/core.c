@@ -93,13 +93,13 @@ bool
 cskburn_serial_connect(cskburn_serial_device_t *dev, uint32_t reset_delay, uint32_t probe_timeout)
 {
 	if (reset_delay > 0) {
-		serial_set_dtr(dev->handle, SERIAL_HIGH);  // RESET=HIGH
 		serial_set_rts(dev->handle, !rts_active);  // UPDATE=HIGH
+		serial_set_dtr(dev->handle, SERIAL_HIGH);  // RESET=HIGH
 
 		msleep(10);
 
-		serial_set_dtr(dev->handle, SERIAL_LOW);  // RESET=LOW
 		serial_set_rts(dev->handle, rts_active);  // UPDATE=LOW
+		serial_set_dtr(dev->handle, SERIAL_LOW);  // RESET=LOW
 
 		msleep(reset_delay);
 
