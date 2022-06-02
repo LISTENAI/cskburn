@@ -59,6 +59,7 @@ get_usb_info(const char *path, serial_usb_info_t *info)
 	DWORD index = 0;
 	BYTE port_name[250] = {0};
 	BYTE hardware_id[250] = {0};
+	uint32_t vid, pid;
 	while (SetupDiEnumDeviceInfo(devs, index, &dev)) {
 		index++;
 
@@ -74,8 +75,9 @@ get_usb_info(const char *path, serial_usb_info_t *info)
 			continue;
 		}
 
-		if (sscanf(hardware_id, "USB\\VID_%04X&PID_%04X", &info->vendor_id, &info->product_id) ==
-				2) {
+		if (sscanf(hardware_id, "USB\\VID_%04X&PID_%04X", &vid, &pid) == 2) {
+			info->vendor_id = vid;
+			info->product_id = pid;
 			ret = true;
 			break;
 		}

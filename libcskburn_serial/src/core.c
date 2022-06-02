@@ -45,7 +45,7 @@ cskburn_serial_open(const char *path, uint32_t chip)
 		goto err_open;
 	}
 
-	serial_usb_info_t usb_info;
+	serial_usb_info_t usb_info = {0};
 	if (serial_get_usb_info(device, &usb_info)) {
 		LOGD("USB VID: 0x%04x, PID: 0x%04x", usb_info.vendor_id, usb_info.product_id);
 		if (usb_info.vendor_id == DAPLINK_VID && usb_info.product_id == DAPLINK_PID) {
