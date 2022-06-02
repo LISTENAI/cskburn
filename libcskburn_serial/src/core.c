@@ -18,9 +18,6 @@
 
 #define FLASH_BLOCK_TRIES 5
 
-#define DAPLINK_VID 0x0d28
-#define DAPLINK_PID 0x0204
-
 extern uint8_t burner_serial[];
 extern uint32_t burner_serial_len;
 
@@ -43,15 +40,6 @@ cskburn_serial_open(const char *path, uint32_t chip)
 	serial_dev_t *device = serial_open(path);
 	if (device == NULL) {
 		goto err_open;
-	}
-
-	serial_usb_info_t usb_info = {0};
-	if (serial_get_usb_info(device, &usb_info)) {
-		LOGD("USB VID: 0x%04x, PID: 0x%04x", usb_info.vendor_id, usb_info.product_id);
-		if (usb_info.vendor_id == DAPLINK_VID && usb_info.product_id == DAPLINK_PID) {
-			init_flags |= FLAG_RESET_NANOKIT;
-			LOGD("DAPLink detected");
-		}
 	}
 
 	dev->handle = device;
