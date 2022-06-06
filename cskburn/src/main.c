@@ -24,8 +24,6 @@
 #define DEFAULT_PROBE_TIMEOUT 10 * 1000
 #define DEFAULT_RESET_ATTEMPTS 4
 #define DEFAULT_RESET_DELAY 500
-#define DEFAULT_PASS_DELAY 500
-#define DEFAULT_FAIL_DELAY 500
 
 #define DEFAULT_CHIP 4
 
@@ -115,8 +113,6 @@ static struct {
 	uint32_t probe_timeout;
 	uint32_t reset_attempts;
 	uint32_t reset_delay;
-	uint32_t pass_delay;
-	uint32_t fail_delay;
 	char *burner;
 	uint8_t *burner_buf;
 	uint32_t burner_len;
@@ -139,8 +135,6 @@ static struct {
 		.probe_timeout = DEFAULT_PROBE_TIMEOUT,
 		.reset_attempts = DEFAULT_RESET_ATTEMPTS,
 		.reset_delay = DEFAULT_RESET_DELAY,
-		.pass_delay = DEFAULT_PASS_DELAY,
-		.fail_delay = DEFAULT_FAIL_DELAY,
 		.burner = NULL,
 		.burner_len = 0,
 		.update_high = false,
@@ -279,12 +273,6 @@ main(int argc, char **argv)
 					break;
 				} else if (strcmp(name, "reset-delay") == 0) {
 					sscanf(optarg, "%d", &options.reset_delay);
-					break;
-				} else if (strcmp(name, "pass-delay") == 0) {
-					sscanf(optarg, "%d", &options.pass_delay);
-					break;
-				} else if (strcmp(name, "fail-delay") == 0) {
-					sscanf(optarg, "%d", &options.fail_delay);
 					break;
 				} else if (strcmp(name, "burner") == 0) {
 					options.burner = optarg;
@@ -601,7 +589,6 @@ static bool
 serial_burn(uint32_t *addrs, char **images, int parts)
 {
 	bool ret = false;
-	uint32_t delay = options.fail_delay;
 
 	int flags = 0;
 	if (options.update_high) flags |= FLAG_INVERT_RTS;
@@ -661,13 +648,12 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 	}
 
 	LOGI("Finished");
-	delay = options.pass_delay;
 	ret = true;
 
 err_write:
 	free(image_buf);
 err_enter:
-	cskburn_serial_reset(dev, delay, ret);
+	cskburn_serial_reset(dev, options.reset_delay);
 	cskburn_serial_close(&dev);
 err_open:
 	return ret;

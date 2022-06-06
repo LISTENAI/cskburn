@@ -304,12 +304,12 @@ cskburn_serial_read_chip_id(cskburn_serial_device_t *dev, uint64_t *chip_id)
 }
 
 bool
-cskburn_serial_reset(cskburn_serial_device_t *dev, uint32_t delay, bool ok)
+cskburn_serial_reset(cskburn_serial_device_t *dev, uint32_t reset_delay)
 {
 	serial_set_rts(dev->handle, !rts_active);  // UPDATE=HIGH
 	serial_set_dtr(dev->handle, SERIAL_LOW);  // RESET=LOW
 
-	msleep(delay);
+	msleep(reset_delay);
 
 	serial_set_dtr(dev->handle, SERIAL_HIGH);  // RESET=HIGH
 
