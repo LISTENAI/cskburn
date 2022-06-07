@@ -226,6 +226,9 @@ command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_c
 			goto exit;
 		}
 	} while (TIME_SINCE_MS(start) < timeout);
+	if (bytes_read == 0) {
+		LOG_TRACE("Read timeout after %d ms", TIME_SINCE_MS(start));
+	}
 
 exit:
 	serial_discard_input(dev->handle);
@@ -243,6 +246,7 @@ check_command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_
 	uint16_t ret_len = 0;
 
 	if (!command(dev, op, in_len, in_chk, out_val, &ret, &ret_len, sizeof(ret), timeout)) {
+		LOGD("DEBUG: Failed to send command %02X", op);
 		return 0xFE;
 	}
 
