@@ -113,13 +113,14 @@ bool
 cskburn_serial_enter(
 		cskburn_serial_device_t *dev, uint32_t baud_rate, uint8_t *burner, uint32_t len)
 {
-	uint32_t chip = dev->chip;
-	if (chip == 3 || chip == 4) {
-		if (len == 0) {
+	if (burner == NULL || len == 0) {
+		if (dev->chip == 3 || dev->chip == 4) {
 			burner = burner_serial_4;
 			len = burner_serial_4_len;
 		}
+	}
 
+	if (burner != NULL && len > 0) {
 		uint32_t offset, length;
 		uint32_t blocks = BLOCKS(len, RAM_BLOCK_SIZE);
 
@@ -209,7 +210,6 @@ bool
 cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image, uint32_t len,
 		void (*on_progress)(int32_t wrote_bytes, uint32_t total_bytes))
 {
-	uint32_t chip = dev->chip;
 	uint32_t offset, length;
 	uint32_t blocks = BLOCKS(len, FLASH_BLOCK_SIZE);
 
@@ -260,14 +260,7 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image
 	}
 #endif  // FEATURE_MD5_CHALLENGE
 
-	if (chip == 6) {
-		for (int i = 0; i < FLASH_BLOCK_TRIES; i++) {
-			if (cmd_flash_finish(dev)) {
-				return true;
-			}
-		}
-		return false;
-	}
+	cmd_flash_finish(dev);
 
 	uint64_t t2 = time_monotonic();
 
