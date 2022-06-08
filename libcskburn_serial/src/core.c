@@ -121,6 +121,18 @@ cskburn_serial_enter(
 	}
 
 	if (burner != NULL && len > 0) {
+		if (dev->chip == 6) {
+			if (!cmd_change_baud(dev, baud_rate, 115200)) {
+				LOGD("DEBUG: Failed changing baud rate");
+				return false;
+			}
+
+			if (!try_sync(dev, 2000)) {
+				LOGD("DEBUG: Device not synced after baud rate change");
+				return false;
+			}
+		}
+
 		uint32_t offset, length;
 		uint32_t blocks = BLOCKS(len, RAM_BLOCK_SIZE);
 
@@ -143,6 +155,10 @@ cskburn_serial_enter(
 
 		if (!cmd_mem_finish(dev)) {
 			return false;
+		}
+
+		if (dev->chip == 6) {
+			serial_set_speed(dev->handle, 115200);
 		}
 
 		msleep(500);
