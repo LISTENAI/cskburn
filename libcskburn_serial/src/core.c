@@ -18,8 +18,8 @@
 
 #define FLASH_BLOCK_TRIES 5
 
-extern uint8_t burner_serial[];
-extern uint32_t burner_serial_len;
+extern uint8_t burner_serial_4[];
+extern uint32_t burner_serial_4_len;
 
 static int init_flags = 0;
 static bool rts_active = SERIAL_LOW;
@@ -116,8 +116,8 @@ cskburn_serial_enter(
 	uint32_t chip = dev->chip;
 	if (chip == 3 || chip == 4) {
 		if (len == 0) {
-			burner = burner_serial;
-			len = burner_serial_len;
+			burner = burner_serial_4;
+			len = burner_serial_4_len;
 		}
 
 		uint32_t offset, length;
