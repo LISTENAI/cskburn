@@ -46,6 +46,7 @@ static struct option long_options[] = {
 #endif
 		{"chip-id", no_argument, NULL, 0},
 		{"verify", required_argument, NULL, 0},
+		{"verify-all", no_argument, NULL, 0},
 		{"probe-timeout", required_argument, NULL, 0},
 		{"reset-attempts", required_argument, NULL, 0},
 		{"reset-delay", required_argument, NULL, 0},
@@ -110,6 +111,7 @@ static struct {
 		uint32_t addr;
 		uint32_t size;
 	} verify_parts[MAX_VERIFY_PARTS];
+	bool verify_all;
 	uint32_t probe_timeout;
 	uint32_t reset_attempts;
 	uint32_t reset_delay;
@@ -132,6 +134,7 @@ static struct {
 		.serial_baud = DEFAULT_BAUD,
 		.read_chip_id = false,
 		.verify_count = 0,
+		.verify_all = false,
 		.probe_timeout = DEFAULT_PROBE_TIMEOUT,
 		.reset_attempts = DEFAULT_RESET_ATTEMPTS,
 		.reset_delay = DEFAULT_RESET_DELAY,
@@ -264,6 +267,9 @@ main(int argc, char **argv)
 					}
 
 					options.verify_count++;
+					break;
+				} else if (strcmp(name, "verify-all") == 0) {
+					options.verify_all = true;
 					break;
 				} else if (strcmp(name, "probe-timeout") == 0) {
 					sscanf(optarg, "%d", &options.probe_timeout);
@@ -635,7 +641,7 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 		image_len = read_file(images[i], image_buf, MAX_IMAGE_SIZE);
 		if (image_len == 0) {
 			LOGE("ERROR: Failed reading %s", images[i]);
-			goto err_enter;
+			goto err_write;
 		}
 
 		LOGI("Burning partition %d/%d... (0x%08X, %.2f KB)", i + 1, parts, addrs[i],
@@ -644,6 +650,17 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 					options.progress ? print_progress : NULL)) {
 			LOGE("ERROR: Failed burning partition %d", i + 1);
 			goto err_write;
+		}
+
+		if (options.verify_all) {
+			uint8_t md5[MD5_SIZE] = {0};
+			char md5_str[MD5_SIZE * 2 + 1] = {0};
+			if (!cskburn_serial_verify(dev, addrs[i], image_len, md5)) {
+				LOGE("ERROR: Failed reading device");
+				goto err_write;
+			}
+			md5_to_str(md5_str, md5);
+			LOGI("md5 (0x%08X-0x%08X): %s", addrs[i], addrs[i] + image_len, md5_str);
 		}
 	}
 
