@@ -5,6 +5,7 @@ set(SRCS
     src/cmd.c
     src/slip.c
     src/burner_4_img.c
+    src/burner_6_img.c
 )
 
 if(FEATURE_MD5_CHALLENGE)

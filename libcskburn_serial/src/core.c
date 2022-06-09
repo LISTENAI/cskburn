@@ -21,6 +21,9 @@
 extern uint8_t burner_serial_4[];
 extern uint32_t burner_serial_4_len;
 
+extern uint8_t burner_serial_6[];
+extern uint32_t burner_serial_6_len;
+
 static int init_flags = 0;
 static bool rts_active = SERIAL_LOW;
 
@@ -117,6 +120,9 @@ cskburn_serial_enter(
 		if (dev->chip == 3 || dev->chip == 4) {
 			burner = burner_serial_4;
 			len = burner_serial_4_len;
+		} else if (dev->chip == 6) {
+			burner = burner_serial_6;
+			len = burner_serial_6_len;
 		}
 	}
 
