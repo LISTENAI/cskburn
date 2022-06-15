@@ -51,7 +51,7 @@
 #define TIMEOUT_FLASH_DATA 1000
 
 // MD5 计算指令超时时间
-#define TIMEOUT_FLASH_MD5SUM 5000
+#define TIMEOUT_FLASH_MD5SUM 10000
 
 typedef struct {
 	uint32_t size;
