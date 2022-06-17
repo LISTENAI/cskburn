@@ -12,7 +12,7 @@
 #include "time_monotonic.h"
 
 #ifdef FEATURE_MD5_CHALLENGE
-#include "mbedtls_md5.h"
+#include "mbedtls/md5.h"
 #endif  // FEATURE_MD5_CHALLENGE
 
 #define EFUSE_BASE 0xF1800000
@@ -250,7 +250,7 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image
 
 	uint8_t md5[MD5_LEN];
 #ifdef FEATURE_MD5_CHALLENGE
-	if (mbedtls_md5_ret(image, len, md5) != 0) {
+	if (mbedtls_md5(image, len, md5) != 0) {
 		return false;
 	}
 #endif  // FEATURE_MD5_CHALLENGE

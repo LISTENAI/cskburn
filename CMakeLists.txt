@@ -13,6 +13,10 @@ else()
     add_subdirectory(third/libusb)
 endif()
 
+if(FEATURE_MD5_CHALLENGE)
+    add_subdirectory(third/mbedtls)
+endif()
+
 add_subdirectory(liblog)
 add_subdirectory(libportable)
 add_subdirectory(libserial)

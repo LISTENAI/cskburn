@@ -8,10 +8,6 @@ set(SRCS
     src/burner_6_img.c
 )
 
-if(FEATURE_MD5_CHALLENGE)
-    list(APPEND SRCS src/mbedtls_md5.c)
-endif()
-
 add_library(${PROJECT_NAME} STATIC ${SRCS})
 
 target_include_directories(
@@ -24,6 +20,7 @@ target_link_libraries(${PROJECT_NAME} portable)
 target_link_libraries(${PROJECT_NAME} serial)
 
 if(FEATURE_MD5_CHALLENGE)
+    target_link_libraries(${PROJECT_NAME} mbedtls)
     target_compile_options(${PROJECT_NAME} PRIVATE -DFEATURE_MD5_CHALLENGE)
 endif()
 
