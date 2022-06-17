@@ -13,6 +13,7 @@
 #include "cskburn_usb.h"
 #endif
 #include "cskburn_serial.h"
+#include "mbedtls/md5.h"
 
 #define MAX_IMAGE_SIZE (32 * 1024 * 1024)
 #define MAX_VERIFY_PARTS 20
@@ -653,14 +654,23 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 		}
 
 		if (options.verify_all) {
-			uint8_t md5[MD5_SIZE] = {0};
+			uint8_t image_md5[MD5_SIZE] = {0};
+			uint8_t flash_md5[MD5_SIZE] = {0};
 			char md5_str[MD5_SIZE * 2 + 1] = {0};
-			if (!cskburn_serial_verify(dev, addrs[i], image_len, md5)) {
+			if (mbedtls_md5(image_buf, image_len, image_md5) != 0) {
+				LOGE("ERROR: Failed calculating MD5");
+				goto err_write;
+			}
+			if (!cskburn_serial_verify(dev, addrs[i], image_len, flash_md5)) {
 				LOGE("ERROR: Failed reading device");
 				goto err_write;
 			}
-			md5_to_str(md5_str, md5);
+			md5_to_str(md5_str, flash_md5);
 			LOGI("md5 (0x%08X-0x%08X): %s", addrs[i], addrs[i] + image_len, md5_str);
+			if (memcmp(image_md5, flash_md5, MD5_SIZE) != 0) {
+				LOGE("ERROR: MD5 mismatch");
+				goto err_write;
+			}
 		}
 	}
 

@@ -11,6 +11,8 @@ target_link_libraries(${PROJECT_NAME} portable)
 target_link_libraries(${PROJECT_NAME} cskburn_usb)
 target_link_libraries(${PROJECT_NAME} cskburn_serial)
 
+target_link_libraries(${PROJECT_NAME} mbedtls)
+
 execute_process(COMMAND git describe --tags --abbrev=0 OUTPUT_VARIABLE GIT_TAG OUTPUT_STRIP_TRAILING_WHITESPACE)
 execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
 execute_process(COMMAND git rev-list --count HEAD OUTPUT_VARIABLE GIT_INCREMENT OUTPUT_STRIP_TRAILING_WHITESPACE)
