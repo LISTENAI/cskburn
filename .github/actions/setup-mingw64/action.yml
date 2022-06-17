@@ -1,0 +1,42 @@
+name: Setup MINGW64
+
+inputs:
+  install:
+    description: 'Additional packages to install'
+    required: false
+
+outputs:
+  shell:
+    description: 'Shell to be used by other steps'
+    value: msys2 {0}
+
+runs:
+  using: composite
+  steps:
+    - run: |
+        echo '${{ inputs.install }}' | tr ' ' '\n' | sort > cache-key
+        date -u '+%Y%m' >> cache-key
+      shell: bash
+    - uses: actions/cache@v3
+      id: cache-mingw64
+      with:
+        path: D:\msys64
+        key: mingw64-${{ hashFiles('cache-key') }}
+    - if: steps.cache-mingw64.outputs.cache-hit != 'true'
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        release: true
+        install: ${{ inputs.install }}
+        location: D:\
+    - if: steps.cache-mingw64.outputs.cache-hit == 'true'
+      run: |
+        echo 'D:/msys64/usr/bin' >> $GITHUB_PATH
+        echo 'MSYSTEM=MINGW64' >> $GITHUB_ENV
+        echo 'MSYS2_PATH_TYPE=minimal' >> $GITHUB_ENV
+        echo 'CHERE_INVOKING=1' >> $GITHUB_ENV
+        MSYS2_CMD=D:/msys64/usr/bin/msys2.cmd
+        printf '@echo off\r\n' >> $MSYS2_CMD
+        printf 'setlocal\r\n' >> $MSYS2_CMD
+        printf 'D:\\msys64\\usr\\bin\\bash.exe -leo pipefail %%*\r\n' >> $MSYS2_CMD
+      shell: bash

@@ -100,11 +100,10 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Setup MSYS2
-        uses: msys2/setup-msys2@v2
+      - name: Setup MinGW-w64
+        id: setup-mingw64
+        uses: ./.github/actions/setup-mingw64
         with:
-          msystem: MINGW64
-          release: false
           install: >-
             git
             zip
@@ -116,7 +115,7 @@ jobs:
         uses: ./.github/actions/cmake-build
         with:
           run-tests: true
-          shell: msys2 {0}
+          shell: ${{ steps.setup-mingw64.outputs.shell }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
@@ -129,7 +128,7 @@ jobs:
         if: ${{ startsWith(github.ref, 'refs/tags/v') }}
         uses: ./.github/actions/release-zip
         with:
-          shell: msys2 {0}
+          shell: ${{ steps.setup-mingw64.outputs.shell }}
           name: cskburn-${{ matrix.name }}.zip
           root-dir: build/cskburn
           files: cskburn.exe
