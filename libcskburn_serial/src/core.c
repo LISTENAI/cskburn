@@ -1,5 +1,6 @@
 #include "core.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -88,6 +89,11 @@ try_sync(cskburn_serial_device_t *dev, int timeout)
 		if (cmd_sync(dev, 100)) {
 			return true;
 		}
+#if !defined(_WIN32) && !defined(_WIN64)
+		if (errno == ENXIO) {
+			break;
+		}
+#endif  // !WIN32 && !WIN64
 	} while (TIME_SINCE_MS(start) < timeout);
 	return false;
 }
@@ -211,6 +217,11 @@ try_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, 
 		if (cmd_flash_block(dev, data, data_len, seq, next_seq)) {
 			return true;
 		}
+#if !defined(_WIN32) && !defined(_WIN64)
+		if (errno == ENXIO) {
+			break;
+		}
+#endif  // !WIN32 && !WIN64
 	}
 	return false;
 }
