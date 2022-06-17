@@ -1,0 +1,34 @@
+name: CMake build
+
+inputs:
+  shell:
+    description: 'The shell to use'
+    required: false
+    default: bash
+  build-dir:
+    description: 'The build directory'
+    required: false
+    default: build
+  build-config:
+    description: 'The build configuration'
+    required: false
+    default: Release
+  build-args:
+    description: 'The build arguments'
+    required: false
+    default:
+  run-tests:
+    description: 'Set to true to run tests'
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - run: |
+        cmake -G Ninja -B ${{ inputs.build-dir }} ${{ inputs.build-args }}
+        cmake --build ${{ inputs.build-dir }} --config ${{ inputs.build-config }}
+      shell: ${{ inputs.shell }}
+    - if: ${{ inputs.run-tests }}
+      run: |
+        ctest --test-dir ${{ inputs.build-dir }} --build-config ${{ inputs.build-config }} --output-on-failure
+      shell: ${{ inputs.shell }}

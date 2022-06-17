@@ -26,10 +26,9 @@ jobs:
         uses: ashutoshvarma/setup-ninja@master
 
       - name: Build
-        run: |
-          cmake -G Ninja -B build
-          cmake --build build --config Release
-          ctest --test-dir build --build-config Release --output-on-failure
+        uses: ./.github/actions/cmake-build
+        with:
+          run-tests: true
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
@@ -68,10 +67,9 @@ jobs:
         uses: ashutoshvarma/setup-ninja@master
 
       - name: Build
-        run: |
-          export CFLAGS='-target arm64-apple-macos'
-          cmake -G Ninja -B build
-          cmake --build build --config Release
+        uses: ./.github/actions/cmake-build
+        env:
+          CFLAGS: -target arm64-apple-macos
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
@@ -119,11 +117,10 @@ jobs:
             mingw-w64-x86_64-ninja
 
       - name: Build
-        shell: msys2 {0}
-        run: |
-          cmake -G Ninja -B build
-          cmake --build build --config Release
-          ctest --test-dir build --build-config Release --output-on-failure
+        uses: ./.github/actions/cmake-build
+        with:
+          run-tests: true
+          shell: msys2 {0}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
@@ -222,19 +219,12 @@ jobs:
       - name: Setup Ninja
         uses: ashutoshvarma/setup-ninja@master
 
-      - name: Setup Android NDK
-        uses: nttld/setup-ndk@v1
-        with:
-          ndk-version: r22b
-          add-to-path: false
-
       - name: Build
-        run: |
-          cmake -G Ninja -B build \
-            -DCMAKE_SYSTEM_NAME=Android \
-            -DCMAKE_ANDROID_ARCH_ABI=${{ matrix.abi }} \
-            -DCMAKE_ANDROID_NDK=${{ steps.setup-ndk.outputs.ndk-path }}
-          cmake --build build --config Release
+        uses: ./.github/actions/cmake-build
+        with:
+          build-args: >-
+            -DCMAKE_SYSTEM_NAME=Android
+            -DCMAKE_ANDROID_ARCH_ABI=${{ matrix.abi }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
