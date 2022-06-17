@@ -1,0 +1,37 @@
+name: Release zip
+
+inputs:
+  shell:
+    description: 'The shell to use'
+    required: false
+    default: bash
+  name:
+    description: 'The name of the release'
+    required: true
+  root-dir:
+    description: 'The root directory'
+    required: false
+    default: build
+  files:
+    description: 'The files to pack'
+    required: true
+  tag:
+    description: 'The tag to release'
+    required: true
+  token:
+    description: 'The GitHub token'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - run: |
+        REPO_DIR=$PWD
+        cd ${{ inputs.root-dir }}
+        zip -r9 $REPO_DIR/${{ inputs.name }} ${{ inputs.files }}
+      shell: ${{ inputs.shell }}
+    - uses: svenstaro/upload-release-action@v2
+      with:
+        file: ${{ inputs.name }}
+        tag: ${{ inputs.tag }}
+        repo_token: ${{ inputs.token }}
