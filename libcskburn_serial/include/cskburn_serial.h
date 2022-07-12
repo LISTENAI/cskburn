@@ -28,6 +28,8 @@ bool cskburn_serial_verify(
 
 bool cskburn_serial_read_chip_id(cskburn_serial_device_t *dev, uint64_t *chip_id);
 
-bool cskburn_serial_reset(cskburn_serial_device_t *dev, uint32_t reset_delay);
+bool cskburn_serial_soft_reset(cskburn_serial_device_t *dev);
+
+bool cskburn_serial_hard_reset(cskburn_serial_device_t *dev, uint32_t reset_delay);
 
 #endif  // __LIB_CSKBURN_SERIAL__
