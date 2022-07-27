@@ -210,12 +210,19 @@ jobs:
       - name: Setup Ninja
         uses: ashutoshvarma/setup-ninja@master
 
+      - name: Setup NDK
+        id: setup-ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r21e
+
       - name: Build
         uses: ./.github/actions/cmake-build
         with:
           build-args: >-
             -DCMAKE_SYSTEM_NAME=Android
             -DCMAKE_ANDROID_ARCH_ABI=${{ matrix.abi }}
+            -DCMAKE_ANDROID_NDK=${{ steps.setup-ndk.outputs.ndk-path }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
