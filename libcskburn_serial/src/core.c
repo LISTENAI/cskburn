@@ -293,6 +293,8 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image
 	}
 #endif  // FEATURE_MD5_CHALLENGE
 
+	cmd_flash_finish(dev);
+
 	uint64_t t2 = time_monotonic();
 
 	uint32_t spent = (uint32_t)((t2 - t1) / 1000);
@@ -328,13 +330,7 @@ cskburn_serial_read_chip_id(cskburn_serial_device_t *dev, uint64_t *chip_id)
 }
 
 bool
-cskburn_serial_soft_reset(cskburn_serial_device_t *dev)
-{
-	return cmd_flash_finish(dev);
-}
-
-bool
-cskburn_serial_hard_reset(cskburn_serial_device_t *dev, uint32_t reset_delay)
+cskburn_serial_reset(cskburn_serial_device_t *dev, uint32_t reset_delay)
 {
 	serial_set_rts(dev->handle, !rts_active);  // UPDATE=HIGH
 	serial_set_dtr(dev->handle, SERIAL_LOW);  // RESET=LOW

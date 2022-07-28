@@ -674,15 +674,13 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 		}
 	}
 
-	cskburn_serial_soft_reset(dev);
-
 	LOGI("Finished");
 	ret = true;
 
 err_write:
 	free(image_buf);
 err_enter:
-	cskburn_serial_hard_reset(dev, options.reset_delay);
+	cskburn_serial_reset(dev, options.reset_delay);
 	cskburn_serial_close(&dev);
 err_open:
 	return ret;
