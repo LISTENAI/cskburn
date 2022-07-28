@@ -401,7 +401,7 @@ cmd_flash_finish(cskburn_serial_device_t *dev)
 {
 	cmd_flash_finish_t *cmd = (cmd_flash_finish_t *)dev->req_cmd;
 	memset(cmd, 0, sizeof(cmd_flash_finish_t));
-	cmd->option = OPTION_REBOOT;
+	cmd->option = 0xFF;  // no-op on CSK4, do nothing on CSK6
 	cmd->address = 0;
 
 	return !check_command(
