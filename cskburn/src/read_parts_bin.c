@@ -18,6 +18,11 @@ read_parts_bin(char **argv, int argc, cskburn_partition_t *parts, int *parts_cnt
 		}
 
 		parts[cnt].path = argv[i + 1];
+		if (has_extname(parts[cnt].path, ".hex")) {
+			i++;
+			continue;
+		}
+
 		parts[cnt].image = malloc(part_size_limit);
 		parts[cnt].size = read_file(parts[cnt].path, parts[cnt].image, part_size_limit);
 		if (parts[cnt].size == 0) {

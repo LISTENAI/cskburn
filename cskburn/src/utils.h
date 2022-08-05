@@ -12,4 +12,6 @@ bool scan_int(char *str, uint32_t *out);
 
 void md5_to_str(char *buf, uint8_t *md5);
 
+bool has_extname(char *path, const char *extname);
+
 #endif  // __CSKBURN_UTILS__

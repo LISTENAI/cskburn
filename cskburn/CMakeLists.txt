@@ -5,6 +5,8 @@ add_executable(
     src/main.c
     src/utils.c
     src/read_parts_bin.c
+    src/read_parts_hex.c
+    src/intelhex/intelhex.c
 )
 
 target_link_libraries(${PROJECT_NAME} log)

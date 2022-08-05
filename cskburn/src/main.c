@@ -352,13 +352,21 @@ main(int argc, char **argv)
 
 	int ret = 0;
 
+	uint32_t base_addr = options.chip == 6 ? 0x18000000 : 0x80000000;
+
 	cskburn_partition_t parts[MAX_FLASH_PARTS];
 	int parts_cnt = 0;
 
 	char **parts_argv = argv + optind;
 	int parts_argc = argc - optind;
+	memset(parts, 0, sizeof(parts));
 	if (!read_parts_bin(parts_argv, parts_argc, parts + parts_cnt, &parts_cnt, MAX_IMAGE_SIZE,
 				MAX_FLASH_PARTS - parts_cnt)) {
+		ret = -1;
+		goto exit;
+	}
+	if (!read_parts_hex(parts_argv, parts_argc, parts + parts_cnt, &parts_cnt, MAX_IMAGE_SIZE,
+				MAX_FLASH_PARTS - parts_cnt, base_addr)) {
 		ret = -1;
 		goto exit;
 	}

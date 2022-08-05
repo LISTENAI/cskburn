@@ -1,6 +1,7 @@
 #include "utils.h"
 
 #include <stdio.h>
+#include <string.h>
 
 uint32_t
 read_file(const char *path, uint8_t *buf, uint32_t limit)
@@ -35,4 +36,13 @@ md5_to_str(char *buf, uint8_t *md5)
 	sprintf(buf, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", md5[0], md5[1],
 			md5[2], md5[3], md5[4], md5[5], md5[6], md5[7], md5[8], md5[9], md5[10], md5[11],
 			md5[12], md5[13], md5[14], md5[15]);
+}
+
+bool
+has_extname(char *path, const char *extname)
+{
+	size_t path_len = strlen(path);
+	size_t extn_len = strlen(extname);
+	if (path_len <= extn_len) return false;
+	return strncasecmp(path + path_len - extn_len, extname, extn_len) == 0;
 }
