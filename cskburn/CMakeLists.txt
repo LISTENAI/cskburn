@@ -3,6 +3,7 @@ project(cskburn)
 add_executable(
     ${PROJECT_NAME}
     src/main.c
+    src/utils.c
 )
 
 target_link_libraries(${PROJECT_NAME} log)

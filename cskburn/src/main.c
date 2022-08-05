@@ -2,13 +2,13 @@
 #include <getopt.h>
 #include <libgen.h>
 #include <stdbool.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "exists.h"
 #include "log.h"
 #include "msleep.h"
+#include "utils.h"
 #ifndef WITHOUT_USB
 #include "cskburn_usb.h"
 #endif
@@ -18,7 +18,6 @@
 #define MAX_IMAGE_SIZE (32 * 1024 * 1024)
 #define MAX_VERIFY_PARTS 20
 #define ENTER_TRIES 5
-#define MD5_SIZE 16
 
 #define DEFAULT_BAUD 3000000
 
@@ -179,9 +178,6 @@ print_version(void)
 	LOGI("%s (%d)", GIT_TAG, GIT_INCREMENT);
 }
 
-static uint32_t read_file(const char *path, uint8_t *buf, uint32_t limit);
-static bool scan_int(char *str, uint32_t *out);
-
 #ifndef WITHOUT_USB
 static bool usb_check(void);
 static bool usb_burn(uint32_t *addrs, char **images, int parts);
@@ -315,6 +311,7 @@ main(int argc, char **argv)
 		options.burner_buf = (uint8_t *)malloc(MAX_IMAGE_SIZE);
 		options.burner_len = read_file(options.burner, options.burner_buf, MAX_IMAGE_SIZE);
 		if (options.burner_len == 0) {
+			LOGE("ERROR: Failed reading %s: %s", options.burner, strerror(errno));
 			return -1;
 		}
 	}
@@ -397,34 +394,6 @@ main(int argc, char **argv)
 	return 0;
 }
 
-static uint32_t
-read_file(const char *path, uint8_t *buf, uint32_t limit)
-{
-	FILE *f = fopen(path, "rb");
-	if (f == NULL) {
-		LOGE("ERROR: Failed opening file: %s", strerror(errno));
-		return 0;
-	}
-
-	size_t len = fread(buf, 1, limit, f);
-	fclose(f);
-	return (uint32_t)len;
-}
-
-static bool
-scan_int(char *str, uint32_t *out)
-{
-	if (sscanf(str, "0x%x", out) == 1) {
-		return true;
-	}
-
-	if (sscanf(str, "%d", out) == 1) {
-		return true;
-	}
-
-	return false;
-}
-
 static void
 print_progress(int32_t wrote_bytes, uint32_t total_bytes)
 {
@@ -443,14 +412,6 @@ print_progress(int32_t wrote_bytes, uint32_t total_bytes)
 		}
 		fflush(stdout);
 	}
-}
-
-static void
-md5_to_str(char *buf, uint8_t *md5)
-{
-	sprintf(buf, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x", md5[0], md5[1],
-			md5[2], md5[3], md5[4], md5[5], md5[6], md5[7], md5[8], md5[9], md5[10], md5[11],
-			md5[12], md5[13], md5[14], md5[15]);
 }
 
 #ifndef WITHOUT_USB
@@ -529,7 +490,7 @@ usb_burn(uint32_t *addrs, char **images, int parts)
 	for (int i = 0; i < parts; i++) {
 		image_len = read_file(images[i], image_buf, MAX_IMAGE_SIZE);
 		if (image_len == 0) {
-			LOGE("ERROR: Failed reading %s", images[i]);
+			LOGE("ERROR: Failed reading %s: %s", images[i], strerror(errno));
 			goto err_enter;
 		}
 
@@ -641,7 +602,7 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 	for (int i = 0; i < parts; i++) {
 		image_len = read_file(images[i], image_buf, MAX_IMAGE_SIZE);
 		if (image_len == 0) {
-			LOGE("ERROR: Failed reading %s", images[i]);
+			LOGE("ERROR: Failed reading %s: %s", images[i], strerror(errno));
 			goto err_write;
 		}
 
