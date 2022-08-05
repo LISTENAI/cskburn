@@ -5,9 +5,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "exists.h"
 #include "log.h"
 #include "msleep.h"
+#include "read_parts.h"
 #include "utils.h"
 #ifndef WITHOUT_USB
 #include "cskburn_usb.h"
@@ -16,6 +16,7 @@
 #include "mbedtls/md5.h"
 
 #define MAX_IMAGE_SIZE (32 * 1024 * 1024)
+#define MAX_FLASH_PARTS 20
 #define MAX_VERIFY_PARTS 20
 #define ENTER_TRIES 5
 
@@ -180,10 +181,10 @@ print_version(void)
 
 #ifndef WITHOUT_USB
 static bool usb_check(void);
-static bool usb_burn(uint32_t *addrs, char **images, int parts);
+static bool usb_burn(cskburn_partition_t *parts, int parts_cnt);
 #endif
 
-static bool serial_burn(uint32_t *addrs, char **images, int parts);
+static bool serial_burn(cskburn_partition_t *parts, int parts_cnt);
 
 int
 main(int argc, char **argv)
@@ -349,49 +350,56 @@ main(int argc, char **argv)
 #endif
 	}
 
-	uint32_t addrs[20];
-	char *images[20];
-	int i = optind, j = 0;
-	while (i < argc - 1) {
-		if (!scan_int(argv[i], &addrs[j])) {
-			i++;
-			continue;
+	int ret = 0;
+
+	cskburn_partition_t parts[MAX_FLASH_PARTS];
+	int parts_cnt = 0;
+
+	char **parts_argv = argv + optind;
+	int parts_argc = argc - optind;
+	if (!read_parts_bin(parts_argv, parts_argc, parts + parts_cnt, &parts_cnt, MAX_IMAGE_SIZE,
+				MAX_FLASH_PARTS - parts_cnt)) {
+		ret = -1;
+		goto exit;
+	}
+
+	for (int i = 0; i < parts_cnt; i++) {
+		if (parts[i].path == NULL) {
+			LOGI("Partition %d: 0x%08X (%.2f KB)", i + 1, parts[i].addr,
+					(float)parts[i].size / 1024.0f);
+		} else {
+			LOGI("Partition %d: 0x%08X (%.2f KB) - %s", i + 1, parts[i].addr,
+					(float)parts[i].size / 1024.0f, parts[i].path);
 		}
-
-		images[j] = argv[i + 1];
-
-		if (!exists(images[j])) {
-			LOGE("ERROR: File for partition %d not found: %s", j + 1, images[j]);
-			return -1;
-		}
-
-		LOGI("Partition %d: 0x%08X %s", j + 1, addrs[j], images[j]);
-
-		i += 2;
-		j += 1;
 	}
 
 	if (options.protocol == PROTO_SERIAL) {
-		if (!serial_burn(addrs, images, j)) {
-			return -1;
+		if (!serial_burn(parts, parts_cnt)) {
+			ret = -1;
+			goto exit;
 		}
 #ifndef WITHOUT_USB
 	} else if (options.protocol == PROTO_USB) {
 		if (options.repeat) {
 			while (1) {
-				usb_burn(addrs, images, j);
+				usb_burn(parts, parts_cnt);
 				LOGI("----------");
 				msleep(2000);
 			}
 		} else {
-			if (!usb_burn(addrs, images, j)) {
-				return -1;
+			if (!usb_burn(parts, parts_cnt)) {
+				ret = -1;
+				goto exit;
 			}
 		}
 #endif
 	}
 
-	return 0;
+exit:
+	for (int i = 0; i < parts_cnt; i++) {
+		free(parts[i].image);
+	}
+	return ret;
 }
 
 static void
@@ -438,7 +446,7 @@ exit:
 }
 
 static bool
-usb_burn(uint32_t *addrs, char **images, int parts)
+usb_burn(cskburn_partition_t *parts, int parts_cnt)
 {
 	bool ret = false;
 
@@ -485,18 +493,10 @@ usb_burn(uint32_t *addrs, char **images, int parts)
 		break;
 	}
 
-	uint8_t *image_buf = malloc(MAX_IMAGE_SIZE);
-	uint32_t image_len;
-	for (int i = 0; i < parts; i++) {
-		image_len = read_file(images[i], image_buf, MAX_IMAGE_SIZE);
-		if (image_len == 0) {
-			LOGE("ERROR: Failed reading %s: %s", images[i], strerror(errno));
-			goto err_enter;
-		}
-
-		LOGI("Burning partition %d/%d... (0x%08X, %.2f KB)", i + 1, parts, addrs[i],
-				(float)image_len / 1024.0f);
-		if (!cskburn_usb_write(dev, addrs[i], image_buf, image_len,
+	for (int i = 0; i < parts_cnt; i++) {
+		LOGI("Burning partition %d/%d... (0x%08X, %.2f KB)", i + 1, parts_cnt, parts[i].addr,
+				(float)parts[i].size / 1024.0f);
+		if (!cskburn_usb_write(dev, parts[i].addr, parts[i].image, parts[i].size,
 					options.progress ? print_progress : NULL)) {
 			LOGE("ERROR: Failed burning partition %d", i + 1);
 			goto err_write;
@@ -509,7 +509,6 @@ usb_burn(uint32_t *addrs, char **images, int parts)
 	ret = true;
 
 err_write:
-	free(image_buf);
 err_enter:
 	cskburn_usb_close(&dev);
 err_open:
@@ -554,7 +553,7 @@ serial_connect(cskburn_serial_device_t *dev)
 }
 
 static bool
-serial_burn(uint32_t *addrs, char **images, int parts)
+serial_burn(cskburn_partition_t *parts, int parts_cnt)
 {
 	bool ret = false;
 
@@ -597,18 +596,10 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 		}
 	}
 
-	uint8_t *image_buf = malloc(MAX_IMAGE_SIZE);
-	uint32_t image_len;
-	for (int i = 0; i < parts; i++) {
-		image_len = read_file(images[i], image_buf, MAX_IMAGE_SIZE);
-		if (image_len == 0) {
-			LOGE("ERROR: Failed reading %s: %s", images[i], strerror(errno));
-			goto err_write;
-		}
-
-		LOGI("Burning partition %d/%d... (0x%08X, %.2f KB)", i + 1, parts, addrs[i],
-				(float)image_len / 1024.0f);
-		if (!cskburn_serial_write(dev, addrs[i], image_buf, image_len,
+	for (int i = 0; i < parts_cnt; i++) {
+		LOGI("Burning partition %d/%d... (0x%08X, %.2f KB)", i + 1, parts_cnt, parts[i].addr,
+				(float)parts[i].size / 1024.0f);
+		if (!cskburn_serial_write(dev, parts[i].addr, parts[i].image, parts[i].size,
 					options.progress ? print_progress : NULL)) {
 			LOGE("ERROR: Failed burning partition %d", i + 1);
 			goto err_write;
@@ -618,16 +609,16 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 			uint8_t image_md5[MD5_SIZE] = {0};
 			uint8_t flash_md5[MD5_SIZE] = {0};
 			char md5_str[MD5_SIZE * 2 + 1] = {0};
-			if (mbedtls_md5(image_buf, image_len, image_md5) != 0) {
+			if (mbedtls_md5(parts[i].image, parts[i].size, image_md5) != 0) {
 				LOGE("ERROR: Failed calculating MD5");
 				goto err_write;
 			}
-			if (!cskburn_serial_verify(dev, addrs[i], image_len, flash_md5)) {
+			if (!cskburn_serial_verify(dev, parts[i].addr, parts[i].size, flash_md5)) {
 				LOGE("ERROR: Failed reading device");
 				goto err_write;
 			}
 			md5_to_str(md5_str, flash_md5);
-			LOGI("md5 (0x%08X-0x%08X): %s", addrs[i], addrs[i] + image_len, md5_str);
+			LOGI("md5 (0x%08X-0x%08X): %s", parts[i].addr, parts[i].addr + parts[i].size, md5_str);
 			if (memcmp(image_md5, flash_md5, MD5_SIZE) != 0) {
 				LOGE("ERROR: MD5 mismatch");
 				goto err_write;
@@ -639,7 +630,6 @@ serial_burn(uint32_t *addrs, char **images, int parts)
 	ret = true;
 
 err_write:
-	free(image_buf);
 err_enter:
 	cskburn_serial_reset(dev, options.reset_delay);
 	cskburn_serial_close(&dev);

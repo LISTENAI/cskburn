@@ -4,6 +4,7 @@ add_executable(
     ${PROJECT_NAME}
     src/main.c
     src/utils.c
+    src/read_parts_bin.c
 )
 
 target_link_libraries(${PROJECT_NAME} log)
