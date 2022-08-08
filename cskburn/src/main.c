@@ -589,6 +589,31 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		LOGI("chip-id: %016llX", chip_id);
 	}
 
+	uint32_t flash_id = 0;
+	if (!cskburn_serial_read_flash_id(dev, &flash_id)) {
+		LOGE("ERROR: Failed detecting flash type");
+		goto err_enter;
+	}
+
+	LOGD("flash-id: %06X", flash_id);
+
+	uint32_t flash_size = 2 << (((flash_id >> 16) & 0xFF) - 1);
+	LOGI("Detected flash size: %d MB", flash_size >> 20);
+
+	for (int i = 0; i < parts_cnt; i++) {
+		if (parts[i].addr >= flash_size) {
+			LOGE("ERROR: The starting boundary of partition %d (0x%08X) exceeds the capacity of "
+				 "flash (%d MB)",
+					i + 1, parts[i].addr, flash_size >> 20);
+			goto err_enter;
+		} else if (parts[i].addr + parts[i].size > flash_size) {
+			LOGE("ERROR: The ending boundary of partition %d (0x%08X) exceeds the capacity of "
+				 "flash (%d MB)",
+					i + 1, parts[i].addr + parts[i].size, flash_size >> 20);
+			goto err_enter;
+		}
+	}
+
 	if (options.verify_count > 0) {
 		uint8_t md5[MD5_SIZE] = {0};
 		char md5_str[MD5_SIZE * 2 + 1] = {0};
