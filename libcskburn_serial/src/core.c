@@ -330,6 +330,12 @@ cskburn_serial_read_chip_id(cskburn_serial_device_t *dev, uint64_t *chip_id)
 }
 
 bool
+cskburn_serial_read_flash_id(cskburn_serial_device_t *dev, uint32_t *flash_id)
+{
+	return cmd_read_flash_id(dev, flash_id);
+}
+
+bool
 cskburn_serial_reset(cskburn_serial_device_t *dev, uint32_t reset_delay)
 {
 	serial_set_rts(dev->handle, !rts_active);  // UPDATE=HIGH

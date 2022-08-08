@@ -1,9 +1,9 @@
 #ifndef __LIB_CSKBURN_SERIAL_CMD__
 #define __LIB_CSKBURN_SERIAL_CMD__
 
+#include <cskburn_serial.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <cskburn_serial.h>
 
 typedef struct {
 	uint8_t direction;
@@ -39,6 +39,7 @@ typedef struct {
 bool cmd_sync(cskburn_serial_device_t *dev, uint16_t timeout);
 
 bool cmd_read_reg(cskburn_serial_device_t *dev, uint32_t reg, uint32_t *val);
+bool cmd_read_flash_id(cskburn_serial_device_t *dev, uint32_t *id);
 
 bool cmd_mem_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks,
 		uint32_t block_size, uint32_t offset);

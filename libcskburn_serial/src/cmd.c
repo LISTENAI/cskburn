@@ -32,6 +32,7 @@
 #ifdef FEATURE_MD5_CHALLENGE
 #define CMD_FLASH_MD5_CHALLENGE 0xF2
 #endif  // FEATURE_MD5_CHALLENGE
+#define CMD_READ_FLASH_ID 0xF3
 
 #define CHECKSUM_MAGIC 0xef
 #define CHECKSUM_NONE 0
@@ -292,6 +293,12 @@ cmd_read_reg(cskburn_serial_device_t *dev, uint32_t reg, uint32_t *val)
 	*cmd = reg;
 
 	return !check_command(dev, CMD_READ_REG, sizeof(reg), CHECKSUM_NONE, val, TIMEOUT_DEFAULT);
+}
+
+bool
+cmd_read_flash_id(cskburn_serial_device_t *dev, uint32_t *id)
+{
+	return !check_command(dev, CMD_READ_FLASH_ID, 0, CHECKSUM_NONE, id, TIMEOUT_DEFAULT);
 }
 
 bool
