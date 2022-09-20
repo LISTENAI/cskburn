@@ -412,7 +412,7 @@ cmd_flash_finish(cskburn_serial_device_t *dev)
 	cmd->address = 0;
 
 	return !check_command(
-			dev, CMD_FLASH_END, sizeof(uint32_t), CHECKSUM_NONE, NULL, TIMEOUT_DEFAULT);
+			dev, CMD_FLASH_END, sizeof(uint32_t), CHECKSUM_NONE, NULL, TIMEOUT_FLASH_DATA);
 }
 
 bool
