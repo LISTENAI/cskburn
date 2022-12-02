@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "cmd.h"
 #include "cskburn_serial.h"
@@ -36,7 +37,7 @@ cskburn_serial_init(int flags)
 }
 
 cskburn_serial_device_t *
-cskburn_serial_open(const char *path, uint32_t chip)
+cskburn_serial_open(const char *path, uint32_t chip, cskburn_serial_nand_t *nand)
 {
 	cskburn_serial_device_t *dev =
 			(cskburn_serial_device_t *)malloc(sizeof(cskburn_serial_device_t));
@@ -53,6 +54,8 @@ cskburn_serial_open(const char *path, uint32_t chip)
 	dev->req_hdr = dev->req_raw_buf;
 	dev->req_cmd = dev->req_raw_buf + sizeof(csk_command_t);
 	dev->chip = chip;
+	dev->nand = nand->enable;
+	memcpy(&dev->nand_cfg, &nand->config, sizeof(nand_config_t));
 	return dev;
 
 err_open:
@@ -330,9 +333,21 @@ cskburn_serial_read_chip_id(cskburn_serial_device_t *dev, uint64_t *chip_id)
 }
 
 bool
-cskburn_serial_read_flash_id(cskburn_serial_device_t *dev, uint32_t *flash_id)
+cskburn_serial_get_flash_info(
+		cskburn_serial_device_t *dev, uint32_t *flash_id, uint64_t *flash_size)
 {
-	return cmd_read_flash_id(dev, flash_id);
+	if (dev->nand) {
+		if (cmd_nand_init(dev, flash_size)) {
+			return true;
+		}
+	} else {
+		if (cmd_read_flash_id(dev, flash_id)) {
+			*flash_size = 2 << (((*flash_id >> 16) & 0xFF) - 1);
+			return true;
+		}
+	}
+
+	return false;
 }
 
 bool

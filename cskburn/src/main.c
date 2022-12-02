@@ -45,6 +45,14 @@ static struct option long_options[] = {
 		{"repeat", no_argument, NULL, 'R'},
 		{"check", no_argument, NULL, 'c'},
 #endif
+		{"nand", no_argument, NULL, 'n'},
+		{"nand-4bit", no_argument, NULL, 0},
+		{"nand-cmd", required_argument, NULL, 0},
+		{"nand-clk", required_argument, NULL, 0},
+		{"nand-dat0", required_argument, NULL, 0},
+		{"nand-dat1", required_argument, NULL, 0},
+		{"nand-dat2", required_argument, NULL, 0},
+		{"nand-dat3", required_argument, NULL, 0},
 		{"chip-id", no_argument, NULL, 0},
 		{"verify", required_argument, NULL, 0},
 		{"verify-all", no_argument, NULL, 0},
@@ -63,6 +71,7 @@ static const char option_string[] = {
 		"hVv"
 		"w"
 		"C:"
+		"n"
 #ifndef WITHOUT_USB
 		"u:"
 		"R"
@@ -144,6 +153,20 @@ static struct {
 		.update_high = false,
 };
 
+static cskburn_serial_nand_t nand_config = {
+		.enable = false,
+		.config =
+				{
+						.mode_4bit = 0,
+						.sd_cmd = {.set = 0},
+						.sd_clk = {.set = 0},
+						.sd_dat0 = {.set = 0},
+						.sd_dat1 = {.set = 0},
+						.sd_dat2 = {.set = 0},
+						.sd_dat3 = {.set = 0},
+				},
+};
+
 static void
 print_help(const char *progname)
 {
@@ -168,6 +191,7 @@ print_help(const char *progname)
 	LOGI("  -c, --check\t\t\tcheck for device presence (without burning)");
 	LOGI("  -C, --chip\t\t\tchip family, acceptable values: 3/4/6 (default: %d)", DEFAULT_CHIP);
 #endif
+	LOGI("  -n, --nand\t\t\tburn to NAND flash (CSK6 only)");
 	LOGI("");
 	LOGI("Example:");
 	LOGI("  cskburn -w 0x0 flashboot.bin 0x10000 master.bin 0x100000 respack.bin");
@@ -226,6 +250,9 @@ main(int argc, char **argv)
 					return -1;
 				}
 				if (options.chip == 3) options.chip = 4;
+				break;
+			case 'n':
+				nand_config.enable = true;
 				break;
 			case 0: { /* long-only options */
 				const char *name = long_options[long_index].name;
@@ -292,6 +319,51 @@ main(int argc, char **argv)
 					break;
 				} else if (strcmp(name, "no-progress") == 0) {
 					options.progress = false;
+					break;
+				} else if (strcmp(name, "nand-4bit") == 0) {
+					nand_config.config.mode_4bit = 1;
+					break;
+				} else if (strcmp(name, "nand-cmd") == 0) {
+					int pad, pin;
+					sscanf(optarg, "%d:%d", &pad, &pin);
+					nand_config.config.sd_cmd.set = 1;
+					nand_config.config.sd_cmd.pad = pad;
+					nand_config.config.sd_cmd.pin = pin;
+					break;
+				} else if (strcmp(name, "nand-clk") == 0) {
+					int pad, pin;
+					sscanf(optarg, "%d:%d", &pad, &pin);
+					nand_config.config.sd_clk.set = 1;
+					nand_config.config.sd_clk.pad = pad;
+					nand_config.config.sd_clk.pin = pin;
+					break;
+				} else if (strcmp(name, "nand-dat0") == 0) {
+					int pad, pin;
+					sscanf(optarg, "%d:%d", &pad, &pin);
+					nand_config.config.sd_dat0.set = 1;
+					nand_config.config.sd_dat0.pad = pad;
+					nand_config.config.sd_dat0.pin = pin;
+					break;
+				} else if (strcmp(name, "nand-dat1") == 0) {
+					int pad, pin;
+					sscanf(optarg, "%d:%d", &pad, &pin);
+					nand_config.config.sd_dat1.set = 1;
+					nand_config.config.sd_dat1.pad = pad;
+					nand_config.config.sd_dat1.pin = pin;
+					break;
+				} else if (strcmp(name, "nand-dat2") == 0) {
+					int pad, pin;
+					sscanf(optarg, "%d:%d", &pad, &pin);
+					nand_config.config.sd_dat2.set = 1;
+					nand_config.config.sd_dat2.pad = pad;
+					nand_config.config.sd_dat2.pin = pin;
+					break;
+				} else if (strcmp(name, "nand-dat3") == 0) {
+					int pad, pin;
+					sscanf(optarg, "%d:%d", &pad, &pin);
+					nand_config.config.sd_dat3.set = 1;
+					nand_config.config.sd_dat3.pad = pad;
+					nand_config.config.sd_dat3.pin = pin;
 					break;
 				} else {
 					print_help(argv[0]);
@@ -569,7 +641,24 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	if (options.update_high) flags |= FLAG_INVERT_RTS;
 	cskburn_serial_init(flags);
 
-	cskburn_serial_device_t *dev = cskburn_serial_open(options.serial, options.chip);
+	if (nand_config.enable) {
+		LOGD("Using NAND flash");
+		LOGD("* 4-bit mode: %d", nand_config.config.mode_4bit);
+		LOGD("* pin sd_cmd : set=%d, pad=%d, pin=%d", nand_config.config.sd_cmd.set,
+				nand_config.config.sd_cmd.pad, nand_config.config.sd_cmd.pin);
+		LOGD("* pin sd_clk : set=%d, pad=%d, pin=%d", nand_config.config.sd_clk.set,
+				nand_config.config.sd_clk.pad, nand_config.config.sd_clk.pin);
+		LOGD("* pin sd_dat0: set=%d, pad=%d, pin=%d", nand_config.config.sd_dat0.set,
+				nand_config.config.sd_dat0.pad, nand_config.config.sd_dat0.pin);
+		LOGD("* pin sd_dat1: set=%d, pad=%d, pin=%d", nand_config.config.sd_dat1.set,
+				nand_config.config.sd_dat1.pad, nand_config.config.sd_dat1.pin);
+		LOGD("* pin sd_dat2: set=%d, pad=%d, pin=%d", nand_config.config.sd_dat2.set,
+				nand_config.config.sd_dat2.pad, nand_config.config.sd_dat2.pin);
+		LOGD("* pin sd_dat3: set=%d, pad=%d, pin=%d", nand_config.config.sd_dat3.set,
+				nand_config.config.sd_dat3.pad, nand_config.config.sd_dat3.pin);
+	}
+
+	cskburn_serial_device_t *dev = cskburn_serial_open(options.serial, options.chip, &nand_config);
 	if (dev == NULL) {
 		LOGE("ERROR: Failed opening device");
 		goto err_open;
@@ -590,25 +679,31 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	}
 
 	uint32_t flash_id = 0;
-	if (!cskburn_serial_read_flash_id(dev, &flash_id)) {
+	uint64_t flash_size = 0;
+	if (!cskburn_serial_get_flash_info(dev, &flash_id, &flash_size)) {
 		LOGE("ERROR: Failed detecting flash type");
 		goto err_enter;
 	}
 
-	LOGD("flash-id: %06X", flash_id);
+	if (flash_id != 0) {
+		LOGD("flash-id: %06X", flash_id);
+	}
 
-	uint32_t flash_size = 2 << (((flash_id >> 16) & 0xFF) - 1);
-	LOGI("Detected flash size: %d MB", flash_size >> 20);
+	if (nand_config.enable) {
+		LOGI("Detected NAND size: %llu MB", flash_size >> 20);
+	} else {
+		LOGI("Detected flash size: %llu MB", flash_size >> 20);
+	}
 
 	for (int i = 0; i < parts_cnt; i++) {
 		if (parts[i].addr >= flash_size) {
 			LOGE("ERROR: The starting boundary of partition %d (0x%08X) exceeds the capacity of "
-				 "flash (%d MB)",
+				 "flash (%llu MB)",
 					i + 1, parts[i].addr, flash_size >> 20);
 			goto err_enter;
 		} else if (parts[i].addr + parts[i].size > flash_size) {
 			LOGE("ERROR: The ending boundary of partition %d (0x%08X) exceeds the capacity of "
-				 "flash (%d MB)",
+				 "flash (%llu MB)",
 					i + 1, parts[i].addr + parts[i].size, flash_size >> 20);
 			goto err_enter;
 		}
