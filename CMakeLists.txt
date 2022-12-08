@@ -3,7 +3,6 @@ cmake_minimum_required(VERSION 3.10)
 project(CSKBurnKit)
 enable_testing()
 
-# set(FEATURE_MD5_CHALLENGE 1 GLOBAL)
 # set(FEATURE_SEQ_QUEST 1 GLOBAL)
 
 if(WIN32)

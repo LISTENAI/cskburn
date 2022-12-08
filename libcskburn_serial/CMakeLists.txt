@@ -19,11 +19,6 @@ target_link_libraries(${PROJECT_NAME} log)
 target_link_libraries(${PROJECT_NAME} portable)
 target_link_libraries(${PROJECT_NAME} serial)
 
-if(FEATURE_MD5_CHALLENGE)
-    target_link_libraries(${PROJECT_NAME} mbedtls)
-    target_compile_options(${PROJECT_NAME} PRIVATE -DFEATURE_MD5_CHALLENGE)
-endif()
-
 if(FEATURE_SEQ_QUEST)
     target_compile_options(${PROJECT_NAME} PRIVATE -DFEATURE_SEQ_QUEST)
 endif()

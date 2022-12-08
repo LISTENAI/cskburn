@@ -34,9 +34,6 @@
 #define CMD_NAND_DATA 0x22
 #define CMD_NAND_END 0x23
 #define CMD_NAND_MD5 0x24
-#ifdef FEATURE_MD5_CHALLENGE
-#define CMD_FLASH_MD5_CHALLENGE 0xF2
-#endif  // FEATURE_MD5_CHALLENGE
 #define CMD_READ_FLASH_ID 0xF3
 
 #define CHECKSUM_MAGIC 0xef
@@ -392,7 +389,7 @@ cmd_mem_finish(cskburn_serial_device_t *dev)
 
 bool
 cmd_flash_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks, uint32_t block_size,
-		uint32_t offset, uint8_t *md5)
+		uint32_t offset)
 {
 	cmd_flash_begin_t *cmd = (cmd_flash_begin_t *)dev->req_cmd;
 	memset(cmd, 0, sizeof(cmd_flash_begin_t));
@@ -401,20 +398,8 @@ cmd_flash_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks, ui
 	cmd->block_size = block_size;
 	cmd->offset = offset;
 
-	uint32_t in_len = sizeof(cmd_flash_begin_t);
-	uint32_t chksum = CHECKSUM_NONE;
-
-#ifdef FEATURE_MD5_CHALLENGE
-	uint8_t *req_data = (uint8_t *)dev->req_cmd + sizeof(cmd_flash_begin_t);
-	memcpy(req_data, md5, MD5_LEN);
-	in_len += MD5_LEN;
-	chksum = checksum(md5, MD5_LEN);
-#else  // FEATURE_MD5_CHALLENGE
-	(void)md5;
-#endif  // FEATURE_MD5_CHALLENGE
-
-	return !check_command(dev, dev->nand ? CMD_NAND_BEGIN : CMD_FLASH_BEGIN, in_len, chksum, NULL,
-			TIMEOUT_DEFAULT);
+	return !check_command(dev, dev->nand ? CMD_NAND_BEGIN : CMD_FLASH_BEGIN,
+			sizeof(cmd_flash_begin_t), CHECKSUM_NONE, NULL, TIMEOUT_DEFAULT);
 }
 
 bool
@@ -489,15 +474,6 @@ cmd_flash_md5sum(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, 
 
 	return true;
 }
-
-#ifdef FEATURE_MD5_CHALLENGE
-bool
-cmd_flash_md5_challenge(cskburn_serial_device_t *dev)
-{
-	return !check_command(
-			dev, CMD_FLASH_MD5_CHALLENGE, 0, CHECKSUM_NONE, NULL, TIMEOUT_FLASH_MD5SUM);
-}
-#endif  // FEATURE_MD5_CHALLENGE
 
 bool
 cmd_change_baud(cskburn_serial_device_t *dev, uint32_t baud, uint32_t old_baud)

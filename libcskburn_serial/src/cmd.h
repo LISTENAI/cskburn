@@ -49,15 +49,11 @@ bool cmd_mem_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_le
 bool cmd_mem_finish(cskburn_serial_device_t *dev);
 
 bool cmd_flash_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks,
-		uint32_t block_size, uint32_t offset, uint8_t *md5);
+		uint32_t block_size, uint32_t offset);
 bool cmd_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, uint32_t seq,
 		uint32_t *next_seq);
 bool cmd_flash_finish(cskburn_serial_device_t *dev);
 bool cmd_flash_md5sum(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uint8_t *md5);
-
-#ifdef FEATURE_MD5_CHALLENGE
-bool cmd_flash_md5_challenge(cskburn_serial_device_t *dev);
-#endif  // FEATURE_MD5_CHALLENGE
 
 bool cmd_change_baud(cskburn_serial_device_t *dev, uint32_t baud, uint32_t old_baud);
 

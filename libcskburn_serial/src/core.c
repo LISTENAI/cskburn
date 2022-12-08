@@ -12,10 +12,6 @@
 #include "serial.h"
 #include "time_monotonic.h"
 
-#ifdef FEATURE_MD5_CHALLENGE
-#include "mbedtls/md5.h"
-#endif  // FEATURE_MD5_CHALLENGE
-
 #define EFUSE_BASE 0xF1800000
 
 #define FLASH_BLOCK_TRIES 5
@@ -199,10 +195,10 @@ cskburn_serial_enter(
 
 static bool
 try_flash_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks, uint32_t block_size,
-		uint32_t offset, uint8_t *md5)
+		uint32_t offset)
 {
 	for (int i = 0; i < FLASH_BLOCK_TRIES; i++) {
-		if (cmd_flash_begin(dev, size, blocks, block_size, offset, md5)) {
+		if (cmd_flash_begin(dev, size, blocks, block_size, offset)) {
 			return true;
 		}
 	}
@@ -229,19 +225,6 @@ try_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, 
 	return false;
 }
 
-#ifdef FEATURE_MD5_CHALLENGE
-static bool
-try_flash_md5_challenge(cskburn_serial_device_t *dev)
-{
-	for (int i = 0; i < FLASH_BLOCK_TRIES; i++) {
-		if (cmd_flash_md5_challenge(dev)) {
-			return true;
-		}
-	}
-	return false;
-}
-#endif  // FEATURE_MD5_CHALLENGE
-
 bool
 cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image, uint32_t len,
 		void (*on_progress)(int32_t wrote_bytes, uint32_t total_bytes))
@@ -251,14 +234,7 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image
 
 	uint64_t t1 = time_monotonic();
 
-	uint8_t md5[MD5_LEN];
-#ifdef FEATURE_MD5_CHALLENGE
-	if (mbedtls_md5(image, len, md5) != 0) {
-		return false;
-	}
-#endif  // FEATURE_MD5_CHALLENGE
-
-	if (!try_flash_begin(dev, len, blocks, FLASH_BLOCK_SIZE, addr, md5)) {
+	if (!try_flash_begin(dev, len, blocks, FLASH_BLOCK_SIZE, addr)) {
 		return false;
 	}
 
@@ -288,13 +264,6 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image
 			on_progress(offset + length, len);
 		}
 	}
-
-#ifdef FEATURE_MD5_CHALLENGE
-	if (!try_flash_md5_challenge(dev)) {
-		LOGD("DEBUG: MD5 challenge failed");
-		return false;
-	}
-#endif  // FEATURE_MD5_CHALLENGE
 
 	cmd_flash_finish(dev);
 
