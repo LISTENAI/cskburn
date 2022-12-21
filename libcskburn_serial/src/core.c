@@ -100,6 +100,9 @@ try_sync(cskburn_serial_device_t *dev, int timeout)
 bool
 cskburn_serial_connect(cskburn_serial_device_t *dev, uint32_t reset_delay, uint32_t probe_timeout)
 {
+	serial_set_rts(dev->handle, SERIAL_HIGH);
+	serial_set_dtr(dev->handle, SERIAL_HIGH);
+
 	if (reset_delay > 0) {
 		serial_set_rts(dev->handle, !rts_active);  // UPDATE=HIGH
 		serial_set_dtr(dev->handle, SERIAL_HIGH);  // RESET=HIGH
