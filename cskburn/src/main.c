@@ -696,6 +696,19 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	}
 
 	for (int i = 0; i < parts_cnt; i++) {
+		if (nand_config.enable) {
+			if (parts[i].addr % 512 != 0) {
+				LOGE("ERROR: Address of partition %d (0x%08X) should be 512 bytes aligned", i + 1,
+						parts[i].addr);
+				goto err_enter;
+			}
+		} else {
+			if (parts[i].addr % (4 * 1024) != 0) {
+				LOGE("ERROR: Address of partition %d (0x%08X) should be 4K aligned", i + 1,
+						parts[i].addr);
+				goto err_enter;
+			}
+		}
 		if (parts[i].addr >= flash_size) {
 			LOGE("ERROR: The starting boundary of partition %d (0x%08X) exceeds the capacity of "
 				 "flash (%llu MB)",
