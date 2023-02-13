@@ -25,6 +25,7 @@ configure_port(HANDLE handle, DWORD baud_rate)
 	dcb.Parity = NOPARITY;
 	dcb.StopBits = ONESTOPBIT;
 	dcb.fRtsControl = RTS_CONTROL_HANDSHAKE;
+	dcb.fDtrControl = DTR_CONTROL_DISABLE;
 
 	if (SetCommState(handle, &dcb) == 0) {
 		return false;
@@ -34,7 +35,7 @@ configure_port(HANDLE handle, DWORD baud_rate)
 }
 
 serial_dev_t *
-_serial_open(const char *path)
+serial_open(const char *path)
 {
 	HANDLE handle = CreateFileA(path,
 			GENERIC_READ | GENERIC_WRITE,  // Read/Write
@@ -78,20 +79,6 @@ _serial_open(const char *path)
 	dev->overlapped_write.hEvent = CreateEventA(NULL, FALSE, FALSE, NULL);
 
 	return dev;
-}
-
-serial_dev_t *
-serial_open(const char *path)
-{
-	//open empty connection and handshake once (for baud-rate reset)
-	serial_dev_t *device_prepare = _serial_open(path);
-	if (device_prepare == NULL) {
-		return NULL;
-	}
-	serial_close(&device_prepare);
-
-	//then officially open the connection
-	return _serial_open(path);
 }
 
 void
