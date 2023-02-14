@@ -13,7 +13,7 @@
 #include "cskburn_usb.h"
 #endif
 #include "cskburn_serial.h"
-#include "mbedtls/md5.h"
+#include "verify.h"
 
 #define MAX_IMAGE_SIZE (32 * 1024 * 1024)
 #define MAX_FLASH_PARTS 20
@@ -432,7 +432,7 @@ main(int argc, char **argv)
 	char **parts_argv = argv + optind;
 	int parts_argc = argc - optind;
 	memset(parts, 0, sizeof(parts));
-	if (!read_parts_bin(parts_argv, parts_argc, parts + parts_cnt, &parts_cnt, MAX_IMAGE_SIZE,
+	if (!read_parts_bin(parts_argv, parts_argc, parts + parts_cnt, &parts_cnt,
 				MAX_FLASH_PARTS - parts_cnt)) {
 		ret = -1;
 		goto exit;
@@ -446,10 +446,10 @@ main(int argc, char **argv)
 	for (int i = 0; i < parts_cnt; i++) {
 		if (parts[i].path == NULL) {
 			LOGI("Partition %d: 0x%08X (%.2f KB)", i + 1, parts[i].addr,
-					(float)parts[i].size / 1024.0f);
+					(float)parts[i].reader->size / 1024.0f);
 		} else {
 			LOGI("Partition %d: 0x%08X (%.2f KB) - %s", i + 1, parts[i].addr,
-					(float)parts[i].size / 1024.0f, parts[i].path);
+					(float)parts[i].reader->size / 1024.0f, parts[i].path);
 		}
 	}
 
@@ -477,7 +477,7 @@ main(int argc, char **argv)
 
 exit:
 	for (int i = 0; i < parts_cnt; i++) {
-		free(parts[i].image);
+		parts[i].reader->close(&parts[i].reader);
 	}
 	return ret;
 }
@@ -575,8 +575,8 @@ usb_burn(cskburn_partition_t *parts, int parts_cnt)
 
 	for (int i = 0; i < parts_cnt; i++) {
 		LOGI("Burning partition %d/%d... (0x%08X, %.2f KB)", i + 1, parts_cnt, parts[i].addr,
-				(float)parts[i].size / 1024.0f);
-		if (!cskburn_usb_write(dev, parts[i].addr, parts[i].image, parts[i].size,
+				(float)parts[i].reader->size / 1024.0f);
+		if (!cskburn_usb_write(dev, parts[i].addr, parts[i].reader,
 					options.progress ? print_progress : NULL)) {
 			LOGE("ERROR: Failed burning partition %d", i + 1);
 			goto err_write;
@@ -714,11 +714,15 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 				 "flash (%llu MB)",
 					i + 1, parts[i].addr, flash_size >> 20);
 			goto err_enter;
-		} else if (parts[i].addr + parts[i].size > flash_size) {
+		} else if (parts[i].addr + parts[i].reader->size > flash_size) {
 			LOGE("ERROR: The ending boundary of partition %d (0x%08X) exceeds the capacity of "
 				 "flash (%llu MB)",
-					i + 1, parts[i].addr + parts[i].size, flash_size >> 20);
+					i + 1, parts[i].addr + parts[i].reader->size, flash_size >> 20);
 			goto err_enter;
+		}
+
+		if (options.verify_all) {
+			verify_install(parts[i].reader);
 		}
 	}
 
@@ -739,8 +743,8 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 
 	for (int i = 0; i < parts_cnt; i++) {
 		LOGI("Burning partition %d/%d... (0x%08X, %.2f KB)", i + 1, parts_cnt, parts[i].addr,
-				(float)parts[i].size / 1024.0f);
-		if (!cskburn_serial_write(dev, parts[i].addr, parts[i].image, parts[i].size,
+				(float)parts[i].reader->size / 1024.0f);
+		if (!cskburn_serial_write(dev, parts[i].addr, parts[i].reader,
 					options.progress ? print_progress : NULL)) {
 			LOGE("ERROR: Failed burning partition %d", i + 1);
 			goto err_write;
@@ -750,16 +754,17 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 			uint8_t image_md5[MD5_SIZE] = {0};
 			uint8_t flash_md5[MD5_SIZE] = {0};
 			char md5_str[MD5_SIZE * 2 + 1] = {0};
-			if (mbedtls_md5(parts[i].image, parts[i].size, image_md5) != 0) {
+			if (verify_finish(parts[i].reader, image_md5) != 0) {
 				LOGE("ERROR: Failed calculating MD5");
 				goto err_write;
 			}
-			if (!cskburn_serial_verify(dev, parts[i].addr, parts[i].size, flash_md5)) {
+			if (!cskburn_serial_verify(dev, parts[i].addr, parts[i].reader->size, flash_md5)) {
 				LOGE("ERROR: Failed reading device");
 				goto err_write;
 			}
 			md5_to_str(md5_str, flash_md5);
-			LOGI("md5 (0x%08X-0x%08X): %s", parts[i].addr, parts[i].addr + parts[i].size, md5_str);
+			LOGI("md5 (0x%08X-0x%08X): %s", parts[i].addr, parts[i].addr + parts[i].reader->size,
+					md5_str);
 			if (memcmp(image_md5, flash_md5, MD5_SIZE) != 0) {
 				LOGE("ERROR: MD5 mismatch");
 				goto err_write;

@@ -4,6 +4,7 @@
 
 #include "intelhex/intelhex.h"
 #include "log.h"
+#include "memio.h"
 #include "read_parts.h"
 #include "utils.h"
 
@@ -100,16 +101,16 @@ append_part(cskburn_partition_t *parts, int *part_idx, uint32_t part_size_limit,
 	int idx = *part_idx;
 	cskburn_partition_t *part = &parts[idx];
 
-	if (part->image != NULL) {
-		if (part->addr + part->size == addr) {
-			memcpy(part->image + part->size, buf, size);
-			part->size += size;
-			LOG_TRACE("Part %d, addr: 0x%08X, size: %d (append)", idx, part->addr, part->size);
+	if (part->reader != NULL) {
+		if (part->addr + part->reader->size == addr) {
+			mem_feed(part->reader, buf, size);
+			LOG_TRACE("Part %d, addr: 0x%08X, size: %d (append)", idx, part->addr,
+					part->reader->size);
 			return 0;
 		} else {
 			idx += 1;
 			LOG_TRACE("Address changed from 0x%08X to 0x%08X, moving to next partition %d",
-					part->addr + part->size, addr, idx);
+					part->addr + part->reader->size, addr, idx);
 			if (idx >= parts_cnt_limit) {
 				LOG_TRACE("Index %d reached part count limit %d, ignored", idx, parts_cnt_limit);
 				return 0;
@@ -121,10 +122,9 @@ append_part(cskburn_partition_t *parts, int *part_idx, uint32_t part_size_limit,
 
 	part->path = malloc(260 + 11);
 	sprintf(part->path, "%s@0x%08X", path, addr);
-	part->image = malloc(part_size_limit);
-	memcpy(part->image, buf, size);
+	part->reader = mem_alloc(part_size_limit);
+	mem_feed(part->reader, buf, size);
 	part->addr = addr;
-	part->size = size;
-	LOG_TRACE("Part %d, addr: 0x%08X, size: %d (new)", idx, part->addr, part->size);
+	LOG_TRACE("Part %d, addr: 0x%08X, size: %d (new)", idx, part->addr, part->reader->size);
 	return 1;
 }

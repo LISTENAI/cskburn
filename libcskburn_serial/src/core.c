@@ -225,35 +225,41 @@ try_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, 
 }
 
 bool
-cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image, uint32_t len,
+cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, reader_t *reader,
 		void (*on_progress)(int32_t wrote_bytes, uint32_t total_bytes))
 {
 	uint32_t offset, length;
-	uint32_t blocks = BLOCKS(len, FLASH_BLOCK_SIZE);
+	uint32_t blocks = BLOCKS(reader->size, FLASH_BLOCK_SIZE);
 
 	uint64_t t1 = time_monotonic();
 
-	if (!try_flash_begin(dev, len, blocks, FLASH_BLOCK_SIZE, addr)) {
+	if (!try_flash_begin(dev, reader->size, blocks, FLASH_BLOCK_SIZE, addr)) {
 		return false;
 	}
+
+	uint8_t buffer[FLASH_BLOCK_SIZE];
 
 	uint32_t i = 0;
 	while (i < blocks) {
 		offset = FLASH_BLOCK_SIZE * i;
 		length = FLASH_BLOCK_SIZE;
 
-		if (offset + length > len) {
-			length = len - offset;
+		if (offset + length > reader->size) {
+			length = reader->size - offset;
 		}
 
-		if (!try_flash_block(dev, image + offset, length, i)) {
+		if (reader->read(reader, buffer, length) != length) {
+			return false;
+		}
+
+		if (!try_flash_block(dev, buffer, length, i)) {
 			return false;
 		}
 
 		i++;
 
 		if (on_progress != NULL) {
-			on_progress(offset + length, len);
+			on_progress(offset + length, reader->size);
 		}
 	}
 
@@ -262,7 +268,7 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image
 	uint64_t t2 = time_monotonic();
 
 	uint32_t spent = (uint32_t)((t2 - t1) / 1000);
-	float speed = (float)len / 1024.0f / (float)spent;
+	float speed = (float)reader->size / 1024.0f / (float)spent;
 	LOGD("Time used %d s, speed %.2f KB/s", spent, speed);
 
 	return true;

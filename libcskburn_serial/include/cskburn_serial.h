@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "io.h"
+
 #define FLAG_INVERT_RTS (1 << 0)
 
 void cskburn_serial_init(int flags);
@@ -47,7 +49,7 @@ bool cskburn_serial_connect(
 bool cskburn_serial_enter(
 		cskburn_serial_device_t *dev, uint32_t baud_rate, uint8_t *burner, uint32_t len);
 
-bool cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image, uint32_t len,
+bool cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, reader_t *reader,
 		void (*on_progress)(int32_t wrote_bytes, uint32_t total_bytes));
 
 bool cskburn_serial_verify(

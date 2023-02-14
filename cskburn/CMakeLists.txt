@@ -3,6 +3,7 @@ project(cskburn)
 add_executable(
     ${PROJECT_NAME}
     src/main.c
+    src/verify.c
     src/utils.c
     src/read_parts_bin.c
     src/read_parts_hex.c
@@ -11,6 +12,7 @@ add_executable(
 
 target_link_libraries(${PROJECT_NAME} log)
 target_link_libraries(${PROJECT_NAME} portable)
+target_link_libraries(${PROJECT_NAME} io)
 
 target_link_libraries(${PROJECT_NAME} cskburn_usb)
 target_link_libraries(${PROJECT_NAME} cskburn_serial)

@@ -16,6 +16,7 @@ target_include_directories(
 
 target_link_libraries(${PROJECT_NAME} log)
 target_link_libraries(${PROJECT_NAME} portable)
+target_link_libraries(${PROJECT_NAME} io)
 
 if(WIN32)
     target_link_libraries(${PROJECT_NAME} usb-win32-compat)
