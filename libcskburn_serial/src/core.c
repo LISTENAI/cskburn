@@ -206,14 +206,13 @@ try_flash_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks, ui
 }
 
 static bool
-try_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, uint32_t seq,
-		uint32_t *next_seq)
+try_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, uint32_t seq)
 {
 	for (int i = 0; i < FLASH_BLOCK_TRIES; i++) {
 		if (i > 0) {
 			LOGD("DEBUG: Attempts %d writing block %d", i, seq);
 		}
-		if (cmd_flash_block(dev, data, data_len, seq, next_seq)) {
+		if (cmd_flash_block(dev, data, data_len, seq)) {
 			return true;
 		}
 #if !defined(_WIN32) && !defined(_WIN64)
@@ -247,18 +246,11 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, uint8_t *image
 			length = len - offset;
 		}
 
-		uint32_t next = 0;
-		if (!try_flash_block(dev, image + offset, length, i, &next)) {
+		if (!try_flash_block(dev, image + offset, length, i)) {
 			return false;
 		}
-#ifdef FEATURE_SEQ_QUEST
-		if (next != i + 1) {
-			LOGD("DEBUG: Pointer jumped from %d to %d", i, next);
-		}
-		i = next;
-#else  // FEATURE_SEQ_QUEST
+
 		i++;
-#endif  // FEATURE_SEQ_QUEST
 
 		if (on_progress != NULL) {
 			on_progress(offset + length, len);

@@ -403,8 +403,7 @@ cmd_flash_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks, ui
 }
 
 bool
-cmd_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, uint32_t seq,
-		uint32_t *next_seq)
+cmd_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, uint32_t seq)
 {
 	cmd_flash_block_t *cmd = (cmd_flash_block_t *)dev->req_cmd;
 	memset(cmd, 0, sizeof(cmd_flash_block_t));
@@ -419,7 +418,7 @@ cmd_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, 
 	uint32_t in_len = sizeof(cmd_flash_block_t) + data_len;
 
 	uint8_t ret = check_command(dev, dev->nand ? CMD_NAND_DATA : CMD_FLASH_DATA, in_len,
-			checksum(data, data_len), next_seq, TIMEOUT_FLASH_DATA);
+			checksum(data, data_len), NULL, TIMEOUT_FLASH_DATA);
 
 	if (ret != 0x00) {
 		LOGD("DEBUG: Failed writing block %d: %02X", seq, ret);
