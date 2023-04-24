@@ -35,6 +35,7 @@
 #define CMD_NAND_END 0x23
 #define CMD_NAND_MD5 0x24
 #define CMD_READ_FLASH_ID 0xF3
+#define CMD_READ_CHIP_ID 0xF4
 
 #define CHECKSUM_MAGIC 0xef
 #define CHECKSUM_NONE 0
@@ -301,6 +302,32 @@ bool
 cmd_read_flash_id(cskburn_serial_device_t *dev, uint32_t *id)
 {
 	return !check_command(dev, CMD_READ_FLASH_ID, 0, CHECKSUM_NONE, id, TIMEOUT_DEFAULT);
+}
+
+bool
+cmd_read_chip_id(cskburn_serial_device_t *dev, uint64_t *id)
+{
+	uint8_t ret_buf[STATUS_BYTES_LEN + sizeof(uint64_t)];
+	uint16_t ret_len = 0;
+
+	if (!command(dev, CMD_READ_CHIP_ID, 0, CHECKSUM_NONE, NULL, ret_buf, &ret_len, sizeof(ret_buf),
+				TIMEOUT_DEFAULT)) {
+		return false;
+	}
+
+	if (ret_len < STATUS_BYTES_LEN) {
+		LOGD("DEBUG: Interrupted serial read");
+		return false;
+	}
+
+	if (ret_buf[0] != 0) {
+		LOGD("DEBUG: Unexpected device response: %02X%02X", ret_buf[0], ret_buf[1]);
+		return false;
+	}
+
+	memcpy(id, ret_buf + STATUS_BYTES_LEN, sizeof(uint64_t));
+
+	return true;
 }
 
 bool
