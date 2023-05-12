@@ -686,7 +686,8 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	}
 
 	if (flash_id != 0) {
-		LOGD("flash-id: %06X", flash_id);
+		LOGD("flash-id: %02X%02X%02X", (flash_id)&0xFF, (flash_id >> 8) & 0xFF,
+				(flash_id >> 16) & 0xFF);
 	}
 
 	if (nand_config.enable) {
