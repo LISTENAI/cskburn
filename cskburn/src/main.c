@@ -397,7 +397,7 @@ main(int argc, char **argv)
 		return -1;
 #else
 		if (options.chip == 6) {
-			LOGE("ERROR: USB burning is not support by chip family 6");
+			LOGE("ERROR: USB burning is not supported by chip family 6");
 			return -1;
 		}
 		if (options.usb != NULL && strcmp(options.usb, "-") != 0) {
@@ -408,6 +408,19 @@ main(int argc, char **argv)
 		}
 		options.protocol = PROTO_USB;
 #endif
+	}
+
+	if (nand_config.enable) {
+#ifndef WITHOUT_USB
+		if (options.protocol != PROTO_SERIAL) {
+			LOGE("ERROR: NAND is supported only in serial burning");
+			return -1;
+		}
+#endif
+		if (options.chip != 6) {
+			LOGE("ERROR: NAND is only supported by chip family 6");
+			return -1;
+		}
 	}
 
 	if (options.action == ACTION_CHECK) {

@@ -134,12 +134,12 @@ cskburn_serial_enter(
 	if (burner != NULL && len > 0) {
 		if (dev->chip == 6) {
 			if (!cmd_change_baud(dev, baud_rate, 115200)) {
-				LOGD("DEBUG: Failed changing baud rate");
+				LOGE("ERROR: Failed changing baud rate");
 				return false;
 			}
 
 			if (!try_sync(dev, 2000)) {
-				LOGD("DEBUG: Device not synced after baud rate change");
+				LOGE("ERROR: Device not synced after baud rate change");
 				return false;
 			}
 		}
@@ -176,17 +176,17 @@ cskburn_serial_enter(
 	}
 
 	if (!try_sync(dev, 2000)) {
-		LOGD("DEBUG: Device not recognized");
+		LOGE("ERROR: Device not recognized");
 		return false;
 	}
 
 	if (!cmd_change_baud(dev, baud_rate, 115200)) {
-		LOGD("DEBUG: Failed changing baud rate");
+		LOGE("ERROR: Failed changing baud rate");
 		return false;
 	}
 
 	if (!try_sync(dev, 2000)) {
-		LOGD("DEBUG: Device not synced after baud rate change");
+		LOGE("ERROR: Device not synced after baud rate change");
 		return false;
 	}
 
