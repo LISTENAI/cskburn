@@ -13,8 +13,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - { name: linux-x64, os: ubuntu-latest }
-          - { name: darwin-x64, os: macos-latest }
+          - { name: linux-x64,  os: ubuntu-latest }
+          - { name: darwin-x64, os: macos-latest  }
 
     steps:
       - uses: actions/checkout@v2
@@ -141,10 +141,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - { name: linux-arm, arch: armv7, distro: buster }
-          - { name: linux-arm64, arch: aarch64, distro: buster }
-          - { name: linux-arm-musl, arch: armv7, distro: alpine_latest }
-          - { name: linux-arm64-musl, arch: aarch64, distro: alpine_latest }
+          - { name: linux-arm,        arch: armv7,    distro: buster        }
+          - { name: linux-arm64,      arch: aarch64,  distro: buster        }
+          - { name: linux-arm-musl,   arch: armv7,    distro: alpine_latest }
+          - { name: linux-arm64-musl, arch: aarch64,  distro: alpine_latest }
 
     steps:
       - uses: actions/checkout@v2
@@ -198,8 +198,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - { name: android-armeabi-v7a, abi: armeabi-v7a }
-          - { name: android-arm64-v8a, abi: arm64-v8a }
+          - { name: android-armeabi-v7a,  abi: armeabi-v7a  }
+          - { name: android-arm64-v8a,    abi: arm64-v8a    }
 
     steps:
       - uses: actions/checkout@v2
