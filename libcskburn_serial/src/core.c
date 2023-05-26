@@ -12,6 +12,8 @@
 #include "serial.h"
 #include "time_monotonic.h"
 
+#define BAUD_RATE_INIT 115200
+
 #define FLASH_BLOCK_TRIES 5
 
 extern uint8_t burner_serial_4[];
@@ -130,8 +132,10 @@ cskburn_serial_enter(
 	}
 
 	if (burner != NULL && len > 0) {
-		if (dev->chip == 6) {
-			if (!cmd_change_baud(dev, baud_rate, 115200)) {
+		// For CSK6, CMD_CHANGE_BAUD is supported by the ROM, so take advantage
+		// of it to speed up the process.
+		if (dev->chip == 6 && baud_rate != BAUD_RATE_INIT) {
+			if (!cmd_change_baud(dev, baud_rate, BAUD_RATE_INIT)) {
 				LOGE("ERROR: Failed changing baud rate");
 				return false;
 			}
@@ -166,8 +170,9 @@ cskburn_serial_enter(
 			return false;
 		}
 
-		if (dev->chip == 6) {
-			serial_set_speed(dev->handle, 115200);
+		// RAM proxy is up with default baud rate
+		if (dev->chip == 6 && baud_rate != BAUD_RATE_INIT) {
+			serial_set_speed(dev->handle, BAUD_RATE_INIT);
 		}
 
 		msleep(500);
@@ -178,7 +183,7 @@ cskburn_serial_enter(
 		return false;
 	}
 
-	if (!cmd_change_baud(dev, baud_rate, 115200)) {
+	if (!cmd_change_baud(dev, baud_rate, BAUD_RATE_INIT)) {
 		LOGE("ERROR: Failed changing baud rate");
 		return false;
 	}
