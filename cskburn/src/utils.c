@@ -17,7 +17,7 @@ read_file(const char *path, uint8_t *buf, uint32_t limit)
 }
 
 bool
-scan_int(char *str, uint32_t *out)
+scan_int(const char *str, uint32_t *out)
 {
 	if (sscanf(str, "0x%x", out) == 1) {
 		return true;
@@ -28,6 +28,20 @@ scan_int(char *str, uint32_t *out)
 	}
 
 	return false;
+}
+
+bool
+scan_addr_size(const char *str, uint32_t *addr, uint32_t *size)
+{
+	char *split = strstr(str, ":");
+	if (split == NULL) {
+		return false;
+	}
+
+	const char *str_addr = str;
+	const char *str_size = split + 1;
+
+	return scan_int(str_addr, addr) && scan_int(str_size, size);
 }
 
 void
@@ -45,4 +59,10 @@ has_extname(char *path, const char *extname)
 	size_t extn_len = strlen(extname);
 	if (path_len <= extn_len) return false;
 	return strncasecmp(path + path_len - extn_len, extname, extn_len) == 0;
+}
+
+bool
+is_aligned(uint32_t addr, uint32_t align)
+{
+	return addr % align == 0;
 }

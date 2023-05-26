@@ -266,26 +266,10 @@ main(int argc, char **argv)
 						return -1;
 					}
 
-					char *split = strstr(optarg, ":");
-					if (split == NULL) {
-						LOGE("ERROR: Argument of --verify should be addr:size (e.g. -u "
-							 "0x00000000:102400)");
-						return -1;
-					}
-
-					char *addr = optarg;
-					char *size = split + 1;
-					split[0] = 0;
-
 					uint16_t index = options.verify_count;
 
-					if (!scan_int(addr, &options.verify_parts[index].addr)) {
-						LOGE("ERROR: Argument of --verify should be addr:size (e.g. -u "
-							 "0x00000000:102400)");
-						return -1;
-					}
-
-					if (!scan_int(size, &options.verify_parts[index].size)) {
+					if (!scan_addr_size(optarg, &options.verify_parts[index].addr,
+								&options.verify_parts[index].size)) {
 						LOGE("ERROR: Argument of --verify should be addr:size (e.g. -u "
 							 "0x00000000:102400)");
 						return -1;
@@ -711,13 +695,13 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 
 	for (int i = 0; i < parts_cnt; i++) {
 		if (nand_config.enable) {
-			if (parts[i].addr % 512 != 0) {
+			if (!is_aligned(parts[i].addr, 512)) {
 				LOGE("ERROR: Address of partition %d (0x%08X) should be 512 bytes aligned", i + 1,
 						parts[i].addr);
 				goto err_enter;
 			}
 		} else {
-			if (parts[i].addr % (4 * 1024) != 0) {
+			if (!is_aligned(parts[i].addr, 4 * 1024)) {
 				LOGE("ERROR: Address of partition %d (0x%08X) should be 4K aligned", i + 1,
 						parts[i].addr);
 				goto err_enter;
