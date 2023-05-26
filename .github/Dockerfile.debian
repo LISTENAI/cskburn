@@ -1,0 +1,6 @@
+FROM debian:10
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update -y && \
+    apt-get install -y git build-essential cmake ninja-build

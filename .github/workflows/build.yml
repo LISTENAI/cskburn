@@ -7,13 +7,17 @@ on:
   pull_request:
 
 jobs:
-  build-posix:
-    runs-on: ${{ matrix.os }}
+  build-linux:
+    runs-on: ubuntu-latest
 
     strategy:
       matrix:
         include:
-          - { name: linux-x64,  os: ubuntu-latest }
+          - { name: linux-x64,        image: debian,  platform: linux/amd64   }
+          - { name: linux-arm,        image: debian,  platform: linux/arm/v7  }
+          - { name: linux-arm64,      image: debian,  platform: linux/arm64   }
+          - { name: linux-arm-musl,   image: alpine,  platform: linux/arm/v7  }
+          - { name: linux-arm64-musl, image: alpine,  platform: linux/arm64   }
 
     steps:
       - uses: actions/checkout@v2
@@ -21,13 +25,39 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Setup Ninja
-        uses: ashutoshvarma/setup-ninja@master
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2.1.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Prepare builder image
+        uses: docker/build-push-action@v3
+        with:
+          platforms: ${{ matrix.platform }}
+          file: .github/Dockerfile.${{ matrix.image }}
+          context: .github
+          tags: cskburn-${{ matrix.name }}:latest
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Build
-        uses: ./.github/actions/cmake-build
+        uses: tj-actions/docker-run@v2
         with:
-          run-tests: true
+          image: cskburn-${{ matrix.name }}:latest
+          name: ${{ matrix.name }}
+          options: >-
+            --platform ${{ matrix.platform }}
+            --volume ${{ github.workspace }}:/cskburn
+            --workdir /cskburn
+          args: |
+            bash -c '
+              git config --global --add safe.directory $PWD
+              cmake -G Ninja -B build
+              cmake --build build --config Release
+              ctest --test-dir build --build-config Release --output-on-failure
+            '
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
@@ -134,63 +164,6 @@ jobs:
           name: cskburn-${{ matrix.name }}.zip
           root-dir: build/cskburn
           files: cskburn.exe
-          tag: ${{ github.ref }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-  build-docker:
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        include:
-          - { name: linux-arm,        arch: armv7,    distro: buster        }
-          - { name: linux-arm64,      arch: aarch64,  distro: buster        }
-          - { name: linux-arm-musl,   arch: armv7,    distro: alpine_latest }
-          - { name: linux-arm64-musl, arch: aarch64,  distro: alpine_latest }
-
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Build
-        uses: uraimo/run-on-arch-action@v2.1.1
-        with:
-          arch: ${{ matrix.arch }}
-          distro: ${{ matrix.distro }}
-          githubToken: ${{ github.token }}
-          install: |
-            case "${{ matrix.distro }}" in
-              buster)
-                apt-get update -q -y
-                apt-get install -q -y git build-essential cmake ninja-build
-                ;;
-              alpine_latest*)
-                apk update
-                apk add git cmake make ninja g++ libtool musl-dev linux-headers
-                ;;
-            esac
-          run: |
-            git config --global --add safe.directory $PWD
-            cmake -G Ninja -B build
-            cmake --build build --config Release
-            ctest --test-dir build --build-config Release --output-on-failure
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v2
-        with:
-          name: cskburn-${{ matrix.name }}
-          path: build/cskburn/cskburn
-          if-no-files-found: error
-
-      - name: Upload release
-        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-        uses: ./.github/actions/release-tar-xz
-        with:
-          name: cskburn-${{ matrix.name }}.tar.xz
-          root-dir: build/cskburn
-          files: cskburn
           tag: ${{ github.ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
