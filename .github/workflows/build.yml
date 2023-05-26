@@ -14,7 +14,6 @@ jobs:
       matrix:
         include:
           - { name: linux-x64,  os: ubuntu-latest }
-          - { name: darwin-x64, os: macos-latest  }
 
     steps:
       - uses: actions/checkout@v2
@@ -47,13 +46,14 @@ jobs:
           tag: ${{ github.ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
-  build-silicon:
-    runs-on: ${{ matrix.os }}
+  build-darwin:
+    runs-on: macos-latest
 
     strategy:
       matrix:
         include:
-          - { name: darwin-arm64, os: macos-latest }
+          - { name: darwin-x64,   target: x86_64-apple-macos, test: true  }
+          - { name: darwin-arm64, target: arm64-apple-macos,  test: false }
 
     steps:
       - uses: actions/checkout@v2
@@ -66,8 +66,10 @@ jobs:
 
       - name: Build
         uses: ./.github/actions/cmake-build
+        with:
+          run-tests: ${{ matrix.test }}
         env:
-          CFLAGS: -target arm64-apple-macos
+          CFLAGS: -target ${{ matrix.target }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
