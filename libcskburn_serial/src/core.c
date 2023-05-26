@@ -278,6 +278,18 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, reader_t *read
 }
 
 bool
+cskburn_serial_erase_all(cskburn_serial_device_t *dev)
+{
+	return cmd_flash_erase_chip(dev);
+}
+
+bool
+cskburn_serial_erase(cskburn_serial_device_t *dev, uint32_t addr, uint32_t size)
+{
+	return cmd_flash_erase_region(dev, addr, size);
+}
+
+bool
 cskburn_serial_verify(cskburn_serial_device_t *dev, uint32_t addr, uint32_t size, uint8_t *md5)
 {
 	return cmd_flash_md5sum(dev, addr, size, md5);

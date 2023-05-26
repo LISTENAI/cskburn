@@ -33,6 +33,8 @@
 #define CMD_NAND_DATA 0x22
 #define CMD_NAND_END 0x23
 #define CMD_NAND_MD5 0x24
+#define CMD_FLASH_ERASE_CHIP 0xD0
+#define CMD_FLASH_ERASE_REGION 0xD1
 #define CMD_READ_FLASH_ID 0xF3
 #define CMD_READ_CHIP_ID 0xF4
 
@@ -53,7 +55,12 @@
 // 取值过小会导致正常返回和重试返回叠加，seq 错位
 #define TIMEOUT_FLASH_DATA 1000
 
+// Flash 擦除指令超时时间
+// TODO: 需要根据区域大小动态调整
+#define TIMEOUT_FLASH_ERASE 30000
+
 // MD5 计算指令超时时间
+// TODO: 需要根据区域大小动态调整
 #define TIMEOUT_FLASH_MD5SUM 30000
 
 typedef struct {
@@ -89,6 +96,11 @@ typedef struct {
 	uint32_t baud;
 	uint32_t old_baud;
 } cmd_change_baud_t;
+
+typedef struct {
+	uint32_t address;
+	uint32_t size;
+} cmd_flash_erase_t;
 
 typedef struct {
 	uint32_t address;
@@ -458,6 +470,24 @@ cmd_flash_finish(cskburn_serial_device_t *dev)
 
 	return !check_command(dev, dev->nand ? CMD_NAND_END : CMD_FLASH_END, sizeof(uint32_t),
 			CHECKSUM_NONE, NULL, TIMEOUT_FLASH_DATA);
+}
+
+bool
+cmd_flash_erase_chip(cskburn_serial_device_t *dev)
+{
+	return !check_command(dev, CMD_FLASH_ERASE_CHIP, 0, CHECKSUM_NONE, NULL, TIMEOUT_FLASH_ERASE);
+}
+
+bool
+cmd_flash_erase_region(cskburn_serial_device_t *dev, uint32_t address, uint32_t size)
+{
+	cmd_flash_erase_t *cmd = (cmd_flash_erase_t *)dev->req_cmd;
+	memset(cmd, 0, sizeof(cmd_flash_erase_t));
+	cmd->address = address;
+	cmd->size = size;
+
+	return !check_command(dev, CMD_FLASH_ERASE_REGION, sizeof(cmd_flash_erase_t), CHECKSUM_NONE,
+			NULL, TIMEOUT_FLASH_ERASE);
 }
 
 bool

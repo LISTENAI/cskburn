@@ -52,6 +52,9 @@ bool cskburn_serial_enter(
 bool cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, reader_t *reader,
 		void (*on_progress)(int32_t wrote_bytes, uint32_t total_bytes));
 
+bool cskburn_serial_erase_all(cskburn_serial_device_t *dev);
+bool cskburn_serial_erase(cskburn_serial_device_t *dev, uint32_t addr, uint32_t size);
+
 bool cskburn_serial_verify(
 		cskburn_serial_device_t *dev, uint32_t addr, uint32_t size, uint8_t *md5);
 

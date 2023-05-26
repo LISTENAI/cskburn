@@ -17,6 +17,7 @@
 
 #define MAX_IMAGE_SIZE (32 * 1024 * 1024)
 #define MAX_FLASH_PARTS 20
+#define MAX_ERASE_PARTS 20
 #define MAX_VERIFY_PARTS 20
 #define ENTER_TRIES 5
 
@@ -54,6 +55,8 @@ static struct option long_options[] = {
 		{"nand-dat2", required_argument, NULL, 0},
 		{"nand-dat3", required_argument, NULL, 0},
 		{"chip-id", no_argument, NULL, 0},
+		{"erase", required_argument, NULL, 0},
+		{"erase-all", no_argument, NULL, 0},
 		{"verify", required_argument, NULL, 0},
 		{"verify-all", no_argument, NULL, 0},
 		{"probe-timeout", required_argument, NULL, 0},
@@ -116,6 +119,12 @@ static struct {
 	char *serial;
 	uint32_t serial_baud;
 	bool read_chip_id;
+	uint16_t erase_count;
+	struct {
+		uint32_t addr;
+		uint32_t size;
+	} erase_parts[MAX_ERASE_PARTS];
+	bool erase_all;
 	uint16_t verify_count;
 	struct {
 		uint32_t addr;
@@ -143,6 +152,8 @@ static struct {
 		.serial = NULL,
 		.serial_baud = DEFAULT_BAUD,
 		.read_chip_id = false,
+		.erase_count = 0,
+		.erase_all = false,
 		.verify_count = 0,
 		.verify_all = false,
 		.probe_timeout = DEFAULT_PROBE_TIMEOUT,
@@ -258,6 +269,27 @@ main(int argc, char **argv)
 				const char *name = long_options[long_index].name;
 				if (strcmp(name, "chip-id") == 0) {
 					options.read_chip_id = true;
+					break;
+				} else if (strcmp(name, "erase") == 0) {
+					if (options.erase_count >= MAX_ERASE_PARTS) {
+						LOGE("ERROR: Only up to %d partitions can be erased at the same time",
+								MAX_ERASE_PARTS);
+						return -1;
+					}
+
+					uint16_t index = options.erase_count;
+
+					if (!scan_addr_size(optarg, &options.erase_parts[index].addr,
+								&options.erase_parts[index].size)) {
+						LOGE("ERROR: Argument of --erase should be addr:size (e.g. -u "
+							 "0x00000000:102400)");
+						return -1;
+					}
+
+					options.erase_count++;
+					break;
+				} else if (strcmp(name, "erase-all") == 0) {
+					options.erase_all = true;
 					break;
 				} else if (strcmp(name, "verify") == 0) {
 					if (options.verify_count >= MAX_VERIFY_PARTS) {
@@ -403,6 +435,10 @@ main(int argc, char **argv)
 #endif
 		if (options.chip != 6) {
 			LOGE("ERROR: NAND is only supported by chip family 6");
+			return -1;
+		}
+		if (options.erase_all || options.erase_count > 0) {
+			LOGE("ERROR: Erasing is not supported on NAND yet");
 			return -1;
 		}
 	}
@@ -693,6 +729,26 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		LOGI("Detected flash size: %llu MB", flash_size >> 20);
 	}
 
+	for (int i = 0; i < options.erase_count; i++) {
+		if (!is_aligned(options.erase_parts[i].addr, 4 * 1024)) {
+			LOGE("ERROR: Erase address (0x%08X) should be 4K aligned", options.erase_parts[i].addr);
+			goto err_enter;
+		} else if (!is_aligned(options.erase_parts[i].size, 4 * 1024)) {
+			LOGE("ERROR: Erase size (0x%08X) should be 4K aligned", options.erase_parts[i].size);
+			goto err_enter;
+		} else if (options.erase_parts[i].addr >= flash_size) {
+			LOGE("ERROR: The starting boundary of erase address (0x%08X) exceeds the capacity of "
+				 "flash (%llu MB)",
+					options.erase_parts[i].addr, flash_size >> 20);
+			goto err_enter;
+		} else if (options.erase_parts[i].addr + options.erase_parts[i].size > flash_size) {
+			LOGE("ERROR: The ending boundary of erase address (0x%08X) exceeds the capacity of "
+				 "flash (%llu MB)",
+					options.erase_parts[i].addr + options.erase_parts[i].size, flash_size >> 20);
+			goto err_enter;
+		}
+	}
+
 	for (int i = 0; i < parts_cnt; i++) {
 		if (nand_config.enable) {
 			if (!is_aligned(parts[i].addr, 512)) {
@@ -721,6 +777,24 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 
 		if (options.verify_all) {
 			verify_install(parts[i].reader);
+		}
+	}
+
+	if (options.erase_all) {
+		LOGI("Erasing entire flash...");
+		if (!cskburn_serial_erase_all(dev)) {
+			LOGE("ERROR: Failed erasing device");
+			goto err_enter;
+		}
+	} else {
+		for (int i = 0; i < options.erase_count; i++) {
+			uint32_t addr = options.erase_parts[i].addr;
+			uint32_t size = options.erase_parts[i].size;
+			LOGI("Erasing region 0x%08X-0x%08X...", addr, addr + size);
+			if (!cskburn_serial_erase(dev, addr, size)) {
+				LOGE("ERROR: Failed erasing device");
+				goto err_enter;
+			}
 		}
 	}
 
