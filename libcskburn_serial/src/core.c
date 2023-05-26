@@ -294,6 +294,11 @@ cskburn_serial_get_flash_info(
 		}
 	} else {
 		if (cmd_read_flash_id(dev, flash_id)) {
+			if ((*flash_id & 0xFFFFFF) == 0x000000 || (*flash_id & 0xFFFFFF) == 0xFFFFFF) {
+				// In case flash is not present
+				return false;
+			}
+
 			*flash_size = 2 << (((*flash_id >> 16) & 0xFF) - 1);
 			return true;
 		}
