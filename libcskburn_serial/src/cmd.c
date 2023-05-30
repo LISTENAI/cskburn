@@ -13,8 +13,13 @@
 #include "slip.h"
 #include "time_monotonic.h"
 
+#ifndef TRACE_DATA
 #define TRACE_DATA 0
+#endif
+
+#ifndef TRACE_SLIP
 #define TRACE_SLIP 0
+#endif
 
 #define DIR_REQ 0x00
 #define DIR_RES 0x01

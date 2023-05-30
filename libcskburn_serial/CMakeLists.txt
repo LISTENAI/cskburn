@@ -20,5 +20,13 @@ target_link_libraries(${PROJECT_NAME} portable)
 target_link_libraries(${PROJECT_NAME} serial)
 target_link_libraries(${PROJECT_NAME} io)
 
+if($ENV{TRACE_DATA})
+    target_compile_options(${PROJECT_NAME} PRIVATE -DTRACE_DATA=$ENV{TRACE_DATA})
+endif()
+
+if($ENV{TRACE_SLIP})
+    target_compile_options(${PROJECT_NAME} PRIVATE -DTRACE_SLIP=$ENV{TRACE_SLIP})
+endif()
+
 add_subdirectory(test)
 add_test(NAME ${PROJECT_NAME} COMMAND libcskburn_serial_test)
