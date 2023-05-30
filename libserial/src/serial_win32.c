@@ -37,7 +37,14 @@ configure_port(HANDLE handle, DWORD baud_rate)
 serial_dev_t *
 serial_open(const char *path)
 {
-	HANDLE handle = CreateFileA(path,
+	char full_path[MAX_PATH];
+	if (strncmp(path, "\\\\.\\", 4) == 0) {
+		strncpy(full_path, path, MAX_PATH);
+	} else {
+		snprintf(full_path, MAX_PATH, "\\\\.\\%s", path);
+	}
+
+	HANDLE handle = CreateFileA(full_path,
 			GENERIC_READ | GENERIC_WRITE,  // Read/Write
 			0,  // No Sharing
 			NULL,  // No Security
