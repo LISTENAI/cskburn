@@ -60,6 +60,7 @@ mem_read(reader_t *reader, uint8_t *buf, uint32_t size)
 		size = reader->size - ctx->read_off;
 	}
 	memcpy(buf, ctx->buffer + ctx->read_off, size);
+	ctx->read_off += size;
 	if (reader->hook) {
 		reader->hook((const uint8_t *)buf, size, reader->hook_ctx);
 	}
