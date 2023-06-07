@@ -312,9 +312,9 @@ cmd_read_flash_id(cskburn_serial_device_t *dev, uint32_t *id)
 }
 
 bool
-cmd_read_chip_id(cskburn_serial_device_t *dev, uint64_t *id)
+cmd_read_chip_id(cskburn_serial_device_t *dev, uint8_t *id)
 {
-	uint8_t ret_buf[STATUS_BYTES_LEN + sizeof(uint64_t)];
+	uint8_t ret_buf[STATUS_BYTES_LEN + CHIP_ID_LEN];
 	uint16_t ret_len = 0;
 
 	if (!command(dev, CMD_READ_CHIP_ID, 0, CHECKSUM_NONE, NULL, ret_buf, &ret_len, sizeof(ret_buf),
@@ -332,7 +332,7 @@ cmd_read_chip_id(cskburn_serial_device_t *dev, uint64_t *id)
 		return false;
 	}
 
-	memcpy(id, ret_buf + STATUS_BYTES_LEN, sizeof(uint64_t));
+	memcpy(id, ret_buf + STATUS_BYTES_LEN, CHIP_ID_LEN);
 
 	return true;
 }

@@ -702,13 +702,14 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	}
 
 	if (options.read_chip_id) {
-		uint64_t chip_id = 0;
-		if (!cskburn_serial_read_chip_id(dev, &chip_id)) {
+		uint8_t id[CHIP_ID_LEN] = {0};
+		if (!cskburn_serial_read_chip_id(dev, id)) {
 			LOGE("ERROR: Failed reading device");
 			goto err_enter;
 		}
 
-		LOGI("chip-id: %016llX", chip_id);
+		LOGI("chip-id: %02X%02X%02X%02X%02X%02X%02X%02X", id[0], id[1], id[2], id[3], id[4], id[5],
+				id[6], id[7]);
 	}
 
 	uint32_t flash_id = 0;

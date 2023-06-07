@@ -8,6 +8,8 @@
 
 #define FLAG_INVERT_RTS (1 << 0)
 
+#define CHIP_ID_LEN 8
+
 void cskburn_serial_init(int flags);
 
 struct _cskburn_serial_device_t;
@@ -58,7 +60,7 @@ bool cskburn_serial_erase(cskburn_serial_device_t *dev, uint32_t addr, uint32_t 
 bool cskburn_serial_verify(
 		cskburn_serial_device_t *dev, uint32_t addr, uint32_t size, uint8_t *md5);
 
-bool cskburn_serial_read_chip_id(cskburn_serial_device_t *dev, uint64_t *chip_id);
+bool cskburn_serial_read_chip_id(cskburn_serial_device_t *dev, uint8_t *chip_id);
 
 bool cskburn_serial_get_flash_info(
 		cskburn_serial_device_t *dev, uint32_t *flash_id, uint64_t *flash_size);

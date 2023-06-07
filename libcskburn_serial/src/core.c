@@ -296,7 +296,7 @@ cskburn_serial_verify(cskburn_serial_device_t *dev, uint32_t addr, uint32_t size
 }
 
 bool
-cskburn_serial_read_chip_id(cskburn_serial_device_t *dev, uint64_t *chip_id)
+cskburn_serial_read_chip_id(cskburn_serial_device_t *dev, uint8_t *chip_id)
 {
 	return cmd_read_chip_id(dev, chip_id);
 }
