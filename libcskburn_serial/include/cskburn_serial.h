@@ -36,13 +36,12 @@ typedef struct {
 } nand_config_t;
 #pragma pack()
 
-typedef struct {
-	bool enable;
-	nand_config_t config;
-} cskburn_serial_nand_t;
+typedef enum {
+	TARGET_FLASH = 0,
+	TARGET_NAND = 1,
+} cskburn_serial_target_t;
 
-cskburn_serial_device_t *cskburn_serial_open(
-		const char *pat, uint32_t chip, cskburn_serial_nand_t *nand);
+cskburn_serial_device_t *cskburn_serial_open(const char *pat, uint32_t chip);
 void cskburn_serial_close(cskburn_serial_device_t **dev);
 
 bool cskburn_serial_connect(
@@ -51,19 +50,24 @@ bool cskburn_serial_connect(
 bool cskburn_serial_enter(
 		cskburn_serial_device_t *dev, uint32_t baud_rate, uint8_t *burner, uint32_t len);
 
-bool cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, reader_t *reader,
+bool cskburn_serial_write(cskburn_serial_device_t *dev, cskburn_serial_target_t target,
+		uint32_t addr, reader_t *reader,
 		void (*on_progress)(int32_t wrote_bytes, uint32_t total_bytes));
 
-bool cskburn_serial_erase_all(cskburn_serial_device_t *dev);
-bool cskburn_serial_erase(cskburn_serial_device_t *dev, uint32_t addr, uint32_t size);
+bool cskburn_serial_erase_all(cskburn_serial_device_t *dev, cskburn_serial_target_t target);
+bool cskburn_serial_erase(
+		cskburn_serial_device_t *dev, cskburn_serial_target_t target, uint32_t addr, uint32_t size);
 
-bool cskburn_serial_verify(
-		cskburn_serial_device_t *dev, uint32_t addr, uint32_t size, uint8_t *md5);
+bool cskburn_serial_verify(cskburn_serial_device_t *dev, cskburn_serial_target_t target,
+		uint32_t addr, uint32_t size, uint8_t *md5);
 
 bool cskburn_serial_read_chip_id(cskburn_serial_device_t *dev, uint8_t *chip_id);
 
 bool cskburn_serial_get_flash_info(
 		cskburn_serial_device_t *dev, uint32_t *flash_id, uint64_t *flash_size);
+
+bool cskburn_serial_init_nand(
+		cskburn_serial_device_t *dev, nand_config_t *config, uint64_t *nand_size);
 
 bool cskburn_serial_reset(cskburn_serial_device_t *dev, uint32_t reset_delay);
 

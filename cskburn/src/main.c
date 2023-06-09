@@ -118,6 +118,7 @@ static struct {
 #endif
 	char *serial;
 	uint32_t serial_baud;
+	cskburn_serial_target_t target;
 	bool read_chip_id;
 	uint16_t erase_count;
 	struct {
@@ -151,6 +152,7 @@ static struct {
 #endif
 		.serial = NULL,
 		.serial_baud = DEFAULT_BAUD,
+		.target = TARGET_FLASH,
 		.read_chip_id = false,
 		.erase_count = 0,
 		.erase_all = false,
@@ -164,18 +166,14 @@ static struct {
 		.update_high = false,
 };
 
-static cskburn_serial_nand_t nand_config = {
-		.enable = false,
-		.config =
-				{
-						.mode_4bit = 0,
-						.sd_cmd = {.set = 0},
-						.sd_clk = {.set = 0},
-						.sd_dat0 = {.set = 0},
-						.sd_dat1 = {.set = 0},
-						.sd_dat2 = {.set = 0},
-						.sd_dat3 = {.set = 0},
-				},
+static nand_config_t nand_config = {
+		.mode_4bit = 0,
+		.sd_cmd = {.set = 0},
+		.sd_clk = {.set = 0},
+		.sd_dat0 = {.set = 0},
+		.sd_dat1 = {.set = 0},
+		.sd_dat2 = {.set = 0},
+		.sd_dat3 = {.set = 0},
 };
 
 static void
@@ -263,7 +261,7 @@ main(int argc, char **argv)
 				if (options.chip == 3) options.chip = 4;
 				break;
 			case 'n':
-				nand_config.enable = true;
+				options.target = TARGET_NAND;
 				break;
 			case 0: { /* long-only options */
 				const char *name = long_options[long_index].name;
@@ -337,49 +335,49 @@ main(int argc, char **argv)
 					options.progress = false;
 					break;
 				} else if (strcmp(name, "nand-4bit") == 0) {
-					nand_config.config.mode_4bit = 1;
+					nand_config.mode_4bit = 1;
 					break;
 				} else if (strcmp(name, "nand-cmd") == 0) {
 					int pad, pin;
 					sscanf(optarg, "%d:%d", &pad, &pin);
-					nand_config.config.sd_cmd.set = 1;
-					nand_config.config.sd_cmd.pad = pad;
-					nand_config.config.sd_cmd.pin = pin;
+					nand_config.sd_cmd.set = 1;
+					nand_config.sd_cmd.pad = pad;
+					nand_config.sd_cmd.pin = pin;
 					break;
 				} else if (strcmp(name, "nand-clk") == 0) {
 					int pad, pin;
 					sscanf(optarg, "%d:%d", &pad, &pin);
-					nand_config.config.sd_clk.set = 1;
-					nand_config.config.sd_clk.pad = pad;
-					nand_config.config.sd_clk.pin = pin;
+					nand_config.sd_clk.set = 1;
+					nand_config.sd_clk.pad = pad;
+					nand_config.sd_clk.pin = pin;
 					break;
 				} else if (strcmp(name, "nand-dat0") == 0) {
 					int pad, pin;
 					sscanf(optarg, "%d:%d", &pad, &pin);
-					nand_config.config.sd_dat0.set = 1;
-					nand_config.config.sd_dat0.pad = pad;
-					nand_config.config.sd_dat0.pin = pin;
+					nand_config.sd_dat0.set = 1;
+					nand_config.sd_dat0.pad = pad;
+					nand_config.sd_dat0.pin = pin;
 					break;
 				} else if (strcmp(name, "nand-dat1") == 0) {
 					int pad, pin;
 					sscanf(optarg, "%d:%d", &pad, &pin);
-					nand_config.config.sd_dat1.set = 1;
-					nand_config.config.sd_dat1.pad = pad;
-					nand_config.config.sd_dat1.pin = pin;
+					nand_config.sd_dat1.set = 1;
+					nand_config.sd_dat1.pad = pad;
+					nand_config.sd_dat1.pin = pin;
 					break;
 				} else if (strcmp(name, "nand-dat2") == 0) {
 					int pad, pin;
 					sscanf(optarg, "%d:%d", &pad, &pin);
-					nand_config.config.sd_dat2.set = 1;
-					nand_config.config.sd_dat2.pad = pad;
-					nand_config.config.sd_dat2.pin = pin;
+					nand_config.sd_dat2.set = 1;
+					nand_config.sd_dat2.pad = pad;
+					nand_config.sd_dat2.pin = pin;
 					break;
 				} else if (strcmp(name, "nand-dat3") == 0) {
 					int pad, pin;
 					sscanf(optarg, "%d:%d", &pad, &pin);
-					nand_config.config.sd_dat3.set = 1;
-					nand_config.config.sd_dat3.pad = pad;
-					nand_config.config.sd_dat3.pin = pin;
+					nand_config.sd_dat3.set = 1;
+					nand_config.sd_dat3.pad = pad;
+					nand_config.sd_dat3.pin = pin;
 					break;
 				} else {
 					print_help(argv[0]);
@@ -426,7 +424,7 @@ main(int argc, char **argv)
 #endif
 	}
 
-	if (nand_config.enable) {
+	if (options.target == TARGET_NAND) {
 #ifndef WITHOUT_USB
 		if (options.protocol != PROTO_SERIAL) {
 			LOGE("ERROR: NAND is supported only in serial burning");
@@ -674,24 +672,24 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	if (options.update_high) flags |= FLAG_INVERT_RTS;
 	cskburn_serial_init(flags);
 
-	if (nand_config.enable) {
+	if (options.target == TARGET_NAND) {
 		LOGD("Using NAND flash");
-		LOGD("* 4-bit mode: %d", nand_config.config.mode_4bit);
-		LOGD("* pin sd_cmd : set=%d, pad=%d, pin=%d", nand_config.config.sd_cmd.set,
-				nand_config.config.sd_cmd.pad, nand_config.config.sd_cmd.pin);
-		LOGD("* pin sd_clk : set=%d, pad=%d, pin=%d", nand_config.config.sd_clk.set,
-				nand_config.config.sd_clk.pad, nand_config.config.sd_clk.pin);
-		LOGD("* pin sd_dat0: set=%d, pad=%d, pin=%d", nand_config.config.sd_dat0.set,
-				nand_config.config.sd_dat0.pad, nand_config.config.sd_dat0.pin);
-		LOGD("* pin sd_dat1: set=%d, pad=%d, pin=%d", nand_config.config.sd_dat1.set,
-				nand_config.config.sd_dat1.pad, nand_config.config.sd_dat1.pin);
-		LOGD("* pin sd_dat2: set=%d, pad=%d, pin=%d", nand_config.config.sd_dat2.set,
-				nand_config.config.sd_dat2.pad, nand_config.config.sd_dat2.pin);
-		LOGD("* pin sd_dat3: set=%d, pad=%d, pin=%d", nand_config.config.sd_dat3.set,
-				nand_config.config.sd_dat3.pad, nand_config.config.sd_dat3.pin);
+		LOGD("* 4-bit mode: %d", nand_config.mode_4bit);
+		LOGD("* pin sd_cmd : set=%d, pad=%d, pin=%d", nand_config.sd_cmd.set,
+				nand_config.sd_cmd.pad, nand_config.sd_cmd.pin);
+		LOGD("* pin sd_clk : set=%d, pad=%d, pin=%d", nand_config.sd_clk.set,
+				nand_config.sd_clk.pad, nand_config.sd_clk.pin);
+		LOGD("* pin sd_dat0: set=%d, pad=%d, pin=%d", nand_config.sd_dat0.set,
+				nand_config.sd_dat0.pad, nand_config.sd_dat0.pin);
+		LOGD("* pin sd_dat1: set=%d, pad=%d, pin=%d", nand_config.sd_dat1.set,
+				nand_config.sd_dat1.pad, nand_config.sd_dat1.pin);
+		LOGD("* pin sd_dat2: set=%d, pad=%d, pin=%d", nand_config.sd_dat2.set,
+				nand_config.sd_dat2.pad, nand_config.sd_dat2.pin);
+		LOGD("* pin sd_dat3: set=%d, pad=%d, pin=%d", nand_config.sd_dat3.set,
+				nand_config.sd_dat3.pad, nand_config.sd_dat3.pin);
 	}
 
-	cskburn_serial_device_t *dev = cskburn_serial_open(options.serial, options.chip, &nand_config);
+	cskburn_serial_device_t *dev = cskburn_serial_open(options.serial, options.chip);
 	if (dev == NULL) {
 		LOGE("ERROR: Failed opening device");
 		goto err_open;
@@ -712,22 +710,26 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 				id[6], id[7]);
 	}
 
-	uint32_t flash_id = 0;
 	uint64_t flash_size = 0;
-	if (!cskburn_serial_get_flash_info(dev, &flash_id, &flash_size)) {
-		LOGE("ERROR: Failed detecting flash type");
-		goto err_enter;
-	}
 
-	if (flash_id != 0) {
+	if (options.target == TARGET_FLASH) {
+		uint32_t flash_id = 0;
+
+		if (!cskburn_serial_get_flash_info(dev, &flash_id, &flash_size)) {
+			LOGE("ERROR: Failed detecting flash type");
+			goto err_enter;
+		}
+
 		LOGD("flash-id: %02X%02X%02X", (flash_id)&0xFF, (flash_id >> 8) & 0xFF,
 				(flash_id >> 16) & 0xFF);
-	}
-
-	if (nand_config.enable) {
-		LOGI("Detected NAND size: %llu MB", flash_size >> 20);
-	} else {
 		LOGI("Detected flash size: %llu MB", flash_size >> 20);
+	} else if (options.target == TARGET_NAND) {
+		if (!cskburn_serial_init_nand(dev, &nand_config, &flash_size)) {
+			LOGE("ERROR: Failed initializing NAND");
+			goto err_enter;
+		}
+
+		LOGI("Detected NAND size: %llu MB", flash_size >> 20);
 	}
 
 	for (int i = 0; i < options.erase_count; i++) {
@@ -751,7 +753,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	}
 
 	for (int i = 0; i < parts_cnt; i++) {
-		if (nand_config.enable) {
+		if (options.target == TARGET_NAND) {
 			if (!is_aligned(parts[i].addr, 512)) {
 				LOGE("ERROR: Address of partition %d (0x%08X) should be 512 bytes aligned", i + 1,
 						parts[i].addr);
@@ -783,7 +785,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 
 	if (options.erase_all) {
 		LOGI("Erasing entire flash...");
-		if (!cskburn_serial_erase_all(dev)) {
+		if (!cskburn_serial_erase_all(dev, options.target)) {
 			LOGE("ERROR: Failed erasing device");
 			goto err_enter;
 		}
@@ -792,7 +794,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 			uint32_t addr = options.erase_parts[i].addr;
 			uint32_t size = options.erase_parts[i].size;
 			LOGI("Erasing region 0x%08X-0x%08X...", addr, addr + size);
-			if (!cskburn_serial_erase(dev, addr, size)) {
+			if (!cskburn_serial_erase(dev, options.target, addr, size)) {
 				LOGE("ERROR: Failed erasing device");
 				goto err_enter;
 			}
@@ -805,7 +807,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		for (int i = 0; i < options.verify_count; i++) {
 			uint32_t addr = options.verify_parts[i].addr;
 			uint32_t size = options.verify_parts[i].size;
-			if (!cskburn_serial_verify(dev, addr, size, md5)) {
+			if (!cskburn_serial_verify(dev, options.target, addr, size, md5)) {
 				LOGE("ERROR: Failed reading device");
 				goto err_enter;
 			}
@@ -817,7 +819,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	for (int i = 0; i < parts_cnt; i++) {
 		LOGI("Burning partition %d/%d... (0x%08X, %.2f KB)", i + 1, parts_cnt, parts[i].addr,
 				(float)parts[i].reader->size / 1024.0f);
-		if (!cskburn_serial_write(dev, parts[i].addr, parts[i].reader,
+		if (!cskburn_serial_write(dev, options.target, parts[i].addr, parts[i].reader,
 					options.progress ? print_progress : NULL)) {
 			LOGE("ERROR: Failed burning partition %d", i + 1);
 			goto err_write;
@@ -831,7 +833,8 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 				LOGE("ERROR: Failed calculating MD5");
 				goto err_write;
 			}
-			if (!cskburn_serial_verify(dev, parts[i].addr, parts[i].reader->size, flash_md5)) {
+			if (!cskburn_serial_verify(
+						dev, options.target, parts[i].addr, parts[i].reader->size, flash_md5)) {
 				LOGE("ERROR: Failed reading device");
 				goto err_write;
 			}

@@ -332,7 +332,7 @@ cmd_read_chip_id(cskburn_serial_device_t *dev, uint8_t *id)
 }
 
 bool
-cmd_nand_init(cskburn_serial_device_t *dev, uint64_t *size)
+cmd_nand_init(cskburn_serial_device_t *dev, nand_config_t *config, uint64_t *size)
 {
 #pragma pack(1)
 	struct {
@@ -345,7 +345,7 @@ cmd_nand_init(cskburn_serial_device_t *dev, uint64_t *size)
 	uint16_t ret_len = 0;
 
 	nand_config_t *cmd = (nand_config_t *)dev->req_cmd;
-	memcpy(cmd, &dev->nand_cfg, sizeof(nand_config_t));
+	memcpy(cmd, config, sizeof(nand_config_t));
 
 	if (!command(dev, CMD_NAND_INIT, sizeof(nand_config_t), CHECKSUM_NONE, NULL, &ret, &ret_len,
 				sizeof(ret), TIMEOUT_FLASH_DATA)) {
@@ -365,6 +365,91 @@ cmd_nand_init(cskburn_serial_device_t *dev, uint64_t *size)
 	LOGD("Inited NAND flash with block size: %u bytes, count: %u", ret.blk_len, ret.blk_num);
 
 	*size = ret.blk_len * ret.blk_num;
+
+	return true;
+}
+
+bool
+cmd_nand_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks, uint32_t block_size,
+		uint32_t offset)
+{
+	cmd_flash_begin_t *cmd = (cmd_flash_begin_t *)dev->req_cmd;
+	memset(cmd, 0, sizeof(cmd_flash_begin_t));
+	cmd->size = size;
+	cmd->blocks = blocks;
+	cmd->block_size = block_size;
+	cmd->offset = offset;
+
+	return !check_command(
+			dev, CMD_NAND_BEGIN, sizeof(cmd_flash_begin_t), CHECKSUM_NONE, NULL, TIMEOUT_DEFAULT);
+}
+
+bool
+cmd_nand_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, uint32_t seq)
+{
+	cmd_flash_block_t *cmd = (cmd_flash_block_t *)dev->req_cmd;
+	memset(cmd, 0, sizeof(cmd_flash_block_t));
+	cmd->size = data_len;
+	cmd->seq = seq;
+	cmd->rev1 = 0;
+	cmd->rev2 = 0;
+
+	uint8_t *req_data = (uint8_t *)dev->req_cmd + sizeof(cmd_flash_block_t);
+	memcpy(req_data, data, data_len);
+
+	uint32_t in_len = sizeof(cmd_flash_block_t) + data_len;
+
+	uint8_t ret = check_command(
+			dev, CMD_NAND_DATA, in_len, checksum(data, data_len), NULL, TIMEOUT_FLASH_DATA);
+
+	if (ret != 0x00) {
+		LOGD("DEBUG: Failed writing block %d: %02X", seq, ret);
+	}
+
+	if (ret == 0x0A) {
+		msleep(250);
+	}
+
+	return !ret;
+}
+
+bool
+cmd_nand_finish(cskburn_serial_device_t *dev)
+{
+	cmd_flash_finish_t *cmd = (cmd_flash_finish_t *)dev->req_cmd;
+	memset(cmd, 0, sizeof(cmd_flash_finish_t));
+
+	return !check_command(
+			dev, CMD_NAND_END, sizeof(uint32_t), CHECKSUM_NONE, NULL, TIMEOUT_FLASH_DATA);
+}
+
+bool
+cmd_nand_md5(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uint8_t *md5)
+{
+	uint8_t ret_buf[STATUS_BYTES_LEN + 16];
+	uint16_t ret_len = 0;
+
+	cmd_flash_md5_t *cmd = (cmd_flash_md5_t *)dev->req_cmd;
+	memset(cmd, 0, sizeof(cmd_flash_md5_t));
+	cmd->address = address;
+	cmd->size = size;
+
+	if (!command(dev, CMD_NAND_MD5, sizeof(cmd_flash_md5_t), CHECKSUM_NONE, NULL, ret_buf, &ret_len,
+				sizeof(ret_buf), TIMEOUT_FLASH_MD5SUM)) {
+		return false;
+	}
+
+	if (ret_len < STATUS_BYTES_LEN) {
+		LOGD("DEBUG: Interrupted serial read");
+		return false;
+	}
+
+	if (ret_buf[0] != 0) {
+		LOGD("DEBUG: Unexpected device response: %02X%02X", ret_buf[0], ret_buf[1]);
+		return false;
+	}
+
+	memcpy(md5, ret_buf + 2, 16);
 
 	return true;
 }
@@ -426,8 +511,8 @@ cmd_flash_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks, ui
 	cmd->block_size = block_size;
 	cmd->offset = offset;
 
-	return !check_command(dev, dev->nand ? CMD_NAND_BEGIN : CMD_FLASH_BEGIN,
-			sizeof(cmd_flash_begin_t), CHECKSUM_NONE, NULL, TIMEOUT_DEFAULT);
+	return !check_command(
+			dev, CMD_FLASH_BEGIN, sizeof(cmd_flash_begin_t), CHECKSUM_NONE, NULL, TIMEOUT_DEFAULT);
 }
 
 bool
@@ -445,8 +530,8 @@ cmd_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, 
 
 	uint32_t in_len = sizeof(cmd_flash_block_t) + data_len;
 
-	uint8_t ret = check_command(dev, dev->nand ? CMD_NAND_DATA : CMD_FLASH_DATA, in_len,
-			checksum(data, data_len), NULL, TIMEOUT_FLASH_DATA);
+	uint8_t ret = check_command(
+			dev, CMD_FLASH_DATA, in_len, checksum(data, data_len), NULL, TIMEOUT_FLASH_DATA);
 
 	if (ret != 0x00) {
 		LOGD("DEBUG: Failed writing block %d: %02X", seq, ret);
@@ -467,8 +552,8 @@ cmd_flash_finish(cskburn_serial_device_t *dev)
 	cmd->option = 0xFF;  // no-op on CSK4, do nothing on CSK6
 	cmd->address = 0;
 
-	return !check_command(dev, dev->nand ? CMD_NAND_END : CMD_FLASH_END, sizeof(uint32_t),
-			CHECKSUM_NONE, NULL, TIMEOUT_FLASH_DATA);
+	return !check_command(
+			dev, CMD_FLASH_END, sizeof(uint32_t), CHECKSUM_NONE, NULL, TIMEOUT_FLASH_DATA);
 }
 
 bool
@@ -500,8 +585,8 @@ cmd_flash_md5sum(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, 
 	cmd->address = address;
 	cmd->size = size;
 
-	if (!command(dev, dev->nand ? CMD_NAND_MD5 : CMD_SPI_FLASH_MD5, sizeof(cmd_flash_md5_t),
-				CHECKSUM_NONE, NULL, ret_buf, &ret_len, sizeof(ret_buf), TIMEOUT_FLASH_MD5SUM)) {
+	if (!command(dev, CMD_SPI_FLASH_MD5, sizeof(cmd_flash_md5_t), CHECKSUM_NONE, NULL, ret_buf,
+				&ret_len, sizeof(ret_buf), TIMEOUT_FLASH_MD5SUM)) {
 		return false;
 	}
 

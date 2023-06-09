@@ -33,7 +33,7 @@ cskburn_serial_init(int flags)
 }
 
 cskburn_serial_device_t *
-cskburn_serial_open(const char *path, uint32_t chip, cskburn_serial_nand_t *nand)
+cskburn_serial_open(const char *path, uint32_t chip)
 {
 	cskburn_serial_device_t *dev =
 			(cskburn_serial_device_t *)malloc(sizeof(cskburn_serial_device_t));
@@ -50,8 +50,6 @@ cskburn_serial_open(const char *path, uint32_t chip, cskburn_serial_nand_t *nand
 	dev->req_hdr = dev->req_raw_buf;
 	dev->req_cmd = dev->req_raw_buf + sizeof(csk_command_t);
 	dev->chip = chip;
-	dev->nand = nand->enable;
-	memcpy(&dev->nand_cfg, &nand->config, sizeof(nand_config_t));
 	return dev;
 
 err_open:
@@ -200,6 +198,7 @@ static bool
 try_flash_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks, uint32_t block_size,
 		uint32_t offset)
 {
+	// TODO: 没有理由需要 retry，但既然原来的代码有，那就保留吧
 	for (int i = 0; i < FLASH_BLOCK_TRIES; i++) {
 		if (cmd_flash_begin(dev, size, blocks, block_size, offset)) {
 			return true;
@@ -209,14 +208,21 @@ try_flash_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks, ui
 }
 
 static bool
-try_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, uint32_t seq)
+try_flash_block(cskburn_serial_device_t *dev, cskburn_serial_target_t target, uint8_t *data,
+		uint32_t data_len, uint32_t seq)
 {
 	for (int i = 0; i < FLASH_BLOCK_TRIES; i++) {
 		if (i > 0) {
 			LOGD("DEBUG: Attempts %d writing block %d", i, seq);
 		}
-		if (cmd_flash_block(dev, data, data_len, seq)) {
-			return true;
+		if (target == TARGET_FLASH) {
+			if (cmd_flash_block(dev, data, data_len, seq)) {
+				return true;
+			}
+		} else {
+			if (cmd_nand_block(dev, data, data_len, seq)) {
+				return true;
+			}
 		}
 #if !defined(_WIN32) && !defined(_WIN64)
 		if (errno == ENXIO) {
@@ -228,15 +234,24 @@ try_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, 
 }
 
 bool
-cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, reader_t *reader,
-		void (*on_progress)(int32_t wrote_bytes, uint32_t total_bytes))
+cskburn_serial_write(cskburn_serial_device_t *dev, cskburn_serial_target_t target, uint32_t addr,
+		reader_t *reader, void (*on_progress)(int32_t wrote_bytes, uint32_t total_bytes))
 {
 	uint32_t offset, length;
 	uint32_t blocks = BLOCKS(reader->size, FLASH_BLOCK_SIZE);
 
 	uint64_t t1 = time_monotonic();
 
-	if (!try_flash_begin(dev, reader->size, blocks, FLASH_BLOCK_SIZE, addr)) {
+	if (target == TARGET_FLASH) {
+		if (!try_flash_begin(dev, reader->size, blocks, FLASH_BLOCK_SIZE, addr)) {
+			return false;
+		}
+	} else if (target == TARGET_NAND) {
+		if (!cmd_nand_begin(dev, reader->size, blocks, FLASH_BLOCK_SIZE, addr)) {
+			return false;
+		}
+	} else {
+		LOGE("ERROR: Unsupported target: %d", target);
 		return false;
 	}
 
@@ -255,7 +270,7 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, reader_t *read
 			return false;
 		}
 
-		if (!try_flash_block(dev, buffer, length, i)) {
+		if (!try_flash_block(dev, target, buffer, length, i)) {
 			return false;
 		}
 
@@ -266,7 +281,11 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, reader_t *read
 		}
 	}
 
-	cmd_flash_finish(dev);
+	if (target == TARGET_FLASH) {
+		cmd_flash_finish(dev);
+	} else if (target == TARGET_NAND) {
+		cmd_nand_finish(dev);
+	}
 
 	uint64_t t2 = time_monotonic();
 
@@ -278,21 +297,46 @@ cskburn_serial_write(cskburn_serial_device_t *dev, uint32_t addr, reader_t *read
 }
 
 bool
-cskburn_serial_erase_all(cskburn_serial_device_t *dev)
+cskburn_serial_erase_all(cskburn_serial_device_t *dev, cskburn_serial_target_t target)
 {
-	return cmd_flash_erase_chip(dev);
+	if (target == TARGET_FLASH) {
+		return cmd_flash_erase_chip(dev);
+	} else if (target == TARGET_NAND) {
+		LOGE("ERROR: Erasing is not supported for NAND yet");
+		return false;
+	}
+
+	LOGE("ERROR: Unsupported target: %d", target);
+	return false;
 }
 
 bool
-cskburn_serial_erase(cskburn_serial_device_t *dev, uint32_t addr, uint32_t size)
+cskburn_serial_erase(
+		cskburn_serial_device_t *dev, cskburn_serial_target_t target, uint32_t addr, uint32_t size)
 {
-	return cmd_flash_erase_region(dev, addr, size);
+	if (target == TARGET_FLASH) {
+		return cmd_flash_erase_region(dev, addr, size);
+	} else if (target == TARGET_NAND) {
+		LOGE("ERROR: Erasing is not supported for NAND yet");
+		return false;
+	}
+
+	LOGE("ERROR: Unsupported target: %d", target);
+	return false;
 }
 
 bool
-cskburn_serial_verify(cskburn_serial_device_t *dev, uint32_t addr, uint32_t size, uint8_t *md5)
+cskburn_serial_verify(cskburn_serial_device_t *dev, cskburn_serial_target_t target, uint32_t addr,
+		uint32_t size, uint8_t *md5)
 {
-	return cmd_flash_md5sum(dev, addr, size, md5);
+	if (target == TARGET_FLASH) {
+		return cmd_flash_md5sum(dev, addr, size, md5);
+	} else if (target == TARGET_NAND) {
+		return cmd_nand_md5(dev, addr, size, md5);
+	}
+
+	LOGE("ERROR: Unsupported target: %d", target);
+	return false;
 }
 
 bool
@@ -305,23 +349,23 @@ bool
 cskburn_serial_get_flash_info(
 		cskburn_serial_device_t *dev, uint32_t *flash_id, uint64_t *flash_size)
 {
-	if (dev->nand) {
-		if (cmd_nand_init(dev, flash_size)) {
-			return true;
-		}
-	} else {
-		if (cmd_read_flash_id(dev, flash_id)) {
-			if ((*flash_id & 0xFFFFFF) == 0x000000 || (*flash_id & 0xFFFFFF) == 0xFFFFFF) {
-				// In case flash is not present
-				return false;
-			}
-
-			*flash_size = 2 << (((*flash_id >> 16) & 0xFF) - 1);
-			return true;
-		}
+	if (!cmd_read_flash_id(dev, flash_id)) {
+		return false;
 	}
 
-	return false;
+	if ((*flash_id & 0xFFFFFF) == 0x000000 || (*flash_id & 0xFFFFFF) == 0xFFFFFF) {
+		// In case flash is not present
+		return false;
+	}
+
+	*flash_size = 2 << (((*flash_id >> 16) & 0xFF) - 1);
+	return true;
+}
+
+bool
+cskburn_serial_init_nand(cskburn_serial_device_t *dev, nand_config_t *config, uint64_t *nand_size)
+{
+	return cmd_nand_init(dev, config, nand_size);
 }
 
 bool
