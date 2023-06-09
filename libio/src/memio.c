@@ -22,12 +22,14 @@ mem_alloc(uint32_t size)
 	}
 
 	memreader_ctx_t *ctx = malloc(sizeof(memreader_ctx_t));
+	memset(ctx, 0, sizeof(memreader_ctx_t));
 	ctx->buffer = buffer;
 	ctx->capacity = size;
 	ctx->feed_off = 0;
 	ctx->read_off = 0;
 
 	reader_t *reader = malloc(sizeof(reader_t));
+	memset(reader, 0, sizeof(reader_t));
 	reader->read = mem_read;
 	reader->close = mem_close;
 	reader->ctx = ctx;
