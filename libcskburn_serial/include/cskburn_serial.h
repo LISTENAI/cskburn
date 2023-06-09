@@ -39,6 +39,7 @@ typedef struct {
 typedef enum {
 	TARGET_FLASH = 0,
 	TARGET_NAND = 1,
+	TARGET_RAM = 2,
 } cskburn_serial_target_t;
 
 cskburn_serial_device_t *cskburn_serial_open(const char *pat, uint32_t chip);
@@ -51,7 +52,7 @@ bool cskburn_serial_enter(
 		cskburn_serial_device_t *dev, uint32_t baud_rate, uint8_t *burner, uint32_t len);
 
 bool cskburn_serial_write(cskburn_serial_device_t *dev, cskburn_serial_target_t target,
-		uint32_t addr, reader_t *reader,
+		uint32_t addr, reader_t *reader, uint32_t jump,
 		void (*on_progress)(int32_t wrote_bytes, uint32_t total_bytes));
 
 bool cskburn_serial_read(cskburn_serial_device_t *dev, cskburn_serial_target_t target,

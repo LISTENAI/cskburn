@@ -250,7 +250,8 @@ try_flash_block(cskburn_serial_device_t *dev, cskburn_serial_target_t target, ui
 
 bool
 cskburn_serial_write(cskburn_serial_device_t *dev, cskburn_serial_target_t target, uint32_t addr,
-		reader_t *reader, void (*on_progress)(int32_t wrote_bytes, uint32_t total_bytes))
+		reader_t *reader, uint32_t jump,
+		void (*on_progress)(int32_t wrote_bytes, uint32_t total_bytes))
 {
 	uint32_t offset, length;
 	uint32_t blocks = BLOCKS(reader->size, FLASH_BLOCK_SIZE);
@@ -263,6 +264,10 @@ cskburn_serial_write(cskburn_serial_device_t *dev, cskburn_serial_target_t targe
 		}
 	} else if (target == TARGET_NAND) {
 		if (!cmd_nand_begin(dev, reader->size, blocks, FLASH_BLOCK_SIZE, addr)) {
+			return false;
+		}
+	} else if (target == TARGET_RAM) {
+		if (!cmd_mem_begin(dev, reader->size, blocks, FLASH_BLOCK_SIZE, addr)) {
 			return false;
 		}
 	} else {
@@ -285,8 +290,14 @@ cskburn_serial_write(cskburn_serial_device_t *dev, cskburn_serial_target_t targe
 			return false;
 		}
 
-		if (!try_flash_block(dev, target, buffer, length, i)) {
-			return false;
+		if (target == TARGET_FLASH || target == TARGET_NAND) {
+			if (!try_flash_block(dev, target, buffer, length, i)) {
+				return false;
+			}
+		} else if (target == TARGET_RAM) {
+			if (!cmd_mem_block(dev, buffer, length, i)) {
+				return false;
+			}
 		}
 
 		i++;
@@ -300,6 +311,8 @@ cskburn_serial_write(cskburn_serial_device_t *dev, cskburn_serial_target_t targe
 		cmd_flash_finish(dev);
 	} else if (target == TARGET_NAND) {
 		cmd_nand_finish(dev);
+	} else if (target == TARGET_RAM) {
+		cmd_mem_finish(dev, jump ? OPTION_JUMP : OPTION_RUN, jump);
 	}
 
 	uint64_t t2 = time_monotonic();

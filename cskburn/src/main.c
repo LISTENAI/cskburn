@@ -55,6 +55,8 @@ static struct option long_options[] = {
 		{"nand-dat1", required_argument, NULL, 0},
 		{"nand-dat2", required_argument, NULL, 0},
 		{"nand-dat3", required_argument, NULL, 0},
+		{"ram", no_argument, NULL, 'r'},
+		{"jump", required_argument, NULL, 0},
 		{"chip-id", no_argument, NULL, 0},
 		{"read", required_argument, NULL, 0},
 		{"erase", required_argument, NULL, 0},
@@ -77,6 +79,7 @@ static const char option_string[] = {
 		"w"
 		"C:"
 		"n"
+		"r"
 #ifndef WITHOUT_USB
 		"u:"
 		"R"
@@ -147,6 +150,7 @@ static struct {
 	uint8_t *burner_buf;
 	uint32_t burner_len;
 	bool update_high;
+	uint32_t jump_address;
 } options = {
 		.progress = true,
 		.wait = false,
@@ -173,6 +177,7 @@ static struct {
 		.burner = NULL,
 		.burner_len = 0,
 		.update_high = false,
+		.jump_address = 0,
 };
 
 static nand_config_t nand_config = {
@@ -310,6 +315,9 @@ main(int argc, char **argv)
 			case 'n':
 				options.target = TARGET_NAND;
 				break;
+			case 'r':
+				options.target = TARGET_RAM;
+				break;
 			case 0: { /* long-only options */
 				const char *name = long_options[long_index].name;
 				if (strcmp(name, "chip-id") == 0) {
@@ -444,6 +452,12 @@ main(int argc, char **argv)
 					nand_config.sd_dat3.pad = pad;
 					nand_config.sd_dat3.pin = pin;
 					break;
+				} else if (strcmp(name, "jump") == 0) {
+					if (!scan_int(optarg, &options.jump_address)) {
+						LOGE("ERROR: Invalid jump address");
+						return -1;
+					}
+					break;
 				} else {
 					print_help(argv[0]);
 					return 0;
@@ -506,6 +520,21 @@ main(int argc, char **argv)
 		}
 		if (options.erase_all || options.erase_count > 0) {
 			LOGE("ERROR: Erasing is not supported on NAND yet");
+			return -1;
+		}
+	} else if (options.target == TARGET_RAM) {
+#ifndef WITHOUT_USB
+		if (options.protocol != PROTO_SERIAL) {
+			LOGE("ERROR: RAM is supported only in serial burning");
+			return -1;
+		}
+#endif
+		if (options.erase_all || options.erase_count > 0) {
+			LOGE("ERROR: Erasing is not supported on RAM");
+			return -1;
+		}
+		if (options.verify_all || options.verify_count > 0) {
+			LOGE("ERROR: Verifying is not supported on RAM");
 			return -1;
 		}
 	}
@@ -842,23 +871,26 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 						parts[i].addr);
 				goto err_enter;
 			}
-		} else {
+		} else if (options.target == TARGET_FLASH) {
 			if (!is_aligned(parts[i].addr, 4 * 1024)) {
 				LOGE("ERROR: Address of partition %d (0x%08X) should be 4K aligned", i + 1,
 						parts[i].addr);
 				goto err_enter;
 			}
 		}
-		if (parts[i].addr >= flash_size) {
-			LOGE("ERROR: The starting boundary of partition %d (0x%08X) exceeds the capacity of "
-				 "flash (%llu MB)",
-					i + 1, parts[i].addr, flash_size >> 20);
-			goto err_enter;
-		} else if (parts[i].addr + parts[i].reader->size > flash_size) {
-			LOGE("ERROR: The ending boundary of partition %d (0x%08X) exceeds the capacity of "
-				 "flash (%llu MB)",
-					i + 1, parts[i].addr + parts[i].reader->size, flash_size >> 20);
-			goto err_enter;
+
+		if (options.target == TARGET_FLASH || options.target == TARGET_NAND) {
+			if (parts[i].addr >= flash_size) {
+				LOGE("ERROR: The starting boundary of partition %d (0x%08X) exceeds the capacity "
+					 "of target (%llu MB)",
+						i + 1, parts[i].addr, flash_size >> 20);
+				goto err_enter;
+			} else if (parts[i].addr + parts[i].reader->size > flash_size) {
+				LOGE("ERROR: The ending boundary of partition %d (0x%08X) exceeds the capacity of "
+					 "target (%llu MB)",
+						i + 1, parts[i].addr + parts[i].reader->size, flash_size >> 20);
+				goto err_enter;
+			}
 		}
 
 		if (options.verify_all) {
@@ -919,10 +951,14 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		}
 	}
 
+	uint32_t jump_addr = 0;
+
 	for (int i = 0; i < parts_cnt; i++) {
+		jump_addr = (options.target == TARGET_RAM && i == parts_cnt - 1) ? options.jump_address : 0;
+
 		LOGI("Burning partition %d/%d... (0x%08X, %.2f KB)", i + 1, parts_cnt, parts[i].addr,
 				(float)parts[i].reader->size / 1024.0f);
-		if (!cskburn_serial_write(dev, options.target, parts[i].addr, parts[i].reader,
+		if (!cskburn_serial_write(dev, options.target, parts[i].addr, parts[i].reader, jump_addr,
 					options.progress ? print_progress : NULL)) {
 			LOGE("ERROR: Failed burning partition %d", i + 1);
 			goto err_write;
@@ -951,12 +987,18 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		}
 	}
 
+	if (jump_addr) {
+		LOGI("Jumping to 0x%08X...", jump_addr);
+	}
+
 	LOGI("Finished");
 	ret = true;
 
 err_write:
 err_enter:
-	cskburn_serial_reset(dev, options.reset_delay);
+	if (!ret) {
+		cskburn_serial_reset(dev, options.reset_delay);
+	}
 	cskburn_serial_close(&dev);
 err_open:
 	return ret;
