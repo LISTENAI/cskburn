@@ -87,12 +87,6 @@ typedef struct {
 	uint32_t address;
 } cmd_mem_finish_t;
 
-typedef enum {
-	OPTION_REBOOT = 0,
-	OPTION_JUMP = 1,
-	OPTION_RUN = 2,
-} cmd_finish_action_t;
-
 typedef cmd_mem_begin_t cmd_flash_begin_t;
 typedef cmd_mem_block_t cmd_flash_block_t;
 typedef cmd_mem_finish_t cmd_flash_finish_t;
@@ -410,12 +404,12 @@ cmd_mem_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, ui
 }
 
 bool
-cmd_mem_finish(cskburn_serial_device_t *dev)
+cmd_mem_finish(cskburn_serial_device_t *dev, cmd_finish_action_t action, uint32_t address)
 {
 	cmd_mem_finish_t *cmd = (cmd_mem_finish_t *)dev->req_cmd;
 	memset(cmd, 0, sizeof(cmd_mem_finish_t));
-	cmd->option = OPTION_REBOOT;
-	cmd->address = 0;
+	cmd->option = action;
+	cmd->address = address;
 
 	return !check_command(
 			dev, CMD_MEM_END, sizeof(cmd_mem_finish_t), CHECKSUM_NONE, NULL, TIMEOUT_DEFAULT);

@@ -19,6 +19,12 @@ typedef struct {
 	uint32_t value;
 } csk_response_t;
 
+typedef enum {
+	OPTION_REBOOT = 0,
+	OPTION_JUMP = 1,
+	OPTION_RUN = 2,
+} cmd_finish_action_t;
+
 #define RAM_BLOCK_SIZE 0x800
 #define FLASH_BLOCK_SIZE 0x1000
 
@@ -46,7 +52,7 @@ bool cmd_nand_init(cskburn_serial_device_t *dev, uint64_t *size);
 bool cmd_mem_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks,
 		uint32_t block_size, uint32_t offset);
 bool cmd_mem_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, uint32_t seq);
-bool cmd_mem_finish(cskburn_serial_device_t *dev);
+bool cmd_mem_finish(cskburn_serial_device_t *dev, cmd_finish_action_t action, uint32_t address);
 
 bool cmd_flash_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks,
 		uint32_t block_size, uint32_t offset);

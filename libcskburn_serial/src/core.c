@@ -166,7 +166,7 @@ cskburn_serial_enter(
 			}
 		}
 
-		if (!cmd_mem_finish(dev)) {
+		if (!cmd_mem_finish(dev, OPTION_REBOOT, 0)) {
 			return false;
 		}
 
