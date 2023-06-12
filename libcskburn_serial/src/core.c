@@ -472,3 +472,29 @@ cskburn_serial_reset(cskburn_serial_device_t *dev, uint32_t reset_delay)
 
 	return true;
 }
+
+void
+cskburn_serial_read_logs(cskburn_serial_device_t *dev, uint32_t baud)
+{
+	uint8_t buffer[1024];
+	int32_t r;
+
+	serial_discard_output(dev->handle);
+	serial_set_speed(dev->handle, baud);
+
+	while (true) {
+		r = serial_read(dev->handle, buffer, sizeof(buffer), 100);
+#if !defined(_WIN32) && !defined(_WIN64)
+		if (r == -1 && errno != EAGAIN) {
+			LOGD("DEBUG: Failed reading logs: %d (%s)", errno, strerror(errno));
+			return;
+		}
+#endif  // !WIN32 && !WIN64
+		if (r <= 0) {
+			msleep(10);
+			continue;
+		}
+		fwrite(buffer, 1, r, stdout);
+		fflush(stdout);
+	}
+}

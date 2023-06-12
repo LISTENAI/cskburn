@@ -70,6 +70,8 @@ static struct option long_options[] = {
 		{"fail-delay", required_argument, NULL, 0},
 		{"burner", required_argument, NULL, 0},
 		{"update-high", no_argument, NULL, 0},
+		{"no-reset", no_argument, NULL, 0},
+		{"read-logs", required_argument, NULL, 0},
 		{"reset-nanokit", no_argument, NULL, 0},  // 不再需要，但是留着以便向后兼容
 		{0, 0, NULL, 0},
 };
@@ -151,6 +153,8 @@ static struct {
 	uint32_t burner_len;
 	bool update_high;
 	uint32_t jump_address;
+	bool no_reset;
+	uint32_t read_logs_baud;
 } options = {
 		.progress = true,
 		.wait = false,
@@ -178,6 +182,8 @@ static struct {
 		.burner_len = 0,
 		.update_high = false,
 		.jump_address = 0,
+		.no_reset = false,
+		.read_logs_baud = 0,
 };
 
 static nand_config_t nand_config = {
@@ -457,6 +463,12 @@ main(int argc, char **argv)
 						LOGE("ERROR: Invalid jump address");
 						return -1;
 					}
+					break;
+				} else if (strcmp(name, "no-reset") == 0) {
+					options.no_reset = true;
+					break;
+				} else if (strcmp(name, "read-logs") == 0) {
+					sscanf(optarg, "%d", &options.read_logs_baud);
 					break;
 				} else {
 					print_help(argv[0]);
@@ -989,9 +1001,19 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 
 	if (jump_addr) {
 		LOGI("Jumping to 0x%08X...", jump_addr);
+	} else if (!options.no_reset) {
+		LOGI("Resetting...");
+		cskburn_serial_reset(dev, options.reset_delay);
 	}
 
-	LOGI("Finished");
+	if (options.read_logs_baud) {
+		LOGI("Reading logs with baud rate %d (Press Ctrl+C to exit)", options.read_logs_baud);
+		LOGI("========================================");
+		cskburn_serial_read_logs(dev, options.read_logs_baud);
+	} else {
+		LOGI("Finished");
+	}
+
 	ret = true;
 
 err_write:

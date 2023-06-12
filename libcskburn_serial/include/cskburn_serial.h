@@ -76,4 +76,6 @@ bool cskburn_serial_init_nand(
 
 bool cskburn_serial_reset(cskburn_serial_device_t *dev, uint32_t reset_delay);
 
+void cskburn_serial_read_logs(cskburn_serial_device_t *dev, uint32_t baud);
+
 #endif  // __LIB_CSKBURN_SERIAL__
