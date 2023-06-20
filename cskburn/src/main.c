@@ -179,31 +179,69 @@ static nand_config_t nand_config = {
 static void
 print_help(const char *progname)
 {
-	LOGI("Usage: %s [<options>] <addr1> <file1> [<addr2> <file2>...]", basename((char *)progname));
+	LOGI("Usage: %s [<options>] <addr1> <file1> [<addr2> <file2> ...]", basename((char *)progname));
+	LOGI("       %s [<options>] --verify <addr1>:<size1> [--verify <addr2>:<size2> ...]",
+			basename((char *)progname));
+	LOGI("       %s [<options>] --erase <addr1>:<size1> [--erase <addr2>:<size2> ...]",
+			basename((char *)progname));
 	LOGI("");
+
 	LOGI("Burning options:");
 #ifndef WITHOUT_USB
-	LOGI("  -u, --usb (-|<bus>:<device>)\tburn with specified USB device. Pass \"-\" to select "
-		 "first CSK device automatically");
+	LOGI("  -u, --usb (-|<bus>:<device>)");
+	LOGI("    burn with specified USB device. Pass \"-\" to select first CSK device automatically");
 #endif
-	LOGI("  -s, --serial <port>\t\tburn with specified serial device (e.g. %s)",
-			example_serial_dev);
+	LOGI("  -s, --serial <port>");
+	LOGI("    burn with specified serial device (e.g. %s)", example_serial_dev);
 	LOGI("");
-	LOGI("Other options:");
-	LOGI("  -h, --help\t\t\tshow help");
-	LOGI("  -V, --version\t\t\tshow version");
-	LOGI("  -v, --verbose\t\t\tprint verbose log");
-	LOGI("  -w, --wait\t\t\twait for device presence and start burning");
-	LOGI("  -b, --baud\t\t\tbaud rate used for serial burning (default: %d)", DEFAULT_BAUD);
+
+	LOGI("Common options:");
+	LOGI("  -h, --help");
+	LOGI("    show help");
+	LOGI("  -V, --version");
+	LOGI("    show version");
+	LOGI("  -v, --verbose");
+	LOGI("    print verbose log");
+	LOGI("");
+
 #ifndef WITHOUT_USB
-	LOGI("  -R, --repeat\t\t\trepeatly wait for device presence and start burning");
-	LOGI("  -c, --check\t\t\tcheck for device presence (without burning)");
-	LOGI("  -C, --chip\t\t\tchip family, acceptable values: 3/4/6 (default: %d)", DEFAULT_CHIP);
-#endif
-	LOGI("  -n, --nand\t\t\tburn to NAND flash (CSK6 only)");
+	LOGI("USB burning options:");
+	LOGI("  -w, --wait");
+	LOGI("    wait for device presence and start burning");
+	LOGI("  -R, --repeat");
+	LOGI("    repeatly wait for device presence and start burning");
+	LOGI("  -c, --check");
+	LOGI("    check for device presence (without burning)");
 	LOGI("");
+#endif
+
+	LOGI("Serial burning options:");
+	LOGI("  -b, --baud");
+	LOGI("    baud rate used for serial burning (default: %d)", DEFAULT_BAUD);
+#ifndef WITHOUT_USB
+	LOGI("  -C, --chip");
+	LOGI("    chip family, acceptable values: 3/4/6 (default: %d)", DEFAULT_CHIP);
+#endif
+	LOGI("  --chip-id");
+	LOGI("    read unique chip ID");
+	LOGI("  --verify-all");
+	LOGI("    verify all partitions after burning");
+	LOGI("  -n, --nand");
+	LOGI("    burn to NAND flash (CSK6 only)");
+	LOGI("");
+
+	LOGI("Advanced operations (serial only):");
+	LOGI("  --erase <addr:size>");
+	LOGI("    erase specified flash region");
+	LOGI("  --erase-all");
+	LOGI("    erase the entire flash");
+	LOGI("  --verify <addr:size>");
+	LOGI("    verify specified flash region");
+	LOGI("");
+
 	LOGI("Example:");
-	LOGI("  cskburn -w 0x0 flashboot.bin 0x10000 master.bin 0x100000 respack.bin");
+	LOGI("    cskburn -C 6 -s %s -b 15000000 --verify-all 0x0 app.bin 0x100000 res.bin",
+			example_serial_dev);
 }
 
 static void

@@ -8,24 +8,54 @@ cskburn
 ## 使用
 
 ```
-用法: cskburn [<选项>] <地址1> <文件1> [<地址2> <文件2>...]
+Usage: cskburn [<options>] <addr1> <file1> [<addr2> <file2> ...]
+       cskburn [<options>] --verify <addr1>:<size1> [--verify <addr2>:<size2> ...]
+       cskburn [<options>] --erase <addr1>:<size1> [--erase <addr2>:<size2> ...]
 
-烧录选项:
-  -u, --usb (-|<总线>:<设备>)		使用指定 USB 设备烧录。传 - 表示自动选取第一个 CSK 设备
-  -s, --serial <端口>			使用指定串口设备 (如 /dev/cu.usbserial-0001) 烧录
+Burning options:
+  -u, --usb (-|<bus>:<device>)
+    burn with specified USB device. Pass "-" to select first CSK device automatically
+  -s, --serial <port>
+    burn with specified serial device (e.g. /dev/cu.usbserial-0001)
 
-其它选项:
-  -h, --help				显示帮助
-  -V, --version				显示版本号
-  -v, --verbose				显示详细日志
-  -w, --wait				等待设备插入，并自动开始烧录
-  -b, --baud				串口烧录所使用的波特率 (默认为 3000000)
-  -R, --repeat				循环等待设备插入，并自动开始烧录
-  -c, --check				检查设备是否插入 (不进行烧录)
-  -C, --chip				指定芯片系列，支持3/4/6，默认为 4
+Common options:
+  -h, --help
+    show help
+  -V, --version
+    show version
+  -v, --verbose
+    print verbose log
 
-用例:
-  cskburn -w 0x0 flashboot.bin 0x10000 master.bin 0x100000 respack.bin
+USB burning options:
+  -w, --wait
+    wait for device presence and start burning
+  -R, --repeat
+    repeatly wait for device presence and start burning
+  -c, --check
+    check for device presence (without burning)
+
+Serial burning options:
+  -b, --baud
+    baud rate used for serial burning (default: 3000000)
+  -C, --chip
+    chip family, acceptable values: 3/4/6 (default: 4)
+  --chip-id
+    read unique chip ID
+  --verify-all
+    verify all partitions after burning
+  -n, --nand
+    burn to NAND flash (CSK6 only)
+
+Advanced operations (serial only):
+  --erase <addr:size>
+    erase specified flash region
+  --erase-all
+    erase the entire flash
+  --verify <addr:size>
+    verify specified flash region
+
+Example:
+    cskburn -C 6 -s /dev/cu.usbserial-0001 -b 15000000 --verify-all 0x0 app.bin 0x100000 res.bin
 ```
 
 ## 编译
