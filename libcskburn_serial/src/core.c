@@ -194,6 +194,21 @@ cskburn_serial_enter(
 	return true;
 }
 
+static void
+print_time_spent(const char *usage, uint64_t t1, uint64_t t2)
+{
+	float spent = (float)(t2 - t1) / 1000.0f;
+	LOGD("%s took %.2fs", usage, spent);
+}
+
+static void
+print_time_spent_with_speed(const char *usage, uint64_t t1, uint64_t t2, uint32_t size)
+{
+	float spent = (float)(t2 - t1) / 1000.0f;
+	float speed = (float)size / 1024.0f / spent;
+	LOGD("%s took %.2fs, speed %.2f KB/s", usage, spent, speed);
+}
+
 static bool
 try_flash_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks, uint32_t block_size,
 		uint32_t offset)
@@ -288,10 +303,7 @@ cskburn_serial_write(cskburn_serial_device_t *dev, cskburn_serial_target_t targe
 	}
 
 	uint64_t t2 = time_monotonic();
-
-	uint32_t spent = (uint32_t)((t2 - t1) / 1000);
-	float speed = (float)reader->size / 1024.0f / (float)spent;
-	LOGD("Time used %d s, speed %.2f KB/s", spent, speed);
+	print_time_spent_with_speed("Writing", t1, t2, reader->size);
 
 	return true;
 }
@@ -300,7 +312,16 @@ bool
 cskburn_serial_erase_all(cskburn_serial_device_t *dev, cskburn_serial_target_t target)
 {
 	if (target == TARGET_FLASH) {
-		return cmd_flash_erase_chip(dev);
+		uint64_t t1 = time_monotonic();
+
+		if (!cmd_flash_erase_chip(dev)) {
+			return false;
+		}
+
+		uint64_t t2 = time_monotonic();
+		print_time_spent("Erasing", t1, t2);
+
+		return true;
 	} else if (target == TARGET_NAND) {
 		LOGE("ERROR: Erasing is not supported for NAND yet");
 		return false;
@@ -315,7 +336,16 @@ cskburn_serial_erase(
 		cskburn_serial_device_t *dev, cskburn_serial_target_t target, uint32_t addr, uint32_t size)
 {
 	if (target == TARGET_FLASH) {
-		return cmd_flash_erase_region(dev, addr, size);
+		uint64_t t1 = time_monotonic();
+
+		if (!cmd_flash_erase_region(dev, addr, size)) {
+			return false;
+		}
+
+		uint64_t t2 = time_monotonic();
+		print_time_spent_with_speed("Erasing", t1, t2, size);
+
+		return true;
 	} else if (target == TARGET_NAND) {
 		LOGE("ERROR: Erasing is not supported for NAND yet");
 		return false;
@@ -330,9 +360,27 @@ cskburn_serial_verify(cskburn_serial_device_t *dev, cskburn_serial_target_t targ
 		uint32_t size, uint8_t *md5)
 {
 	if (target == TARGET_FLASH) {
-		return cmd_flash_md5sum(dev, addr, size, md5);
+		uint64_t t1 = time_monotonic();
+
+		if (!cmd_flash_md5sum(dev, addr, size, md5)) {
+			return false;
+		}
+
+		uint64_t t2 = time_monotonic();
+		print_time_spent_with_speed("Verifying", t1, t2, size);
+
+		return true;
 	} else if (target == TARGET_NAND) {
-		return cmd_nand_md5(dev, addr, size, md5);
+		uint64_t t1 = time_monotonic();
+
+		if (!cmd_nand_md5(dev, addr, size, md5)) {
+			return false;
+		}
+
+		uint64_t t2 = time_monotonic();
+		print_time_spent_with_speed("Verifying", t1, t2, size);
+
+		return true;
 	}
 
 	LOGE("ERROR: Unsupported target: %d", target);
