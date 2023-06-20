@@ -60,13 +60,15 @@
 // 取值过小会导致正常返回和重试返回叠加，seq 错位
 #define TIMEOUT_FLASH_DATA 1000
 
-// Flash 擦除指令超时时间
-// TODO: 需要根据区域大小动态调整
-#define TIMEOUT_FLASH_ERASE 30000
+// Flash 擦除指令超时时间 (每 MB)
+// 实测约 468KB/s，即每 MB 约 2190ms
+// 取保守值
+#define TIMEOUT_FLASH_ERASE_PER_MB 4000
 
-// MD5 计算指令超时时间
-// TODO: 需要根据区域大小动态调整
-#define TIMEOUT_FLASH_MD5SUM 30000
+// MD5 计算指令超时时间 (每 MB)
+// 实测约 4096KB/s，即每 MB 约 250ms
+// 取保守值
+#define TIMEOUT_FLASH_MD5SUM_PER_MB 500
 
 typedef struct {
 	uint32_t size;
@@ -110,7 +112,7 @@ typedef struct {
 
 static bool
 command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_chk,
-		uint32_t *out_val, void *out_buf, uint16_t *out_len, uint16_t out_limit, uint16_t timeout)
+		uint32_t *out_val, void *out_buf, uint16_t *out_len, uint16_t out_limit, uint32_t timeout)
 {
 	bool ret = false;
 
@@ -251,7 +253,7 @@ exit:
 
 static uint8_t
 check_command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_chk,
-		uint32_t *out_val, uint16_t timeout)
+		uint32_t *out_val, uint32_t timeout)
 {
 	struct {
 		uint8_t error;
@@ -285,6 +287,13 @@ checksum(void *buf, uint16_t len)
 		state ^= ((uint8_t *)buf)[i];
 	}
 	return state;
+}
+
+static uint32_t
+calc_timeout(uint32_t size, uint32_t per_mb)
+{
+	uint32_t mb = size / (1024 * 1024);
+	return per_mb * (mb == 0 ? 1 : mb);
 }
 
 bool
@@ -435,7 +444,7 @@ cmd_nand_md5(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uint
 	cmd->size = size;
 
 	if (!command(dev, CMD_NAND_MD5, sizeof(cmd_flash_md5_t), CHECKSUM_NONE, NULL, ret_buf, &ret_len,
-				sizeof(ret_buf), TIMEOUT_FLASH_MD5SUM)) {
+				sizeof(ret_buf), calc_timeout(size, TIMEOUT_FLASH_MD5SUM_PER_MB))) {
 		return false;
 	}
 
@@ -559,7 +568,9 @@ cmd_flash_finish(cskburn_serial_device_t *dev)
 bool
 cmd_flash_erase_chip(cskburn_serial_device_t *dev)
 {
-	return !check_command(dev, CMD_FLASH_ERASE_CHIP, 0, CHECKSUM_NONE, NULL, TIMEOUT_FLASH_ERASE);
+	// TODO: 暂时假定 32MB flash
+	return !check_command(
+			dev, CMD_FLASH_ERASE_CHIP, 0, CHECKSUM_NONE, NULL, TIMEOUT_FLASH_ERASE_PER_MB * 32);
 }
 
 bool
@@ -571,7 +582,7 @@ cmd_flash_erase_region(cskburn_serial_device_t *dev, uint32_t address, uint32_t 
 	cmd->size = size;
 
 	return !check_command(dev, CMD_FLASH_ERASE_REGION, sizeof(cmd_flash_erase_t), CHECKSUM_NONE,
-			NULL, TIMEOUT_FLASH_ERASE);
+			NULL, calc_timeout(size, TIMEOUT_FLASH_ERASE_PER_MB));
 }
 
 bool
@@ -586,7 +597,7 @@ cmd_flash_md5sum(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, 
 	cmd->size = size;
 
 	if (!command(dev, CMD_SPI_FLASH_MD5, sizeof(cmd_flash_md5_t), CHECKSUM_NONE, NULL, ret_buf,
-				&ret_len, sizeof(ret_buf), TIMEOUT_FLASH_MD5SUM)) {
+				&ret_len, sizeof(ret_buf), calc_timeout(size, TIMEOUT_FLASH_MD5SUM_PER_MB))) {
 		return false;
 	}
 

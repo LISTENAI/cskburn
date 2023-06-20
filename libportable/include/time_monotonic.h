@@ -3,8 +3,8 @@
 
 #if defined(_WIN32) || defined(_WIN64)
 
-#include <stdint.h>
 #include <Sysinfoapi.h>
+#include <stdint.h>
 #define time_monotonic() (uint64_t) GetTickCount64()
 
 #else  // POSIX
@@ -14,6 +14,6 @@ uint64_t time_monotonic();
 
 #endif  // POSIX
 
-#define TIME_SINCE_MS(start) (uint16_t)(time_monotonic() - start)
+#define TIME_SINCE_MS(start) (uint32_t)(time_monotonic() - start)
 
 #endif  // __LIB_PORTABLE_TIME_MONOTONIC__
