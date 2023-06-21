@@ -61,14 +61,14 @@
 #define TIMEOUT_FLASH_DATA 1000
 
 // Flash 擦除指令超时时间 (每 MB)
-// 实测约 468KB/s，即每 MB 约 2190ms
+// 实测约 405KB/s，即每 MB 约 2530ms
 // 取保守值
 #define TIMEOUT_FLASH_ERASE_PER_MB 4000
 
 // MD5 计算指令超时时间 (每 MB)
-// 实测约 4096KB/s，即每 MB 约 250ms
+// 实测约 1882KB/s，即每 MB 约 540ms
 // 取保守值
-#define TIMEOUT_FLASH_MD5SUM_PER_MB 500
+#define TIMEOUT_FLASH_MD5SUM_PER_MB 1000
 
 typedef struct {
 	uint32_t size;
