@@ -760,14 +760,14 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 
 		LOGD("flash-id: %02X%02X%02X", (flash_id)&0xFF, (flash_id >> 8) & 0xFF,
 				(flash_id >> 16) & 0xFF);
-		LOGI("Detected flash size: %llu MB", flash_size >> 20);
+		LOGI("Detected flash size: %lu MB", flash_size >> 20);
 	} else if (options.target == TARGET_NAND) {
 		if (!cskburn_serial_init_nand(dev, &nand_config, &flash_size)) {
 			LOGE("ERROR: Failed initializing NAND");
 			goto err_enter;
 		}
 
-		LOGI("Detected NAND size: %llu MB", flash_size >> 20);
+		LOGI("Detected NAND size: %lu MB", flash_size >> 20);
 	}
 
 	for (int i = 0; i < options.erase_count; i++) {
@@ -779,12 +779,12 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 			goto err_enter;
 		} else if (options.erase_parts[i].addr >= flash_size) {
 			LOGE("ERROR: The starting boundary of erase address (0x%08X) exceeds the capacity of "
-				 "flash (%llu MB)",
+				 "flash (%lu MB)",
 					options.erase_parts[i].addr, flash_size >> 20);
 			goto err_enter;
 		} else if (options.erase_parts[i].addr + options.erase_parts[i].size > flash_size) {
 			LOGE("ERROR: The ending boundary of erase address (0x%08X) exceeds the capacity of "
-				 "flash (%llu MB)",
+				 "flash (%lu MB)",
 					options.erase_parts[i].addr + options.erase_parts[i].size, flash_size >> 20);
 			goto err_enter;
 		}
@@ -806,12 +806,12 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		}
 		if (parts[i].addr >= flash_size) {
 			LOGE("ERROR: The starting boundary of partition %d (0x%08X) exceeds the capacity of "
-				 "flash (%llu MB)",
+				 "flash (%lu MB)",
 					i + 1, parts[i].addr, flash_size >> 20);
 			goto err_enter;
 		} else if (parts[i].addr + parts[i].reader->size > flash_size) {
 			LOGE("ERROR: The ending boundary of partition %d (0x%08X) exceeds the capacity of "
-				 "flash (%llu MB)",
+				 "flash (%lu MB)",
 					i + 1, parts[i].addr + parts[i].reader->size, flash_size >> 20);
 			goto err_enter;
 		}
