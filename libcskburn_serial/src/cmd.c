@@ -134,7 +134,6 @@ command_send(cskburn_serial_device_t *dev, uint8_t op, uint8_t *req_buf, uint32_
 		}
 #endif  // !WIN32 && !WIN64
 		if (r <= 0) {
-			msleep(10);
 			continue;
 		}
 
@@ -181,7 +180,6 @@ command_recv(cskburn_serial_device_t *dev, uint8_t op, uint8_t **res_buf, uint32
 		}
 #endif  // !WIN32 && !WIN64
 		if (r <= 0) {
-			msleep(10);
 			continue;
 		}
 
