@@ -19,12 +19,10 @@ file_open(const char *filename)
 		return NULL;
 	}
 
-	filereader_ctx_t *ctx = malloc(sizeof(filereader_ctx_t));
-	memset(ctx, 0, sizeof(filereader_ctx_t));
+	filereader_ctx_t *ctx = calloc(1, sizeof(filereader_ctx_t));
 	ctx->fp = fp;
 
-	reader_t *reader = malloc(sizeof(reader_t));
-	memset(reader, 0, sizeof(reader_t));
+	reader_t *reader = calloc(1, sizeof(reader_t));
 	reader->read = file_read;
 	reader->close = file_close;
 	reader->ctx = ctx;
