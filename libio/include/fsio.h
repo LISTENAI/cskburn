@@ -2,4 +2,4 @@
 
 #include "io.h"
 
-reader_t *file_open(const char *filename);
+reader_t *filereader_open(const char *filename);

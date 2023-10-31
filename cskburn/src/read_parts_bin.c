@@ -24,7 +24,7 @@ read_parts_bin(
 			continue;
 		}
 
-		reader_t *reader = file_open(parts[cnt].path);
+		reader_t *reader = filereader_open(parts[cnt].path);
 		if (reader == NULL) {
 			LOGE("ERROR: Failed reading %s: %s", parts[cnt].path, strerror(errno));
 			return false;

@@ -10,11 +10,11 @@ typedef struct {
 	uint32_t read_off;
 } memreader_ctx_t;
 
-uint32_t mem_read(reader_t *reader, uint8_t *buf, uint32_t size);
-void mem_close(reader_t **reader);
+uint32_t memreader_read(reader_t *reader, uint8_t *buf, uint32_t size);
+void memreader_close(reader_t **reader);
 
 reader_t *
-mem_alloc(uint32_t size)
+memreader_alloc(uint32_t size)
 {
 	uint8_t *buffer = malloc(size);
 	if (buffer == NULL) {
@@ -28,8 +28,8 @@ mem_alloc(uint32_t size)
 	ctx->read_off = 0;
 
 	reader_t *reader = calloc(1, sizeof(reader_t));
-	reader->read = mem_read;
-	reader->close = mem_close;
+	reader->read = memreader_read;
+	reader->close = memreader_close;
 	reader->ctx = ctx;
 	reader->size = 0;
 
@@ -37,7 +37,7 @@ mem_alloc(uint32_t size)
 }
 
 uint32_t
-mem_feed(reader_t *reader, const uint8_t *buf, uint32_t size)
+memreader_feed(reader_t *reader, const uint8_t *buf, uint32_t size)
 {
 	memreader_ctx_t *ctx = (memreader_ctx_t *)reader->ctx;
 	if (ctx->feed_off >= ctx->capacity) {
@@ -53,7 +53,7 @@ mem_feed(reader_t *reader, const uint8_t *buf, uint32_t size)
 }
 
 uint32_t
-mem_read(reader_t *reader, uint8_t *buf, uint32_t size)
+memreader_read(reader_t *reader, uint8_t *buf, uint32_t size)
 {
 	memreader_ctx_t *ctx = (memreader_ctx_t *)reader->ctx;
 	if (ctx->read_off + size > reader->size) {
@@ -68,7 +68,7 @@ mem_read(reader_t *reader, uint8_t *buf, uint32_t size)
 }
 
 void
-mem_close(reader_t **reader)
+memreader_close(reader_t **reader)
 {
 	memreader_ctx_t *ctx = (memreader_ctx_t *)(*reader)->ctx;
 	free(ctx->buffer);

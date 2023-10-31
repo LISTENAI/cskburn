@@ -103,7 +103,7 @@ append_part(cskburn_partition_t *parts, int *part_idx, uint32_t part_size_limit,
 
 	if (part->reader != NULL) {
 		if (part->addr + part->reader->size == addr) {
-			mem_feed(part->reader, buf, size);
+			memreader_feed(part->reader, buf, size);
 			LOG_TRACE("Part %d, addr: 0x%08X, size: %d (append)", idx, part->addr,
 					part->reader->size);
 			return 0;
@@ -122,8 +122,8 @@ append_part(cskburn_partition_t *parts, int *part_idx, uint32_t part_size_limit,
 
 	part->path = malloc(260 + 11);
 	sprintf(part->path, "%s@0x%08X", path, addr);
-	part->reader = mem_alloc(part_size_limit);
-	mem_feed(part->reader, buf, size);
+	part->reader = memreader_alloc(part_size_limit);
+	memreader_feed(part->reader, buf, size);
 	part->addr = addr;
 	LOG_TRACE("Part %d, addr: 0x%08X, size: %d (new)", idx, part->addr, part->reader->size);
 	return 1;
