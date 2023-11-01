@@ -117,41 +117,20 @@ typedef struct {
 } cmd_read_flash_t;
 
 static bool
-command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_chk,
-		uint32_t *out_val, void *out_buf, uint16_t *out_len, uint16_t out_limit, uint32_t timeout)
+command_send(cskburn_serial_device_t *dev, uint8_t op, uint8_t *req_buf, uint32_t req_len,
+		uint32_t timeout)
 {
-	bool ret = false;
+	uint32_t req_slip_len = slip_encode(req_buf, dev->req_slip_buf, req_len);
 
-	LOG_TRACE("> req op=%02X len=%d", op, in_len);
-#if TRACE_DATA
-	LOG_DUMP(dev->req_cmd, in_len);
-#endif
-
-	uint32_t req_raw_len = sizeof(csk_command_t) + in_len;
-
-	csk_command_t *req = (csk_command_t *)dev->req_hdr;
-	req->direction = DIR_REQ;
-	req->command = op;
-	req->size = in_len;
-	req->checksum = in_chk;
-
-	uint32_t req_slip_len = slip_encode(dev->req_raw_buf, dev->req_slip_buf, req_raw_len);
-
-	int32_t r;
-	uint64_t start;
-
-	serial_discard_input(dev->handle);
-	serial_discard_output(dev->handle);
-
-	start = time_monotonic();
+	uint64_t start = time_monotonic();
 	uint32_t bytes_wrote = 0;
 	do {
-		r = serial_write(
+		int32_t r = serial_write(
 				dev->handle, dev->req_slip_buf + bytes_wrote, req_slip_len - bytes_wrote, timeout);
 #if !defined(_WIN32) && !defined(_WIN64)
 		if (r == -1 && errno != EAGAIN) {
 			LOGD("DEBUG: Failed writing command %02X: %d (%s)", op, errno, strerror(errno));
-			goto exit;
+			return false;
 		}
 #endif  // !WIN32 && !WIN64
 		if (r <= 0) {
@@ -172,19 +151,25 @@ command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_c
 	} while (TIME_SINCE_MS(start) < timeout);
 	if (bytes_wrote < req_slip_len) {
 		LOGD("DEBUG: Timeout sending command %02X", op);
-		goto exit;
+		return false;
 	}
 
-	start = time_monotonic();
+	return true;
+}
+
+static bool
+command_recv(cskburn_serial_device_t *dev, uint8_t op, uint8_t **res_buf, uint32_t timeout)
+{
+	uint64_t start = time_monotonic();
 	uint32_t bytes_read = 0;
 	uint32_t res_slip_offset = 0;
 	do {
-		r = serial_read(dev->handle, dev->res_slip_buf + bytes_read, MAX_RES_READ_LEN - bytes_read,
-				timeout);
+		int32_t r = serial_read(dev->handle, dev->res_slip_buf + bytes_read,
+				MAX_RES_READ_LEN - bytes_read, timeout);
 #if !defined(_WIN32) && !defined(_WIN64)
 		if (r == -1 && errno != EAGAIN) {
 			LOGD("DEBUG: Failed reading command %02X: %d (%s)", op, errno, strerror(errno));
-			goto exit;
+			return false;
 		}
 #endif  // !WIN32 && !WIN64
 		if (r <= 0) {
@@ -220,37 +205,76 @@ command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_c
 				continue;
 			}
 
-			uint8_t *res_data = res_raw_ptr + sizeof(csk_response_t);
-
-			LOG_TRACE("< res op=%02X len=%d val=%d", res->command, res->size, res->value);
-#if TRACE_DATA
-			LOG_DUMP(res_data, res->size);
-#endif
-
 			if (res->command != op) {
 				continue;
 			}
 
-			if (out_val != NULL) {
-				*out_val = res->value;
-			}
+			*res_buf = res_raw_ptr;
 
-			if (out_buf != NULL && out_len != NULL) {
-				uint16_t res_size = res->size;
-				if (res_size > out_limit) {
-					res_size = out_limit;
-				}
-				memcpy(out_buf, res_data, res_size);
-				*out_len = res_size;
-			}
-
-			ret = true;
 			goto exit;
 		}
 	} while (TIME_SINCE_MS(start) < timeout);
 	if (bytes_read == 0) {
 		LOG_TRACE("Read timeout after %d ms", TIME_SINCE_MS(start));
+		return false;
 	}
+
+exit:
+	return true;
+}
+
+static bool
+command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_chk,
+		uint32_t *out_val, void *out_buf, uint16_t *out_len, uint16_t out_limit, uint32_t timeout)
+{
+	bool ret = false;
+
+	serial_discard_input(dev->handle);
+	serial_discard_output(dev->handle);
+
+	LOG_TRACE("> req op=%02X len=%d", op, in_len);
+#if TRACE_DATA
+	LOG_DUMP(dev->req_cmd, in_len);
+#endif
+
+	csk_command_t *req = (csk_command_t *)dev->req_hdr;
+	req->direction = DIR_REQ;
+	req->command = op;
+	req->size = in_len;
+	req->checksum = in_chk;
+
+	uint32_t req_raw_len = sizeof(csk_command_t) + in_len;
+	if (!command_send(dev, op, dev->req_raw_buf, req_raw_len, timeout)) {
+		goto exit;
+	}
+
+	uint8_t *res_raw_ptr;
+	if (!command_recv(dev, op, &res_raw_ptr, timeout)) {
+		goto exit;
+	}
+
+	csk_response_t *res = (csk_response_t *)res_raw_ptr;
+	uint8_t *res_data = res_raw_ptr + sizeof(csk_response_t);
+
+	LOG_TRACE("< res op=%02X len=%d val=%d", res->command, res->size, res->value);
+#if TRACE_DATA
+	LOG_DUMP(res_data, res->size);
+#endif
+
+	if (out_val != NULL) {
+		*out_val = res->value;
+	}
+
+	if (out_buf != NULL && out_len != NULL) {
+		uint16_t res_size = res->size;
+		if (res_size > out_limit) {
+			res_size = out_limit;
+		}
+		memcpy(out_buf, res_data, res_size);
+		*out_len = res_size;
+	}
+
+	ret = true;
 
 exit:
 	serial_discard_input(dev->handle);
