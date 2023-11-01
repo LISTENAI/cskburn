@@ -13,6 +13,7 @@
 #include "cskburn_usb.h"
 #endif
 #include "cskburn_serial.h"
+#include "fsio.h"
 #include "verify.h"
 
 #define MAX_IMAGE_SIZE (32 * 1024 * 1024)
@@ -55,6 +56,7 @@ static struct option long_options[] = {
 		{"nand-dat2", required_argument, NULL, 0},
 		{"nand-dat3", required_argument, NULL, 0},
 		{"chip-id", no_argument, NULL, 0},
+		{"read", required_argument, NULL, 0},
 		{"erase", required_argument, NULL, 0},
 		{"erase-all", no_argument, NULL, 0},
 		{"verify", required_argument, NULL, 0},
@@ -120,6 +122,12 @@ static struct {
 	uint32_t serial_baud;
 	cskburn_serial_target_t target;
 	bool read_chip_id;
+	uint16_t read_count;
+	struct {
+		uint32_t addr;
+		uint32_t size;
+		const char *path;
+	} read_parts[MAX_FLASH_PARTS];
 	uint16_t erase_count;
 	struct {
 		uint32_t addr;
@@ -154,6 +162,7 @@ static struct {
 		.serial_baud = DEFAULT_BAUD,
 		.target = TARGET_FLASH,
 		.read_chip_id = false,
+		.read_count = 0,
 		.erase_count = 0,
 		.erase_all = false,
 		.verify_count = 0,
@@ -305,6 +314,24 @@ main(int argc, char **argv)
 				const char *name = long_options[long_index].name;
 				if (strcmp(name, "chip-id") == 0) {
 					options.read_chip_id = true;
+					break;
+				} else if (strcmp(name, "read") == 0) {
+					if (options.read_count >= MAX_FLASH_PARTS) {
+						LOGE("ERROR: Only up to %d partitions can be read at the same time",
+								MAX_FLASH_PARTS);
+						return -1;
+					}
+
+					uint16_t index = options.read_count;
+
+					if (!scan_addr_size_name(optarg, &options.read_parts[index].addr,
+								&options.read_parts[index].size, &options.read_parts[index].path)) {
+						LOGE("ERROR: Argument of --read should be addr:size:path (e.g. -u "
+							 "0x00000000:102400:app.bin)");
+						return -1;
+					}
+
+					options.read_count++;
 					break;
 				} else if (strcmp(name, "erase") == 0) {
 					if (options.erase_count >= MAX_ERASE_PARTS) {
@@ -471,6 +498,10 @@ main(int argc, char **argv)
 #endif
 		if (options.chip != 6) {
 			LOGE("ERROR: NAND is only supported by chip family 6");
+			return -1;
+		}
+		if (options.read_count > 0) {
+			LOGE("ERROR: Reading is not supported on NAND yet");
 			return -1;
 		}
 		if (options.erase_all || options.erase_count > 0) {
@@ -770,6 +801,20 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		LOGI("Detected NAND size: %llu MB", flash_size >> 20);
 	}
 
+	for (int i = 0; i < options.read_count; i++) {
+		if (options.read_parts[i].addr >= flash_size) {
+			LOGE("ERROR: The starting boundary of read address (0x%08X) exceeds the capacity of "
+				 "flash (%llu MB)",
+					options.read_parts[i].addr, flash_size >> 20);
+			goto err_enter;
+		} else if (options.read_parts[i].addr + options.read_parts[i].size > flash_size) {
+			LOGE("ERROR: The ending boundary of read address (0x%08X) exceeds the capacity of "
+				 "flash (%llu MB)",
+					options.read_parts[i].addr + options.read_parts[i].size, flash_size >> 20);
+			goto err_enter;
+		}
+	}
+
 	for (int i = 0; i < options.erase_count; i++) {
 		if (!is_aligned(options.erase_parts[i].addr, 4 * 1024)) {
 			LOGE("ERROR: Erase address (0x%08X) should be 4K aligned", options.erase_parts[i].addr);
@@ -819,6 +864,26 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		if (options.verify_all) {
 			verify_install(parts[i].reader);
 		}
+	}
+
+	for (int i = 0; i < options.read_count; i++) {
+		uint32_t addr = options.read_parts[i].addr;
+		uint32_t size = options.read_parts[i].size;
+
+		writer_t *writer = filewriter_open(options.read_parts[i].path);
+		if (writer == NULL) {
+			LOGE("ERROR: Failed opening %s: %s", options.read_parts[i].path, strerror(errno));
+			goto err_enter;
+		}
+
+		LOGI("Reading region 0x%08X-0x%08X...", addr, addr + size);
+		if (!cskburn_serial_read(dev, options.target, addr, size, writer,
+					options.progress ? print_progress : NULL)) {
+			LOGE("ERROR: Failed reading device");
+			goto err_enter;
+		}
+
+		writer->close(&writer);
 	}
 
 	if (options.erase_all) {

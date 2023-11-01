@@ -12,6 +12,8 @@ bool scan_int(const char *str, uint32_t *out);
 
 bool scan_addr_size(const char *str, uint32_t *addr, uint32_t *size);
 
+bool scan_addr_size_name(const char *str, uint32_t *addr, uint32_t *size, const char **name);
+
 void md5_to_str(char *buf, uint8_t *md5);
 
 bool has_extname(char *path, const char *extname);

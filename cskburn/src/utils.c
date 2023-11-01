@@ -44,6 +44,30 @@ scan_addr_size(const char *str, uint32_t *addr, uint32_t *size)
 	return scan_int(str_addr, addr) && scan_int(str_size, size);
 }
 
+bool
+scan_addr_size_name(const char *str, uint32_t *addr, uint32_t *size, const char **name)
+{
+	char *split;
+
+	if (name == NULL) {
+		return false;
+	}
+
+	if ((split = strstr(str, ":")) == NULL) {
+		return false;
+	}
+
+	const char *str_addr = str;
+	const char *str_size = split + 1;
+
+	if ((split = strstr(str_size, ":")) == NULL) {
+		return false;
+	}
+
+	*name = split + 1;
+	return scan_int(str_addr, addr) && scan_int(str_size, size);
+}
+
 void
 md5_to_str(char *buf, uint8_t *md5)
 {
