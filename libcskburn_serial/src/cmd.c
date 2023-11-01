@@ -121,12 +121,12 @@ command_send(cskburn_serial_device_t *dev, uint8_t op, uint8_t *req_buf, uint32_
 		uint32_t timeout)
 {
 	uint32_t req_slip_len = slip_encode(req_buf, dev->req_slip_buf, req_len);
+	uint8_t *req_slip_ptr = dev->req_slip_buf;
+	uint8_t *req_slip_end = dev->req_slip_buf + req_slip_len;
 
 	uint64_t start = time_monotonic();
-	uint32_t bytes_wrote = 0;
 	do {
-		int32_t r = serial_write(
-				dev->handle, dev->req_slip_buf + bytes_wrote, req_slip_len - bytes_wrote, timeout);
+		int32_t r = serial_write(dev->handle, req_slip_ptr, req_slip_end - req_slip_ptr, timeout);
 #if !defined(_WIN32) && !defined(_WIN64)
 		if (r == -1 && errno != EAGAIN) {
 			LOGD("DEBUG: Failed writing command %02X: %d (%s)", op, errno, strerror(errno));
@@ -140,16 +140,17 @@ command_send(cskburn_serial_device_t *dev, uint8_t op, uint8_t *req_buf, uint32_
 
 		LOG_TRACE("Wrote %d bytes in %d ms", r, TIME_SINCE_MS(start));
 #if TRACE_SLIP
-		LOG_DUMP(dev->req_slip_buf + bytes_wrote, r);
+		LOG_DUMP(req_slip_ptr, r);
 #endif
 
-		bytes_wrote += r;
+		req_slip_ptr += r;
 
-		if (bytes_wrote >= req_slip_len) {
+		if (req_slip_ptr >= req_slip_end) {
 			break;
 		}
 	} while (TIME_SINCE_MS(start) < timeout);
-	if (bytes_wrote < req_slip_len) {
+
+	if (req_slip_ptr < req_slip_end) {
 		LOGD("DEBUG: Timeout sending command %02X", op);
 		return false;
 	}
@@ -160,12 +161,19 @@ command_send(cskburn_serial_device_t *dev, uint8_t op, uint8_t *req_buf, uint32_
 static bool
 command_recv(cskburn_serial_device_t *dev, uint8_t op, uint8_t **res_buf, uint32_t timeout)
 {
+	uint8_t *res_slip_ptr = dev->res_slip_buf;
+	uint8_t *res_slip_end = dev->res_slip_buf + MAX_RES_READ_LEN;
+
+	uint8_t *res_dec_ptr = dev->res_slip_buf;
+	uint8_t *res_dec_end = dev->res_slip_buf;
+
+	uint8_t *res_raw_ptr = dev->res_slip_buf;
+
+	uint8_t *res_out_ptr = dev->res_slip_buf;
+
 	uint64_t start = time_monotonic();
-	uint32_t bytes_read = 0;
-	uint32_t res_slip_offset = 0;
 	do {
-		int32_t r = serial_read(dev->handle, dev->res_slip_buf + bytes_read,
-				MAX_RES_READ_LEN - bytes_read, timeout);
+		int32_t r = serial_read(dev->handle, res_slip_ptr, res_slip_end - res_slip_ptr, timeout);
 #if !defined(_WIN32) && !defined(_WIN64)
 		if (r == -1 && errno != EAGAIN) {
 			LOGD("DEBUG: Failed reading command %02X: %d (%s)", op, errno, strerror(errno));
@@ -179,48 +187,38 @@ command_recv(cskburn_serial_device_t *dev, uint8_t op, uint8_t **res_buf, uint32
 
 		LOG_TRACE("Read %d bytes in %d ms", r, TIME_SINCE_MS(start));
 #if TRACE_SLIP
-		LOG_DUMP(dev->res_slip_buf + bytes_read, r);
+		LOG_DUMP(res_slip_ptr, r);
 #endif
 
-		bytes_read += r;
+		res_slip_ptr += r;
+		res_dec_end = res_slip_ptr;
 
-		while (res_slip_offset < bytes_read) {
-			uint8_t *res_raw_ptr = dev->res_slip_buf + res_slip_offset;
-			uint32_t res_slip_limit = bytes_read - res_slip_offset;
+		while (res_dec_ptr + 1 < res_dec_end) {
+			bool decoded;
+			uint32_t dc, rc = 0;
+			decoded = slip_decode(res_dec_ptr, res_raw_ptr, &dc, &rc, res_dec_end - res_dec_ptr);
 
-			uint32_t res_raw_len = 0;
-			uint32_t res_slip_step = slip_decode(res_raw_ptr, &res_raw_len, res_slip_limit);
-			if (res_slip_step == 0) {
-				break;
-			}
+			res_dec_ptr += dc;
+			res_raw_ptr += rc;
 
-			res_slip_offset += res_slip_step;
-
-			if (res_raw_len <= 0) {
+			if (!decoded || rc == 0) {
 				continue;
 			}
 
-			csk_response_t *res = (csk_response_t *)res_raw_ptr;
-			if (res->direction != DIR_RES) {
+			csk_response_t *res = (csk_response_t *)res_out_ptr;
+			if (res->direction != DIR_RES || res->command != op) {
+				res_raw_ptr = res_out_ptr;
 				continue;
 			}
 
-			if (res->command != op) {
-				continue;
-			}
+			*res_buf = res_out_ptr;
 
-			*res_buf = res_raw_ptr;
-
-			goto exit;
+			return true;
 		}
 	} while (TIME_SINCE_MS(start) < timeout);
-	if (bytes_read == 0) {
-		LOG_TRACE("Read timeout after %d ms", TIME_SINCE_MS(start));
-		return false;
-	}
 
-exit:
-	return true;
+	LOG_TRACE("Read timeout after %d ms", TIME_SINCE_MS(start));
+	return false;
 }
 
 static bool

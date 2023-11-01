@@ -1,6 +1,6 @@
-#include <stdbool.h>
-
 #include "slip.h"
+
+#include <stdbool.h>
 
 #define END 0300
 #define ESC 0333
@@ -8,7 +8,7 @@
 #define ESC_ESC 0335
 
 uint32_t
-slip_encode(uint8_t *in, uint8_t *out, uint32_t len)
+slip_encode(const uint8_t *in, uint8_t *out, uint32_t len)
 {
 	uint32_t oi = 0;
 	out[oi++] = END;
@@ -27,24 +27,26 @@ slip_encode(uint8_t *in, uint8_t *out, uint32_t len)
 	return oi;
 }
 
-uint32_t
-slip_decode(uint8_t *buf, uint32_t *len, uint32_t limit)
+bool
+slip_decode(const uint8_t *in, uint8_t *out, uint32_t *ii, uint32_t *oi, uint32_t limit)
 {
-	uint32_t ii = 0, oi = 0;
-	while (ii < limit) {
-		if (buf[ii] == END) {
-			*len = oi;
-			return ii + 1;
-		} else if (ii < limit - 1 && buf[ii] == ESC && buf[ii + 1] == ESC_END) {
-			buf[oi++] = END;
-			ii += 2;
-		} else if (ii < limit - 1 && buf[ii] == ESC && buf[ii + 1] == ESC_ESC) {
-			buf[oi++] = ESC;
-			ii += 2;
+	*ii = *oi = 0;
+	while (*ii < limit) {
+		if (in[*ii] == END) {
+			*ii += 1;
+			return true;
+		} else if (*ii == limit - 1 && in[*ii] == ESC) {
+			return false;
+		} else if (*ii < limit - 1 && in[*ii] == ESC && in[*ii + 1] == ESC_END) {
+			out[(*oi)++] = END;
+			*ii += 2;
+		} else if (*ii < limit - 1 && in[*ii] == ESC && in[*ii + 1] == ESC_ESC) {
+			out[(*oi)++] = ESC;
+			*ii += 2;
 		} else {
-			buf[oi++] = buf[ii];
-			ii += 1;
+			out[(*oi)++] = in[*ii];
+			*ii += 1;
 		}
 	}
-	return 0;
+	return false;
 }
