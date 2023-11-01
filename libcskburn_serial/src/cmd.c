@@ -31,6 +31,7 @@
 #define CMD_MEM_END 0x06
 #define CMD_MEM_DATA 0x07
 #define CMD_SYNC 0x08
+#define CMD_READ_FLASH 0x0e
 #define CMD_CHANGE_BAUDRATE 0x0f
 #define CMD_SPI_FLASH_MD5 0x13
 #define CMD_NAND_INIT 0x20
@@ -109,6 +110,11 @@ typedef struct {
 	uint32_t rev1;
 	uint32_t rev2;
 } cmd_flash_md5_t;
+
+typedef struct {
+	uint32_t address;
+	uint32_t size;
+} cmd_read_flash_t;
 
 static bool
 command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_chk,
@@ -612,6 +618,39 @@ cmd_flash_md5sum(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, 
 	}
 
 	memcpy(md5, ret_buf + 2, 16);
+
+	return true;
+}
+
+bool
+cmd_read_flash(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uint8_t *data,
+		uint32_t *data_len)
+{
+	uint8_t ret_buf[STATUS_BYTES_LEN + 64];
+	uint16_t ret_len = 0;
+
+	cmd_read_flash_t *cmd = (cmd_read_flash_t *)dev->req_cmd;
+	memset(cmd, 0, sizeof(cmd_read_flash_t));
+	cmd->address = address;
+	cmd->size = size;
+
+	if (!command(dev, CMD_READ_FLASH, sizeof(cmd_read_flash_t), CHECKSUM_NONE, NULL, ret_buf,
+				&ret_len, sizeof(ret_buf), TIMEOUT_FLASH_DATA)) {
+		return false;
+	}
+
+	if (ret_len < STATUS_BYTES_LEN) {
+		LOGD("DEBUG: Interrupted serial read");
+		return false;
+	}
+
+	if (ret_buf[0] != 0) {
+		LOGD("DEBUG: Unexpected device response: %02X%02X", ret_buf[0], ret_buf[1]);
+		return false;
+	}
+
+	*data_len = ret_len - STATUS_BYTES_LEN;
+	memcpy(data, ret_buf + STATUS_BYTES_LEN, *data_len);
 
 	return true;
 }

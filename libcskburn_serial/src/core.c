@@ -309,6 +309,37 @@ cskburn_serial_write(cskburn_serial_device_t *dev, cskburn_serial_target_t targe
 }
 
 bool
+cskburn_serial_read(cskburn_serial_device_t *dev, cskburn_serial_target_t target, uint32_t addr,
+		uint32_t size, writer_t *writer,
+		void (*on_progress)(int32_t read_bytes, uint32_t total_bytes))
+{
+	uint64_t t1 = time_monotonic();
+
+	uint8_t buffer[FLASH_READ_SIZE];
+	uint32_t offset, read_size;
+	while (offset < size) {
+		if (!cmd_read_flash(dev, addr + offset, FLASH_READ_SIZE, buffer, &read_size)) {
+			return false;
+		}
+
+		if (writer->write(writer, buffer, read_size) != read_size) {
+			return false;
+		}
+
+		offset += read_size;
+
+		if (on_progress != NULL) {
+			on_progress(offset, size);
+		}
+	}
+
+	uint64_t t2 = time_monotonic();
+	print_time_spent_with_speed("Reading", t1, t2, size);
+
+	return true;
+}
+
+bool
 cskburn_serial_erase_all(cskburn_serial_device_t *dev, cskburn_serial_target_t target)
 {
 	if (target == TARGET_FLASH) {
