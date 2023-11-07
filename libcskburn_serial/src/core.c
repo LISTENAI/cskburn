@@ -186,6 +186,8 @@ cskburn_serial_enter(
 		return false;
 	}
 
+	msleep(200);
+
 	if (!try_sync(dev, 2000)) {
 		LOGE("ERROR: Device not synced after baud rate change");
 		return false;
