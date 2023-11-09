@@ -10,6 +10,7 @@
 #include "log.h"
 #include "msleep.h"
 #include "serial.h"
+#include "slip.h"
 #include "time_monotonic.h"
 
 #define BAUD_RATE_INIT 115200
@@ -38,17 +39,22 @@ cskburn_serial_open(const char *path, uint32_t chip)
 	cskburn_serial_device_t *dev =
 			(cskburn_serial_device_t *)malloc(sizeof(cskburn_serial_device_t));
 
-	serial_dev_t *device = serial_open(path);
-	if (device == NULL) {
+	serial_dev_t *serial = serial_open(path);
+	if (serial == NULL) {
 		goto err_open;
 	}
 
-	dev->handle = device;
-	dev->req_raw_buf = (uint8_t *)malloc(MAX_REQ_RAW_LEN);
-	dev->req_slip_buf = (uint8_t *)malloc(MAX_REQ_SLIP_LEN);
-	dev->res_slip_buf = (uint8_t *)malloc(MAX_RES_SLIP_LEN);
-	dev->req_hdr = dev->req_raw_buf;
-	dev->req_cmd = dev->req_raw_buf + sizeof(csk_command_t);
+	slip_dev_t *slip = slip_init(serial, MAX_REQ_SLIP_LEN, MAX_RES_SLIP_LEN);
+	if (slip == NULL) {
+		goto err_open;
+	}
+
+	dev->serial = serial;
+	dev->slip = slip;
+	dev->req_buf = (uint8_t *)malloc(MAX_REQ_RAW_LEN);
+	dev->res_buf = (uint8_t *)malloc(MAX_RES_RAW_LEN);
+	dev->req_hdr = dev->req_buf;
+	dev->req_cmd = dev->req_buf + sizeof(csk_command_t);
 	dev->chip = chip;
 	return dev;
 
@@ -61,17 +67,17 @@ void
 cskburn_serial_close(cskburn_serial_device_t **dev)
 {
 	if (dev != NULL) {
-		if ((*dev)->handle != NULL) {
-			serial_close((serial_dev_t **)&(*dev)->handle);
+		if ((*dev)->slip != NULL) {
+			slip_deinit(&(*dev)->slip);
 		}
-		if ((*dev)->req_raw_buf != NULL) {
-			free((*dev)->req_raw_buf);
+		if ((*dev)->serial != NULL) {
+			serial_close(&(*dev)->serial);
 		}
-		if ((*dev)->req_slip_buf != NULL) {
-			free((*dev)->req_slip_buf);
+		if ((*dev)->req_buf != NULL) {
+			free((*dev)->req_buf);
 		}
-		if ((*dev)->res_slip_buf != NULL) {
-			free((*dev)->res_slip_buf);
+		if ((*dev)->res_buf != NULL) {
+			free((*dev)->res_buf);
 		}
 		free(*dev);
 		*dev = NULL;
@@ -99,17 +105,17 @@ bool
 cskburn_serial_connect(cskburn_serial_device_t *dev, uint32_t reset_delay, uint32_t probe_timeout)
 {
 	if (reset_delay > 0) {
-		serial_set_rts(dev->handle, !rts_active);  // UPDATE=HIGH
-		serial_set_dtr(dev->handle, SERIAL_HIGH);  // RESET=HIGH
+		serial_set_rts(dev->serial, !rts_active);  // UPDATE=HIGH
+		serial_set_dtr(dev->serial, SERIAL_HIGH);  // RESET=HIGH
 
 		msleep(10);
 
-		serial_set_rts(dev->handle, rts_active);  // UPDATE=LOW
-		serial_set_dtr(dev->handle, SERIAL_LOW);  // RESET=LOW
+		serial_set_rts(dev->serial, rts_active);  // UPDATE=LOW
+		serial_set_dtr(dev->serial, SERIAL_LOW);  // RESET=LOW
 
 		msleep(reset_delay);
 
-		serial_set_dtr(dev->handle, SERIAL_HIGH);  // RESET=HIGH
+		serial_set_dtr(dev->serial, SERIAL_HIGH);  // RESET=HIGH
 	}
 
 	return try_sync(dev, probe_timeout);
@@ -170,7 +176,7 @@ cskburn_serial_enter(
 
 		// RAM proxy is up with default baud rate
 		if (dev->chip == 6 && baud_rate != BAUD_RATE_INIT) {
-			serial_set_speed(dev->handle, BAUD_RATE_INIT);
+			serial_set_speed(dev->serial, BAUD_RATE_INIT);
 		}
 
 		msleep(500);
@@ -465,12 +471,12 @@ cskburn_serial_init_nand(cskburn_serial_device_t *dev, nand_config_t *config, ui
 bool
 cskburn_serial_reset(cskburn_serial_device_t *dev, uint32_t reset_delay)
 {
-	serial_set_rts(dev->handle, !rts_active);  // UPDATE=HIGH
-	serial_set_dtr(dev->handle, SERIAL_LOW);  // RESET=LOW
+	serial_set_rts(dev->serial, !rts_active);  // UPDATE=HIGH
+	serial_set_dtr(dev->serial, SERIAL_LOW);  // RESET=LOW
 
 	msleep(reset_delay);
 
-	serial_set_dtr(dev->handle, SERIAL_HIGH);  // RESET=HIGH
+	serial_set_dtr(dev->serial, SERIAL_HIGH);  // RESET=HIGH
 
 	return true;
 }
@@ -481,11 +487,11 @@ cskburn_serial_read_logs(cskburn_serial_device_t *dev, uint32_t baud)
 	uint8_t buffer[1024];
 	int32_t r;
 
-	serial_discard_output(dev->handle);
-	serial_set_speed(dev->handle, baud);
+	serial_discard_output(dev->serial);
+	serial_set_speed(dev->serial, baud);
 
 	while (true) {
-		r = serial_read(dev->handle, buffer, sizeof(buffer), 100);
+		r = serial_read(dev->serial, buffer, sizeof(buffer), 100);
 #if !defined(_WIN32) && !defined(_WIN64)
 		if (r == -1 && errno != EAGAIN) {
 			LOGD("DEBUG: Failed reading logs: %d (%s)", errno, strerror(errno));

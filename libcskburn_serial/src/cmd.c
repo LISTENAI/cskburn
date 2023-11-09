@@ -17,10 +17,6 @@
 #define TRACE_DATA 0
 #endif
 
-#ifndef TRACE_SLIP
-#define TRACE_SLIP 0
-#endif
-
 #define DIR_REQ 0x00
 #define DIR_RES 0x01
 
@@ -120,95 +116,27 @@ static bool
 command_send(cskburn_serial_device_t *dev, uint8_t op, uint8_t *req_buf, uint32_t req_len,
 		uint32_t timeout)
 {
-	uint32_t req_slip_len = slip_encode(req_buf, dev->req_slip_buf, req_len);
-	uint8_t *req_slip_ptr = dev->req_slip_buf;
-	uint8_t *req_slip_end = dev->req_slip_buf + req_slip_len;
-
-	uint64_t start = time_monotonic();
-	do {
-		int32_t r = serial_write(dev->handle, req_slip_ptr, req_slip_end - req_slip_ptr, timeout);
-		if (r == 0) {
-			continue;
-		} else if (r == -ETIMEDOUT) {
-			break;
-		} else if (r < 0) {
-			LOGD("DEBUG: Failed writing command %02X: %d (%s)", op, r, strerror(-r));
-			return r;
-		}
-
-		LOG_TRACE("Wrote %d bytes in %d ms", r, TIME_SINCE_MS(start));
-#if TRACE_SLIP
-		LOG_DUMP(req_slip_ptr, r);
-#endif
-
-		req_slip_ptr += r;
-
-		if (req_slip_ptr >= req_slip_end) {
-			break;
-		}
-	} while (TIME_SINCE_MS(start) < timeout);
-
-	if (req_slip_ptr < req_slip_end) {
-		LOGD("DEBUG: Timeout sending command %02X", op);
-		return false;
-	}
-
-	return true;
+	return slip_write(dev->slip, req_buf, req_len, timeout) >= 0;
 }
 
 static bool
 command_recv(cskburn_serial_device_t *dev, uint8_t op, uint8_t **res_buf, uint32_t timeout)
 {
-	uint8_t *res_slip_ptr = dev->res_slip_buf;
-	uint8_t *res_slip_end = dev->res_slip_buf + MAX_RES_READ_LEN;
-
-	uint8_t *res_dec_ptr = dev->res_slip_buf;
-	uint8_t *res_dec_end = dev->res_slip_buf;
-
-	uint8_t *res_raw_ptr = dev->res_slip_buf;
-
-	uint8_t *res_out_ptr = dev->res_slip_buf;
-
 	uint64_t start = time_monotonic();
 	do {
-		int32_t r = serial_read(dev->handle, res_slip_ptr, res_slip_end - res_slip_ptr, timeout);
+		ssize_t r = slip_read(dev->slip, dev->res_buf, MAX_RES_SLIP_LEN, timeout);
 		if (r == 0) {
 			continue;
 		} else if (r == -ETIMEDOUT) {
 			break;
 		} else if (r < 0) {
-			LOGD("DEBUG: Failed reading command %02X: %d (%s)", op, r, strerror(-r));
-			return r;
+			LOGD("DEBUG: Failed reading command %02X: %zd (%s)", op, r, strerror(-r));
+			return false;
 		}
 
-		LOG_TRACE("Read %d bytes in %d ms", r, TIME_SINCE_MS(start));
-#if TRACE_SLIP
-		LOG_DUMP(res_slip_ptr, r);
-#endif
-
-		res_slip_ptr += r;
-		res_dec_end = res_slip_ptr;
-
-		while (res_dec_ptr + 1 < res_dec_end) {
-			bool decoded;
-			uint32_t dc, rc = 0;
-			decoded = slip_decode(res_dec_ptr, res_raw_ptr, &dc, &rc, res_dec_end - res_dec_ptr);
-
-			res_dec_ptr += dc;
-			res_raw_ptr += rc;
-
-			if (!decoded || rc == 0) {
-				continue;
-			}
-
-			csk_response_t *res = (csk_response_t *)res_out_ptr;
-			if (res->direction != DIR_RES || res->command != op) {
-				res_raw_ptr = res_out_ptr;
-				continue;
-			}
-
-			*res_buf = res_out_ptr;
-
+		csk_response_t *res = (csk_response_t *)dev->res_buf;
+		if (res->direction == DIR_RES || res->command == op) {
+			*res_buf = dev->res_buf;
 			return true;
 		}
 	} while (TIME_SINCE_MS(start) < timeout);
@@ -223,8 +151,8 @@ command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_c
 {
 	bool ret = false;
 
-	serial_discard_input(dev->handle);
-	serial_discard_output(dev->handle);
+	serial_discard_input(dev->serial);
+	serial_discard_output(dev->serial);
 
 	LOG_TRACE("> req op=%02X len=%d", op, in_len);
 #if TRACE_DATA
@@ -237,18 +165,18 @@ command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_c
 	req->size = in_len;
 	req->checksum = in_chk;
 
-	uint32_t req_raw_len = sizeof(csk_command_t) + in_len;
-	if (!command_send(dev, op, dev->req_raw_buf, req_raw_len, timeout)) {
+	uint32_t req_len = sizeof(csk_command_t) + in_len;
+	if (!command_send(dev, op, dev->req_buf, req_len, timeout)) {
 		goto exit;
 	}
 
-	uint8_t *res_raw_ptr;
-	if (!command_recv(dev, op, &res_raw_ptr, timeout)) {
+	uint8_t *res_ptr;
+	if (!command_recv(dev, op, &res_ptr, timeout)) {
 		goto exit;
 	}
 
-	csk_response_t *res = (csk_response_t *)res_raw_ptr;
-	uint8_t *res_data = res_raw_ptr + sizeof(csk_response_t);
+	csk_response_t *res = (csk_response_t *)res_ptr;
+	uint8_t *res_data = res_ptr + sizeof(csk_response_t);
 
 	LOG_TRACE("< res op=%02X len=%d val=%d", res->command, res->size, res->value);
 #if TRACE_DATA
@@ -271,7 +199,7 @@ command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_c
 	ret = true;
 
 exit:
-	serial_discard_input(dev->handle);
+	serial_discard_input(dev->serial);
 	return ret;
 }
 
@@ -686,5 +614,5 @@ cmd_change_baud(cskburn_serial_device_t *dev, uint32_t baud, uint32_t old_baud)
 		return false;
 	}
 
-	return serial_set_speed(dev->handle, baud);
+	return serial_set_speed(dev->serial, baud);
 }
