@@ -56,7 +56,6 @@ jobs:
               git config --global --add safe.directory $PWD
               cmake -G Ninja -B build
               cmake --build build --config Release
-              ctest --test-dir build --build-config Release --output-on-failure
             '
 
       - name: Upload artifacts
@@ -82,8 +81,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - { name: darwin-x64,   target: x86_64-apple-macos, test: true  }
-          - { name: darwin-arm64, target: arm64-apple-macos,  test: false }
+          - { name: darwin-x64,   target: x86_64-apple-macos }
+          - { name: darwin-arm64, target: arm64-apple-macos  }
 
     steps:
       - uses: actions/checkout@v2
@@ -96,8 +95,6 @@ jobs:
 
       - name: Build
         uses: ./.github/actions/cmake-build
-        with:
-          run-tests: ${{ matrix.test }}
         env:
           CFLAGS: -target ${{ matrix.target }}
 

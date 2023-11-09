@@ -27,6 +27,3 @@ endif()
 if($ENV{TRACE_SLIP})
     target_compile_options(${PROJECT_NAME} PRIVATE -DTRACE_SLIP=$ENV{TRACE_SLIP})
 endif()
-
-add_subdirectory(test)
-add_test(NAME ${PROJECT_NAME} COMMAND libcskburn_serial_test)

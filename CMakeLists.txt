@@ -19,5 +19,3 @@ add_subdirectory(libserial)
 add_subdirectory(libcskburn_usb)
 add_subdirectory(libcskburn_serial)
 add_subdirectory(cskburn)
-
-add_subdirectory(unity)

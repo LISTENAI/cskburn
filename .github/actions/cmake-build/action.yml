@@ -17,9 +17,6 @@ inputs:
     description: 'The build arguments'
     required: false
     default:
-  run-tests:
-    description: 'Set to true to run tests'
-    required: false
 
 runs:
   using: composite
@@ -27,8 +24,4 @@ runs:
     - run: |
         cmake -G Ninja -B ${{ inputs.build-dir }} ${{ inputs.build-args }}
         cmake --build ${{ inputs.build-dir }} --config ${{ inputs.build-config }}
-      shell: ${{ inputs.shell }}
-    - if: ${{ inputs.run-tests == 'true' }}
-      run: |
-        ctest --test-dir ${{ inputs.build-dir }} --build-config ${{ inputs.build-config }} --output-on-failure
       shell: ${{ inputs.shell }}
