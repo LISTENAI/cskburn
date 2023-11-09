@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <serial.h>
 #include <windows.h>
 
@@ -130,7 +131,7 @@ handle_overlapped_result(HANDLE handle, LPOVERLAPPED overlapped, LPDWORD count, 
 	return false;
 }
 
-int32_t
+ssize_t
 serial_read(serial_dev_t *dev, void *buf, size_t count, uint64_t timeout)
 {
 	DWORD read = 0;
@@ -141,7 +142,7 @@ serial_read(serial_dev_t *dev, void *buf, size_t count, uint64_t timeout)
 
 	if (ReadFile(dev->handle, buf, 1, (LPDWORD)&read, &dev->overlapped_read) == FALSE) {
 		if (!handle_overlapped_result(dev->handle, &dev->overlapped_read, &read, timeout)) {
-			return -1;
+			return -ETIMEDOUT;
 		}
 	}
 
@@ -154,7 +155,7 @@ serial_read(serial_dev_t *dev, void *buf, size_t count, uint64_t timeout)
 	DWORD errors;
 	COMSTAT stat;
 	if (ClearCommError(dev->handle, &errors, &stat) == 0) {
-		return -1;
+		return -EPERM;
 	}
 
 	if (stat.cbInQue == 0) {
@@ -172,14 +173,14 @@ serial_read(serial_dev_t *dev, void *buf, size_t count, uint64_t timeout)
 
 	if (ReadFile(dev->handle, buf, count, (LPDWORD)&read, &dev->overlapped_read) == FALSE) {
 		if (!handle_overlapped_result(dev->handle, &dev->overlapped_read, &read, timeout)) {
-			return -1;
+			return -ETIMEDOUT;
 		}
 	}
 
 	return read + 1;
 }
 
-int32_t
+ssize_t
 serial_write(serial_dev_t *dev, const void *buf, size_t count, uint64_t timeout)
 {
 	DWORD wrote = 0;
@@ -188,7 +189,7 @@ serial_write(serial_dev_t *dev, const void *buf, size_t count, uint64_t timeout)
 
 	if (WriteFile(dev->handle, buf, count, (LPDWORD)&wrote, &dev->overlapped_write) == FALSE) {
 		if (!handle_overlapped_result(dev->handle, &dev->overlapped_write, &wrote, timeout)) {
-			return -1;
+			return -ETIMEDOUT;
 		}
 	}
 

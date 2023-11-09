@@ -127,14 +127,13 @@ command_send(cskburn_serial_device_t *dev, uint8_t op, uint8_t *req_buf, uint32_
 	uint64_t start = time_monotonic();
 	do {
 		int32_t r = serial_write(dev->handle, req_slip_ptr, req_slip_end - req_slip_ptr, timeout);
-#if !defined(_WIN32) && !defined(_WIN64)
-		if (r == -1 && errno != EAGAIN) {
-			LOGD("DEBUG: Failed writing command %02X: %d (%s)", op, errno, strerror(errno));
-			return false;
-		}
-#endif  // !WIN32 && !WIN64
-		if (r <= 0) {
+		if (r == 0) {
 			continue;
+		} else if (r == -ETIMEDOUT) {
+			break;
+		} else if (r < 0) {
+			LOGD("DEBUG: Failed writing command %02X: %d (%s)", op, r, strerror(-r));
+			return r;
 		}
 
 		LOG_TRACE("Wrote %d bytes in %d ms", r, TIME_SINCE_MS(start));
@@ -173,14 +172,13 @@ command_recv(cskburn_serial_device_t *dev, uint8_t op, uint8_t **res_buf, uint32
 	uint64_t start = time_monotonic();
 	do {
 		int32_t r = serial_read(dev->handle, res_slip_ptr, res_slip_end - res_slip_ptr, timeout);
-#if !defined(_WIN32) && !defined(_WIN64)
-		if (r == -1 && errno != EAGAIN) {
-			LOGD("DEBUG: Failed reading command %02X: %d (%s)", op, errno, strerror(errno));
-			return false;
-		}
-#endif  // !WIN32 && !WIN64
-		if (r <= 0) {
+		if (r == 0) {
 			continue;
+		} else if (r == -ETIMEDOUT) {
+			break;
+		} else if (r < 0) {
+			LOGD("DEBUG: Failed reading command %02X: %d (%s)", op, r, strerror(-r));
+			return r;
 		}
 
 		LOG_TRACE("Read %d bytes in %d ms", r, TIME_SINCE_MS(start));

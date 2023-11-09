@@ -1,11 +1,11 @@
-#include <serial.h>
-
+#include <errno.h>
 #include <fcntl.h>
+#include <serial.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <termios.h>
-#include <sys/time.h>
 #include <sys/ioctl.h>
+#include <sys/time.h>
+#include <termios.h>
+#include <unistd.h>
 
 #include "set_baud.h"
 
@@ -127,34 +127,48 @@ set_fd_timeout(serial_dev_t *dev, fd_set *fds, struct timeval *tv, uint64_t time
 	tv->tv_usec = (timeout % 1000) * 1000;
 }
 
-int32_t
+ssize_t
 serial_read(serial_dev_t *dev, void *buf, size_t count, uint64_t timeout)
 {
+	ssize_t ret;
+
 	fd_set fds;
 	struct timeval tv;
 	set_fd_timeout(dev, &fds, &tv, timeout);
 
-	int ret = select(dev->fd + 1, &fds, NULL, NULL, &tv);
-	if (ret <= 0) {
-		return ret;
+	ret = select(dev->fd + 1, &fds, NULL, NULL, &tv);
+	if (ret < 0) {
+		return -errno;
 	}
 
-	return read(dev->fd, buf, count);
+	ret = read(dev->fd, buf, count);
+	if (ret < 0) {
+		return errno == ETIMEDOUT ? 0 : -errno;
+	}
+
+	return ret;
 }
 
-int32_t
+ssize_t
 serial_write(serial_dev_t *dev, const void *buf, size_t count, uint64_t timeout)
 {
+	ssize_t ret;
+
 	fd_set fds;
 	struct timeval tv;
 	set_fd_timeout(dev, &fds, &tv, timeout);
 
-	int ret = select(dev->fd + 1, NULL, &fds, NULL, &tv);
-	if (ret <= 0) {
-		return ret;
+	ret = select(dev->fd + 1, NULL, &fds, NULL, &tv);
+	if (ret < 0) {
+		return -errno;
 	}
 
-	return write(dev->fd, buf, count);
+	ret = write(dev->fd, buf, count);
+	if (ret < 0) {
+		return errno == ETIMEDOUT ? 0 : -errno;
+	}
+
+	return ret;
 }
 
 void
