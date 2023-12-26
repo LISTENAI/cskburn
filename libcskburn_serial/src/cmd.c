@@ -608,6 +608,8 @@ cmd_read_flash(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, ui
 bool
 cmd_change_baud(cskburn_serial_device_t *dev, uint32_t baud, uint32_t old_baud)
 {
+	int ret;
+
 	cmd_change_baud_t *cmd = (cmd_change_baud_t *)dev->req_cmd;
 	memset(cmd, 0, sizeof(cmd_change_baud_t));
 	cmd->baud = baud;
@@ -618,5 +620,11 @@ cmd_change_baud(cskburn_serial_device_t *dev, uint32_t baud, uint32_t old_baud)
 		return false;
 	}
 
-	return serial_set_speed(dev->serial, baud);
+	ret = serial_set_speed(dev->serial, baud);
+	if (ret != 0) {
+		LOGD("DEBUG: Failed to set baudrate: %d (%s)", ret, strerror(-ret));
+		return false;
+	}
+
+	return true;
 }

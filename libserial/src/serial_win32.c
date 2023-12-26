@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <serial.h>
+#include <stdlib.h>
 #include <windows.h>
 
 struct _serial_dev_t {
@@ -10,15 +11,16 @@ struct _serial_dev_t {
 	bool dtr;
 };
 
-static bool
+static int
 configure_port(HANDLE handle, DWORD baud_rate)
 {
-	DCB dcb = {0};
+	DCB dcb;
+
 	SecureZeroMemory(&dcb, sizeof(DCB));
 	dcb.DCBlength = sizeof(DCB);
 
 	if (GetCommState(handle, &dcb) == 0) {
-		return false;
+		return -EIO;
 	}
 
 	dcb.BaudRate = baud_rate;
@@ -29,16 +31,18 @@ configure_port(HANDLE handle, DWORD baud_rate)
 	dcb.fDtrControl = DTR_CONTROL_DISABLE;
 
 	if (SetCommState(handle, &dcb) == 0) {
-		return false;
+		return -EIO;
 	}
 
-	return true;
+	return 0;
 }
 
-serial_dev_t *
-serial_open(const char *path)
+int
+serial_open(const char *path, serial_dev_t **dev)
 {
 	char full_path[MAX_PATH];
+	int ret;
+
 	if (strncmp(path, "\\\\.\\", 4) == 0) {
 		strncpy(full_path, path, MAX_PATH);
 	} else {
@@ -54,39 +58,36 @@ serial_open(const char *path)
 			NULL);  // Null for Comm Devices
 
 	if (handle == INVALID_HANDLE_VALUE) {
-		return NULL;
+		return -ENODEV;
 	}
 
-	if (!configure_port(handle, CBR_115200)) {
+	ret = configure_port(handle, CBR_115200);
+	if (ret != 0) {
 		CloseHandle(handle);
-		return NULL;
+		return ret;
 	}
 
-	COMMTIMEOUTS timeouts = {0};
+	COMMTIMEOUTS timeouts;
 	SecureZeroMemory(&timeouts, sizeof(COMMTIMEOUTS));
 
 	if (GetCommTimeouts(handle, &timeouts) == 0) {
 		CloseHandle(handle);
-		return NULL;
+		return -EIO;
 	}
 
 	timeouts.ReadIntervalTimeout = 1;
 
 	if (SetCommTimeouts(handle, &timeouts) == 0) {
 		CloseHandle(handle);
-		return NULL;
+		return -EIO;
 	}
 
-	serial_dev_t *dev = (serial_dev_t *)malloc(sizeof(serial_dev_t));
-	dev->handle = handle;
+	(*dev) = (serial_dev_t *)calloc(1, sizeof(serial_dev_t));
+	(*dev)->handle = handle;
+	(*dev)->overlapped_read.hEvent = CreateEventA(NULL, TRUE, FALSE, NULL);
+	(*dev)->overlapped_write.hEvent = CreateEventA(NULL, FALSE, FALSE, NULL);
 
-	SecureZeroMemory(&dev->overlapped_read, sizeof(OVERLAPPED));
-	dev->overlapped_read.hEvent = CreateEventA(NULL, TRUE, FALSE, NULL);
-
-	SecureZeroMemory(&dev->overlapped_write, sizeof(OVERLAPPED));
-	dev->overlapped_write.hEvent = CreateEventA(NULL, FALSE, FALSE, NULL);
-
-	return dev;
+	return 0;
 }
 
 void
@@ -99,22 +100,24 @@ serial_close(serial_dev_t **dev)
 	*dev = NULL;
 }
 
-bool
+int
 serial_set_speed(serial_dev_t *dev, uint32_t speed)
 {
-	if (!configure_port(dev->handle, speed)) {
-		return false;
+	int ret;
+
+	if ((ret = configure_port(dev->handle, speed)) != 0) {
+		return ret;
 	}
 
-	if (!serial_set_rts(dev, dev->rts)) {
-		return false;
+	if ((ret = serial_set_rts(dev, dev->rts)) != 0) {
+		return ret;
 	}
 
-	if (!serial_set_dtr(dev, dev->dtr)) {
-		return false;
+	if ((ret = serial_set_dtr(dev, dev->dtr)) != 0) {
+		return ret;
 	}
 
-	return true;
+	return 0;
 }
 
 static bool
@@ -131,23 +134,38 @@ handle_overlapped_result(HANDLE handle, LPOVERLAPPED overlapped, LPDWORD count, 
 	return false;
 }
 
-ssize_t
-serial_read(serial_dev_t *dev, void *buf, size_t count, uint64_t timeout)
+static ssize_t
+serial_do_read(serial_dev_t *dev, void *buf, size_t count, uint64_t timeout)
 {
 	DWORD read = 0;
 
-	// Wait for the first byte to be available
-
 	ResetEvent(dev->overlapped_read.hEvent);
 
-	if (ReadFile(dev->handle, buf, 1, (LPDWORD)&read, &dev->overlapped_read) == FALSE) {
+	if (ReadFile(dev->handle, buf, count, &read, &dev->overlapped_read) == FALSE) {
 		if (!handle_overlapped_result(dev->handle, &dev->overlapped_read, &read, timeout)) {
 			return -ETIMEDOUT;
 		}
 	}
 
+	return (ssize_t)read;
+}
+
+ssize_t
+serial_read(serial_dev_t *dev, void *buf, size_t count, uint64_t timeout)
+{
+	ssize_t read = 0;
+	ssize_t ret;
+
+	// Wait for the first byte to be available and read it
+
+	ret = serial_do_read(dev, buf, 1, timeout);
+	if (ret < 0) {
+		return ret;
+	}
+
+	read += ret;
 	if (read == 0) {
-		return 0;
+		return read;
 	}
 
 	// Get number of remaining bytes
@@ -155,7 +173,7 @@ serial_read(serial_dev_t *dev, void *buf, size_t count, uint64_t timeout)
 	DWORD errors;
 	COMSTAT stat;
 	if (ClearCommError(dev->handle, &errors, &stat) == 0) {
-		return -EPERM;
+		return -EIO;
 	}
 
 	if (stat.cbInQue == 0) {
@@ -163,21 +181,19 @@ serial_read(serial_dev_t *dev, void *buf, size_t count, uint64_t timeout)
 	}
 
 	buf = (uint8_t *)buf + 1;
-	count -= 1;
-
+	count = count + 1;
 	count = count < stat.cbInQue ? count : stat.cbInQue;
 
 	// Read the remaining bytes
 
-	ResetEvent(dev->overlapped_read.hEvent);
-
-	if (ReadFile(dev->handle, buf, count, (LPDWORD)&read, &dev->overlapped_read) == FALSE) {
-		if (!handle_overlapped_result(dev->handle, &dev->overlapped_read, &read, timeout)) {
-			return -ETIMEDOUT;
-		}
+	ret = serial_do_read(dev, buf, count, timeout);
+	if (ret < 0) {
+		return ret;
 	}
 
-	return read + 1;
+	read += ret;
+
+	return read;
 }
 
 ssize_t
@@ -187,13 +203,13 @@ serial_write(serial_dev_t *dev, const void *buf, size_t count, uint64_t timeout)
 
 	ResetEvent(dev->overlapped_write.hEvent);
 
-	if (WriteFile(dev->handle, buf, count, (LPDWORD)&wrote, &dev->overlapped_write) == FALSE) {
+	if (WriteFile(dev->handle, buf, count, &wrote, &dev->overlapped_write) == FALSE) {
 		if (!handle_overlapped_result(dev->handle, &dev->overlapped_write, &wrote, timeout)) {
 			return -ETIMEDOUT;
 		}
 	}
 
-	return wrote;
+	return (ssize_t)wrote;
 }
 
 void
@@ -208,24 +224,26 @@ serial_discard_output(serial_dev_t *dev)
 	PurgeComm(dev->handle, PURGE_TXCLEAR | PURGE_TXABORT);
 }
 
-bool
+int
 serial_set_rts(serial_dev_t *dev, bool val)
 {
 	dev->rts = val;
-	if (val) {
-		return EscapeCommFunction(dev->handle, SETRTS) != 0;
-	} else {
-		return EscapeCommFunction(dev->handle, CLRRTS) != 0;
+
+	if (EscapeCommFunction(dev->handle, val ? SETRTS : CLRRTS) == 0) {
+		return -EIO;
 	}
+
+	return 0;
 }
 
-bool
+int
 serial_set_dtr(serial_dev_t *dev, bool val)
 {
 	dev->dtr = val;
-	if (val) {
-		return EscapeCommFunction(dev->handle, SETDTR) != 0;
-	} else {
-		return EscapeCommFunction(dev->handle, CLRDTR) != 0;
+
+	if (EscapeCommFunction(dev->handle, val ? SETDTR : CLRDTR) == 0) {
+		return -EIO;
 	}
+
+	return 0;
 }

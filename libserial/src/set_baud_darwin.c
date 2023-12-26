@@ -1,7 +1,8 @@
-#include "set_baud.h"
-
-#include <sys/ioctl.h>
 #include <IOKit/serial/ioss.h>
+#include <errno.h>
+#include <sys/ioctl.h>
+
+#include "set_baud.h"
 
 int
 set_baud(int fd, int speed)
@@ -10,7 +11,7 @@ set_baud(int fd, int speed)
 
 	ret = ioctl(fd, IOSSIOSPEED, &speed);
 	if (ret != 0) {
-		return ret;
+		return -errno;
 	}
 
 	return 0;

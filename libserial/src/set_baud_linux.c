@@ -1,6 +1,7 @@
-#include "set_baud.h"
-
 #include <asm/termios.h>
+#include <errno.h>
+
+#include "set_baud.h"
 
 extern int ioctl(int, unsigned long, ...);
 
@@ -12,7 +13,7 @@ set_baud(int fd, int speed)
 
 	ret = ioctl(fd, TCGETS2, &tio2);
 	if (ret != 0) {
-		return ret;
+		return -errno;
 	}
 
 	tio2.c_cflag &= ~CBAUD;
@@ -22,7 +23,7 @@ set_baud(int fd, int speed)
 
 	ret = ioctl(fd, TCSETS2, &tio2);
 	if (ret != 0) {
-		return ret;
+		return -errno;
 	}
 
 	return 0;

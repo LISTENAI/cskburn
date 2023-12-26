@@ -20,13 +20,13 @@ set_interface_attribs(int fd, int speed)
 	struct termios tty;
 
 	ret = ioctl(fd, TIOCEXCL);
-	if (ret < 0) {
-		return ret;
+	if (ret != 0) {
+		return -errno;
 	}
 
 	ret = tcgetattr(fd, &tty);
-	if (ret < 0) {
-		return ret;
+	if (ret != 0) {
+		return -errno;
 	}
 
 	tty.c_cflag |= (CLOCAL | CREAD); /* ignore modem controls */
@@ -46,15 +46,10 @@ set_interface_attribs(int fd, int speed)
 
 	ret = tcsetattr(fd, TCSANOW, &tty);
 	if (ret != 0) {
-		return ret;
+		return -errno;
 	}
 
-	ret = set_baud(fd, speed);
-	if (ret != 0) {
-		return ret;
-	}
-
-	return 0;
+	return set_baud(fd, speed);
 }
 
 static int
@@ -65,7 +60,7 @@ set_modem_control(int fd, int flag, int val)
 
 	ret = ioctl(fd, TIOCMGET, &bits);
 	if (ret != 0) {
-		return ret;
+		return -errno;
 	}
 
 	if (val) {
@@ -75,32 +70,32 @@ set_modem_control(int fd, int flag, int val)
 	}
 
 	ret = ioctl(fd, TIOCMSET, &bits);
-	if (ret == 0) {
-		return ret;
+	if (ret != 0) {
+		return -errno;
 	}
 
-	return 1;
+	return 0;
 }
 
-serial_dev_t *
-serial_open(const char *path)
+int
+serial_open(const char *path, serial_dev_t **dev)
 {
 	int fd, ret;
 
 	fd = open(path, O_RDWR | O_NOCTTY | O_NONBLOCK);
 	if (fd < 0) {
-		return NULL;
+		return -errno;
 	}
 
 	ret = set_interface_attribs(fd, 115200);
 	if (ret != 0) {
-		return NULL;
+		return ret;
 	}
 
-	serial_dev_t *dev = (serial_dev_t *)malloc(sizeof(serial_dev_t));
-	dev->fd = fd;
+	(*dev) = (serial_dev_t *)calloc(1, sizeof(serial_dev_t));
+	(*dev)->fd = fd;
 
-	return dev;
+	return 0;
 }
 
 void
@@ -111,10 +106,10 @@ serial_close(serial_dev_t **dev)
 	*dev = NULL;
 }
 
-bool
+int
 serial_set_speed(serial_dev_t *dev, uint32_t speed)
 {
-	return set_baud(dev->fd, speed) == 0;
+	return set_baud(dev->fd, speed);
 }
 
 static inline void
@@ -138,12 +133,12 @@ serial_read(serial_dev_t *dev, void *buf, size_t count, uint64_t timeout)
 
 	ret = select(dev->fd + 1, &fds, NULL, NULL, &tv);
 	if (ret < 0) {
-		return -errno;
+		return errno == EAGAIN ? 0 : -errno;
 	}
 
 	ret = read(dev->fd, buf, count);
 	if (ret < 0) {
-		return errno == ETIMEDOUT ? 0 : -errno;
+		return errno == EAGAIN ? 0 : -errno;
 	}
 
 	return ret;
@@ -160,12 +155,12 @@ serial_write(serial_dev_t *dev, const void *buf, size_t count, uint64_t timeout)
 
 	ret = select(dev->fd + 1, NULL, &fds, NULL, &tv);
 	if (ret < 0) {
-		return -errno;
+		return errno == EAGAIN ? 0 : -errno;
 	}
 
 	ret = write(dev->fd, buf, count);
 	if (ret < 0) {
-		return errno == ETIMEDOUT ? 0 : -errno;
+		return errno == EAGAIN ? 0 : -errno;
 	}
 
 	return ret;
@@ -183,13 +178,13 @@ serial_discard_output(serial_dev_t *dev)
 	tcflush(dev->fd, TCOFLUSH);
 }
 
-bool
+int
 serial_set_rts(serial_dev_t *dev, bool val)
 {
 	return set_modem_control(dev->fd, TIOCM_RTS, val);
 }
 
-bool
+int
 serial_set_dtr(serial_dev_t *dev, bool val)
 {
 	return set_modem_control(dev->fd, TIOCM_DTR, val);

@@ -36,11 +36,15 @@ cskburn_serial_init(int flags)
 cskburn_serial_device_t *
 cskburn_serial_open(const char *path, uint32_t chip)
 {
+	int ret;
+
 	cskburn_serial_device_t *dev =
 			(cskburn_serial_device_t *)malloc(sizeof(cskburn_serial_device_t));
 
-	serial_dev_t *serial = serial_open(path);
-	if (serial == NULL) {
+	serial_dev_t *serial = NULL;
+	ret = serial_open(path, &serial);
+	if (ret != 0) {
+		LOGE("ERROR: Failed opening serial device: %d (%s)", ret, strerror(-ret));
 		goto err_open;
 	}
 
@@ -492,13 +496,10 @@ cskburn_serial_read_logs(cskburn_serial_device_t *dev, uint32_t baud)
 
 	while (true) {
 		r = serial_read(dev->serial, buffer, sizeof(buffer), 100);
-#if !defined(_WIN32) && !defined(_WIN64)
-		if (r == -1 && errno != EAGAIN) {
-			LOGD("DEBUG: Failed reading logs: %d (%s)", errno, strerror(errno));
+		if (r < 0) {
+			LOGD("DEBUG: Failed reading logs: %d (%s)", r, strerror(-r));
 			return;
-		}
-#endif  // !WIN32 && !WIN64
-		if (r <= 0) {
+		} else if (r == 0) {
 			msleep(10);
 			continue;
 		}
