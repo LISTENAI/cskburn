@@ -57,6 +57,10 @@
 // 取值过小会导致正常返回和重试返回叠加，seq 错位
 #define TIMEOUT_FLASH_DATA 1000
 
+// Flash 结束写入指令超时时间
+// 该操作包含等待写入队列的时间，实测可到 750ms，取保险值
+#define TIMEOUT_FLASH_END 2000
+
 // Flash 擦除指令超时时间 (每 MB)
 // 实测约 405KB/s，即每 MB 约 2530ms
 // 取保守值
@@ -381,7 +385,7 @@ cmd_nand_finish(cskburn_serial_device_t *dev)
 	memset(cmd, 0, sizeof(cmd_flash_finish_t));
 
 	return !check_command(
-			dev, CMD_NAND_END, sizeof(uint32_t), CHECKSUM_NONE, NULL, TIMEOUT_FLASH_DATA);
+			dev, CMD_NAND_END, sizeof(uint32_t), CHECKSUM_NONE, NULL, TIMEOUT_FLASH_END);
 }
 
 bool
@@ -514,7 +518,7 @@ cmd_flash_finish(cskburn_serial_device_t *dev)
 	cmd->address = 0;
 
 	return !check_command(
-			dev, CMD_FLASH_END, sizeof(uint32_t), CHECKSUM_NONE, NULL, TIMEOUT_FLASH_DATA);
+			dev, CMD_FLASH_END, sizeof(uint32_t), CHECKSUM_NONE, NULL, TIMEOUT_FLASH_END);
 }
 
 bool
