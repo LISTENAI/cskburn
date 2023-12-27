@@ -135,10 +135,13 @@ slip_write(slip_dev_t *dev, const uint8_t *buf, size_t count, uint64_t timeout)
 	uint8_t *tx_head = tx_buf_head;
 	uint8_t *tx_tail = tx_buf_head;
 
+	const uint8_t *buf_head = buf;
+	const uint8_t *buf_tail = buf + count;
+
 	if (tx_tail + 1 > tx_buf_tail) return -ENOMEM;
 	*tx_tail++ = END;
 
-	for (const uint8_t *buf_head = buf; buf_head < buf + count; buf_head++) {
+	for (buf_head = buf; buf_head < buf_tail; buf_head++) {
 		if (*buf_head == END) {
 			if (tx_tail + 2 > tx_buf_tail) return -ENOMEM;
 			*tx_tail++ = ESC;
@@ -178,5 +181,5 @@ slip_write(slip_dev_t *dev, const uint8_t *buf, size_t count, uint64_t timeout)
 		tx_head += r;
 	}
 
-	return tx_tail - dev->tx_buf;
+	return buf_head - buf;
 }

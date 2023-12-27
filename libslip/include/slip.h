@@ -1,7 +1,6 @@
 #ifndef __LIB_SLIP__
 #define __LIB_SLIP__
 
-#include <stdbool.h>
 #include <stdint.h>
 
 #include "serial.h"
