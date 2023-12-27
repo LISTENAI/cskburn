@@ -45,38 +45,38 @@ typedef enum {
 
 #define BLOCKS(size, block_size) ((size + block_size - 1) / block_size)
 
-bool cmd_sync(cskburn_serial_device_t *dev, uint16_t timeout);
+int cmd_sync(cskburn_serial_device_t *dev, uint16_t timeout);
 
-bool cmd_read_flash_id(cskburn_serial_device_t *dev, uint32_t *id);
-bool cmd_read_chip_id(cskburn_serial_device_t *dev, uint8_t *id);
+int cmd_read_flash_id(cskburn_serial_device_t *dev, uint32_t *id);
+int cmd_read_chip_id(cskburn_serial_device_t *dev, uint8_t *id);
 
-bool cmd_nand_init(cskburn_serial_device_t *dev, nand_config_t *config, uint64_t *size);
+int cmd_nand_init(cskburn_serial_device_t *dev, nand_config_t *config, uint64_t *size);
 
-bool cmd_nand_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks,
+int cmd_nand_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks,
 		uint32_t block_size, uint32_t offset);
-bool cmd_nand_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, uint32_t seq);
-bool cmd_nand_finish(cskburn_serial_device_t *dev);
+int cmd_nand_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, uint32_t seq);
+int cmd_nand_finish(cskburn_serial_device_t *dev);
 
-bool cmd_nand_md5(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uint8_t *md5);
+int cmd_nand_md5(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uint8_t *md5);
 
-bool cmd_mem_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks,
+int cmd_mem_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks, uint32_t block_size,
+		uint32_t offset);
+int cmd_mem_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, uint32_t seq);
+int cmd_mem_finish(cskburn_serial_device_t *dev, cmd_finish_action_t action, uint32_t address);
+
+int cmd_flash_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks,
 		uint32_t block_size, uint32_t offset);
-bool cmd_mem_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, uint32_t seq);
-bool cmd_mem_finish(cskburn_serial_device_t *dev, cmd_finish_action_t action, uint32_t address);
+int cmd_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, uint32_t seq);
+int cmd_flash_finish(cskburn_serial_device_t *dev);
 
-bool cmd_flash_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks,
-		uint32_t block_size, uint32_t offset);
-bool cmd_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, uint32_t seq);
-bool cmd_flash_finish(cskburn_serial_device_t *dev);
+int cmd_flash_erase_chip(cskburn_serial_device_t *dev);
+int cmd_flash_erase_region(cskburn_serial_device_t *dev, uint32_t address, uint32_t size);
 
-bool cmd_flash_erase_chip(cskburn_serial_device_t *dev);
-bool cmd_flash_erase_region(cskburn_serial_device_t *dev, uint32_t address, uint32_t size);
+int cmd_flash_md5sum(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uint8_t *md5);
 
-bool cmd_flash_md5sum(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uint8_t *md5);
-
-bool cmd_read_flash(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uint8_t *data,
+int cmd_read_flash(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uint8_t *data,
 		uint32_t *data_len);
 
-bool cmd_change_baud(cskburn_serial_device_t *dev, uint32_t baud, uint32_t old_baud);
+int cmd_change_baud(cskburn_serial_device_t *dev, uint32_t baud, uint32_t old_baud);
 
 #endif  // __LIB_CSKBURN_SERIAL_CMD__
