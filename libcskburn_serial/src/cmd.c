@@ -139,7 +139,7 @@ command_recv(cskburn_serial_device_t *dev, uint8_t op, uint8_t **res_buf, uint32
 		}
 
 		csk_response_t *res = (csk_response_t *)dev->res_buf;
-		if (res->direction == DIR_RES || res->command == op) {
+		if (res->direction == DIR_RES && res->command == op) {
 			*res_buf = dev->res_buf;
 			return true;
 		}
