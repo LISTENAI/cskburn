@@ -226,7 +226,7 @@ static int
 try_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, uint32_t seq)
 {
 	int ret;
-	for (int i = 0; i < FLASH_BLOCK_TRIES; i++) {
+	for (int i = 0;; i++) {
 		if (i > 0) {
 			LOGD("DEBUG: Attempts %d writing block %d", i, seq);
 		}

@@ -1021,9 +1021,9 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 
 err_write:
 err_enter:
-	if (ret != 0) {
-		cskburn_serial_reset(dev, options.reset_delay);
-	}
+	// if (ret != 0) {
+	// 	cskburn_serial_reset(dev, options.reset_delay);
+	// }
 	cskburn_serial_close(&dev);
 err_open:
 	return ret;
