@@ -233,6 +233,8 @@ try_flash_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, 
 		ret = cmd_flash_block(dev, data, data_len, seq);
 		if (ret == 0) {
 			return 0;
+		} else if (ret == -ETIMEDOUT) {
+			continue;
 		} else if (ret < 0) {  // In case of hardware error
 			return ret;
 		}
