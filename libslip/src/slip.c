@@ -77,7 +77,7 @@ slip_read(slip_dev_t *dev, uint8_t *buf, size_t count, uint64_t timeout)
 				continue;
 			}
 		} else if (r < 0) {
-			LOGD("DEBUG: Failed reading command: %zd (%s)", r, strerror(-r));
+			LOGD_RET(r, "DEBUG: Failed reading command");
 			return r;
 		}
 
@@ -169,7 +169,7 @@ slip_write(slip_dev_t *dev, const uint8_t *buf, size_t count, uint64_t timeout)
 				continue;
 			}
 		} else if (r < 0) {
-			LOGD("DEBUG: Failed writing command: %zd (%s)", r, strerror(-r));
+			LOGD_RET(r, "DEBUG: Failed writing command");
 			return r;
 		}
 

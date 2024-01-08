@@ -35,7 +35,7 @@ read_parts_hex(char **argv, int argc, cskburn_partition_t *parts, int *parts_cnt
 			hex_len = read_file(argv[i], hex_ptr, MAX_HEX_SIZE);
 			hex_parsed = 0;
 			if (hex_len == 0) {
-				LOGE("ERROR: Failed reading %s: %s", argv[i], strerror(errno));
+				LOGE_RET(-errno, "ERROR: Failed reading %s", argv[i]);
 				goto exit;
 			} else {
 				LOGD("Parsing HEX file: %s, size: %d", argv[i], hex_len);

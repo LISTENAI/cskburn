@@ -144,13 +144,12 @@ cskburn_serial_enter(
 		// of it to speed up the process.
 		if (dev->chip == 6 && baud_rate != BAUD_RATE_INIT) {
 			if ((ret = cmd_change_baud(dev, baud_rate, BAUD_RATE_INIT)) != 0) {
-				LOGE("ERROR: Failed changing baud rate: %d (%s)", ret, strerror(-ret));
+				LOGE_RET(ret, "ERROR: Failed changing baud rate");
 				return ret;
 			}
 
 			if ((ret = try_sync(dev, 2000)) != 0) {
-				LOGE("ERROR: Device not synced after baud rate change: %d (%s)", ret,
-						strerror(-ret));
+				LOGE_RET(ret, "ERROR: Device not synced after baud rate change");
 				return ret;
 			}
 		}
@@ -188,19 +187,19 @@ cskburn_serial_enter(
 	}
 
 	if ((ret = try_sync(dev, 2000)) != 0) {
-		LOGE("ERROR: Device not recognized: %d (%s)", ret, strerror(-ret));
+		LOGE_RET(ret, "ERROR: Device not recognized");
 		return ret;
 	}
 
 	if ((ret = cmd_change_baud(dev, baud_rate, BAUD_RATE_INIT)) != 0) {
-		LOGE("ERROR: Failed changing baud rate: %d (%s)", ret, strerror(-ret));
+		LOGE_RET(ret, "ERROR: Failed changing baud rate");
 		return ret;
 	}
 
 	msleep(200);
 
 	if ((ret = try_sync(dev, 2000)) != 0) {
-		LOGE("ERROR: Device not synced after baud rate change: %d (%s)", ret, strerror(-ret));
+		LOGE_RET(ret, "ERROR: Device not synced after baud rate change");
 		return ret;
 	}
 

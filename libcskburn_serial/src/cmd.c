@@ -169,13 +169,13 @@ command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_c
 
 	uint32_t req_len = sizeof(csk_command_t) + in_len;
 	if ((ret = command_send(dev, op, dev->req_buf, req_len, timeout)) < 0) {
-		LOGD("DEBUG: Failed to write command %02X: %d (%s)", op, ret, strerror(-ret));
+		LOGD_RET(ret, "DEBUG: Failed to write command %02X", op);
 		goto exit;
 	}
 
 	uint8_t *res_ptr;
 	if ((ret = command_recv(dev, op, &res_ptr, timeout)) < 0) {
-		LOGD("DEBUG: Failed to read command %02X: %d (%s)", op, ret, strerror(-ret));
+		LOGD_RET(ret, "DEBUG: Failed to read command %02X", op);
 		goto exit;
 	}
 
@@ -629,7 +629,7 @@ cmd_change_baud(cskburn_serial_device_t *dev, uint32_t baud, uint32_t old_baud)
 
 	ret = serial_set_speed(dev->serial, baud);
 	if (ret != 0) {
-		LOGD("DEBUG: Failed to set baudrate: %d (%s)", ret, strerror(-ret));
+		LOGD_RET(ret, "DEBUG: Failed to set baudrate");
 		return ret;
 	}
 

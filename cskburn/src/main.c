@@ -489,7 +489,7 @@ main(int argc, char **argv)
 		options.burner_buf = (uint8_t *)malloc(MAX_IMAGE_SIZE);
 		options.burner_len = read_file(options.burner, options.burner_buf, MAX_IMAGE_SIZE);
 		if (options.burner_len == 0) {
-			LOGE("ERROR: Failed reading %s: %s", options.burner, strerror(errno));
+			LOGE_RET(-errno, "ERROR: Failed reading %s", options.burner);
 			return -1;
 		}
 	}
@@ -803,7 +803,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 
 	cskburn_serial_device_t *dev = NULL;
 	if ((ret = cskburn_serial_open(&dev, options.serial, options.chip)) != 0) {
-		LOGE("ERROR: Failed opening device: %d (%s)", ret, strerror(-ret));
+		LOGE_RET(ret, "ERROR: Failed opening device");
 		goto err_open;
 	}
 
@@ -814,7 +814,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	if (options.read_chip_id) {
 		uint8_t id[CHIP_ID_LEN] = {0};
 		if ((ret = cskburn_serial_read_chip_id(dev, id)) != 0) {
-			LOGE("ERROR: Failed reading device: %d (%s)", ret, strerror(-ret));
+			LOGE_RET(ret, "ERROR: Failed reading device");
 			goto err_enter;
 		}
 
@@ -828,7 +828,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		uint32_t flash_id = 0;
 
 		if ((ret = cskburn_serial_get_flash_info(dev, &flash_id, &flash_size)) != 0) {
-			LOGE("ERROR: Failed detecting flash type: %d (%s)", ret, strerror(-ret));
+			LOGE_RET(ret, "ERROR: Failed detecting flash type");
 			goto err_enter;
 		}
 
@@ -837,7 +837,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		LOGI("Detected flash size: %llu MB", flash_size >> 20);
 	} else if (options.target == TARGET_NAND) {
 		if ((ret = cskburn_serial_init_nand(dev, &nand_config, &flash_size)) != 0) {
-			LOGE("ERROR: Failed initializing NAND: %d (%s)", ret, strerror(-ret));
+			LOGE_RET(ret, "ERROR: Failed initializing NAND");
 			goto err_enter;
 		}
 
@@ -918,15 +918,14 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 
 		writer_t *writer = filewriter_open(options.read_parts[i].path);
 		if (writer == NULL) {
-			LOGE("ERROR: Failed opening %s: %s", options.read_parts[i].path, strerror(errno));
+			LOGE_RET(-errno, "ERROR: Failed opening %s", options.read_parts[i].path);
 			goto err_enter;
 		}
 
 		LOGI("Reading region 0x%08X-0x%08X...", addr, addr + size);
 		if ((ret = cskburn_serial_read(dev, options.target, addr, size, writer,
 					 options.progress ? print_progress : NULL)) != 0) {
-			LOGE("ERROR: Failed reading region 0x%08X-0x%08X: %d (%s)", addr, addr + size, ret,
-					strerror(-ret));
+			LOGE_RET(ret, "ERROR: Failed reading region 0x%08X-0x%08X", addr, addr + size);
 			goto err_enter;
 		}
 
@@ -936,7 +935,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	if (options.erase_all) {
 		LOGI("Erasing entire flash...");
 		if ((ret = cskburn_serial_erase_all(dev, options.target)) != 0) {
-			LOGE("ERROR: Failed erasing device: %d (%s)", ret, strerror(-ret));
+			LOGE_RET(ret, "ERROR: Failed erasing device");
 			goto err_enter;
 		}
 	} else {
@@ -945,8 +944,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 			uint32_t size = options.erase_parts[i].size;
 			LOGI("Erasing region 0x%08X-0x%08X...", addr, addr + size);
 			if ((ret = cskburn_serial_erase(dev, options.target, addr, size)) != 0) {
-				LOGE("ERROR: Failed erasing region 0x%08X-0x%08X: %d (%s)", addr, addr + size, ret,
-						strerror(-ret));
+				LOGE_RET(ret, "ERROR: Failed erasing region 0x%08X-0x%08X", addr, addr + size);
 				goto err_enter;
 			}
 		}
@@ -959,8 +957,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 			uint32_t addr = options.verify_parts[i].addr;
 			uint32_t size = options.verify_parts[i].size;
 			if ((ret = cskburn_serial_verify(dev, options.target, addr, size, md5)) != 0) {
-				LOGE("ERROR: Failed verifing region 0x%08X-0x%08X: %d (%s)", addr, addr + size, ret,
-						strerror(-ret));
+				LOGE_RET(ret, "ERROR: Failed verifing region 0x%08X-0x%08X", addr, addr + size);
 				goto err_enter;
 			}
 			md5_to_str(md5_str, md5);
@@ -977,7 +974,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 				(float)parts[i].reader->size / 1024.0f);
 		if ((ret = cskburn_serial_write(dev, options.target, parts[i].addr, parts[i].reader,
 					 jump_addr, options.progress ? print_progress : NULL)) != 0) {
-			LOGE("ERROR: Failed burning partition %d: %d (%s)", i + 1, ret, strerror(-ret));
+			LOGE_RET(ret, "ERROR: Failed burning partition %d", i + 1);
 			goto err_write;
 		}
 
@@ -991,7 +988,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 			}
 			if ((ret = cskburn_serial_verify(dev, options.target, parts[i].addr,
 						 parts[i].reader->size, flash_md5)) != 0) {
-				LOGE("ERROR: Failed verifing partition %d: %d (%s)", i + 1, ret, strerror(-ret));
+				LOGE_RET(ret, "ERROR: Failed verifing partition %d", i + 1);
 				goto err_write;
 			}
 			md5_to_str(md5_str, flash_md5);
