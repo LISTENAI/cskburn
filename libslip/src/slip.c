@@ -71,7 +71,6 @@ slip_read(slip_dev_t *dev, uint8_t *buf, size_t count, uint64_t timeout)
 	while (rx_tail < rx_buf_tail) {
 		ssize_t r = serial_read(dev->serial, rx_tail, rx_buf_tail - rx_tail, timeout);
 		if (r < 0) {
-			LOGD_RET(r, "DEBUG: Failed reading command");
 			return r;
 		}
 
@@ -157,7 +156,6 @@ slip_write(slip_dev_t *dev, const uint8_t *buf, size_t count, uint64_t timeout)
 	while (tx_head < tx_tail) {
 		ssize_t r = serial_write(dev->serial, tx_head, tx_tail - tx_head, timeout);
 		if (r < 0) {
-			LOGD_RET(r, "DEBUG: Failed writing command");
 			return r;
 		}
 
