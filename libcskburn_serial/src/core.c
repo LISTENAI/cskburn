@@ -324,11 +324,17 @@ cskburn_serial_write(cskburn_serial_device_t *dev, cskburn_serial_target_t targe
 	}
 
 	if (target == TARGET_FLASH) {
-		cmd_flash_finish(dev);
+		if ((ret = cmd_flash_finish(dev)) != 0) {
+			return ret;
+		}
 	} else if (target == TARGET_NAND) {
-		cmd_nand_finish(dev);
+		if ((ret = cmd_nand_finish(dev)) != 0) {
+			return ret;
+		}
 	} else if (target == TARGET_RAM) {
-		cmd_mem_finish(dev, jump ? OPTION_JUMP : OPTION_RUN, jump);
+		if ((ret = cmd_mem_finish(dev, jump ? OPTION_JUMP : OPTION_RUN, jump)) != 0) {
+			return ret;
+		}
 	}
 
 	uint64_t t2 = time_monotonic();
