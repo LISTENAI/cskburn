@@ -40,25 +40,25 @@ const char *errid(int errnum);
 		}                                                \
 	} while (0);
 
-#define LOGE_RET(ret, format, ...)                                            \
-	if (ret < 0) {                                                            \
-		LOGE(format ": %s (%s)", ##__VA_ARGS__, errid(-ret), strerror(-ret)); \
-	} else {                                                                  \
-		LOGE(format ": %02X", ##__VA_ARGS__, (uint8_t)(ret & 0xFF));          \
+#define LOGE_RET(ret, format, ...)                                   \
+	if (ret < 0) {                                                   \
+		LOGE(format ": %s", ##__VA_ARGS__, errid(-ret));             \
+	} else {                                                         \
+		LOGE(format ": %02X", ##__VA_ARGS__, (uint8_t)(ret & 0xFF)); \
 	}
 
-#define LOGI_RET(ret, format, ...)                                            \
-	if (ret < 0) {                                                            \
-		LOGI(format ": %s (%s)", ##__VA_ARGS__, errid(-ret), strerror(-ret)); \
-	} else {                                                                  \
-		LOGI(format ": %02X", ##__VA_ARGS__, (uint8_t)(ret & 0xFF));          \
+#define LOGI_RET(ret, format, ...)                                   \
+	if (ret < 0) {                                                   \
+		LOGI(format ": %s", ##__VA_ARGS__, errid(-ret));             \
+	} else {                                                         \
+		LOGI(format ": %02X", ##__VA_ARGS__, (uint8_t)(ret & 0xFF)); \
 	}
 
-#define LOGD_RET(ret, format, ...)                                            \
-	if (ret < 0) {                                                            \
-		LOGD(format ": %s (%s)", ##__VA_ARGS__, errid(-ret), strerror(-ret)); \
-	} else {                                                                  \
-		LOGD(format ": %02X", ##__VA_ARGS__, (uint8_t)(ret & 0xFF));          \
+#define LOGD_RET(ret, format, ...)                                   \
+	if (ret < 0) {                                                   \
+		LOGD(format ": %s", ##__VA_ARGS__, errid(-ret));             \
+	} else {                                                         \
+		LOGD(format ": %02X", ##__VA_ARGS__, (uint8_t)(ret & 0xFF)); \
 	}
 
 #define LOG_TRACE(format, ...)                                                     \
