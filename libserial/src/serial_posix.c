@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 #include "set_baud.h"
+#include "time_monotonic.h"
 
 struct _serial_dev_t {
 	int fd;
@@ -122,8 +123,8 @@ set_fd_timeout(serial_dev_t *dev, fd_set *fds, struct timeval *tv, uint64_t time
 	tv->tv_usec = (timeout % 1000) * 1000;
 }
 
-ssize_t
-serial_read(serial_dev_t *dev, void *buf, size_t count, uint64_t timeout)
+static ssize_t
+do_serial_read(serial_dev_t *dev, void *buf, size_t count, uint64_t timeout)
 {
 	ssize_t ret;
 
@@ -133,12 +134,53 @@ serial_read(serial_dev_t *dev, void *buf, size_t count, uint64_t timeout)
 
 	ret = select(dev->fd + 1, &fds, NULL, NULL, &tv);
 	if (ret < 0) {
-		return errno == EAGAIN ? 0 : -errno;
+		return -errno;
 	}
 
 	ret = read(dev->fd, buf, count);
 	if (ret < 0) {
-		return errno == EAGAIN ? 0 : -errno;
+		return -errno;
+	}
+
+	return ret;
+}
+
+ssize_t
+serial_read(serial_dev_t *dev, void *buf, size_t count, uint64_t timeout)
+{
+	ssize_t ret;
+
+	uint64_t start = time_monotonic();
+	while ((ret = do_serial_read(dev, buf, count, timeout)) <= 0) {
+		if (ret == 0 || ret == -EAGAIN) {
+			if (TIME_SINCE_MS(start) >= timeout) {
+				return -ETIMEDOUT;
+			}
+		} else {
+			return ret;
+		}
+	}
+
+	return ret;
+}
+
+static ssize_t
+do_serial_write(serial_dev_t *dev, const void *buf, size_t count, uint64_t timeout)
+{
+	ssize_t ret;
+
+	fd_set fds;
+	struct timeval tv;
+	set_fd_timeout(dev, &fds, &tv, timeout);
+
+	ret = select(dev->fd + 1, NULL, &fds, NULL, &tv);
+	if (ret < 0) {
+		return -errno;
+	}
+
+	ret = write(dev->fd, buf, count);
+	if (ret < 0) {
+		return -errno;
 	}
 
 	return ret;
@@ -149,18 +191,15 @@ serial_write(serial_dev_t *dev, const void *buf, size_t count, uint64_t timeout)
 {
 	ssize_t ret;
 
-	fd_set fds;
-	struct timeval tv;
-	set_fd_timeout(dev, &fds, &tv, timeout);
-
-	ret = select(dev->fd + 1, NULL, &fds, NULL, &tv);
-	if (ret < 0) {
-		return errno == EAGAIN ? 0 : -errno;
-	}
-
-	ret = write(dev->fd, buf, count);
-	if (ret < 0) {
-		return errno == EAGAIN ? 0 : -errno;
+	uint64_t start = time_monotonic();
+	while ((ret = do_serial_write(dev, buf, count, timeout)) <= 0) {
+		if (ret == 0 || ret == -EAGAIN) {
+			if (TIME_SINCE_MS(start) >= timeout) {
+				return -ETIMEDOUT;
+			}
+		} else {
+			return ret;
+		}
 	}
 
 	return ret;
