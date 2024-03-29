@@ -45,6 +45,11 @@ Serial burning options:
     verify all partitions after burning
   -n, --nand
     burn to NAND flash (CSK6 only)
+  --timeout <ms>
+    override timeout for each operation, acceptable values:
+    -1: no timeout
+     0: use default strategy
+    >0: timeout in milliseconds
 
 Advanced operations (serial only):
   --erase <addr:size>

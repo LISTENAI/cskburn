@@ -14,6 +14,7 @@ struct _cskburn_serial_device_t {
 	uint8_t *req_buf;
 	uint8_t *res_buf;
 	uint32_t chip;
+	int32_t timeout;
 };
 
 #endif  // __LIB_CSKBURN_SERIAL_CORE__

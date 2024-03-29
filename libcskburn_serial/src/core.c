@@ -34,7 +34,7 @@ cskburn_serial_init(int flags)
 }
 
 int
-cskburn_serial_open(cskburn_serial_device_t **dev, const char *path, uint32_t chip)
+cskburn_serial_open(cskburn_serial_device_t **dev, const char *path, uint32_t chip, int32_t timeout)
 {
 	int ret;
 
@@ -57,6 +57,7 @@ cskburn_serial_open(cskburn_serial_device_t **dev, const char *path, uint32_t ch
 	(*dev)->req_hdr = (*dev)->req_buf;
 	(*dev)->req_cmd = (*dev)->req_buf + sizeof(csk_command_t);
 	(*dev)->chip = chip;
+	(*dev)->timeout = timeout;
 
 	return 0;
 
