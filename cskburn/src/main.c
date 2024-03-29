@@ -66,6 +66,7 @@ static struct option long_options[] = {
 		{"probe-timeout", required_argument, NULL, 0},
 		{"reset-attempts", required_argument, NULL, 0},
 		{"reset-delay", required_argument, NULL, 0},
+		{"timeout", required_argument, NULL, 0},
 		{"pass-delay", required_argument, NULL, 0},
 		{"fail-delay", required_argument, NULL, 0},
 		{"burner", required_argument, NULL, 0},
@@ -148,6 +149,7 @@ static struct {
 	uint32_t probe_timeout;
 	uint32_t reset_attempts;
 	uint32_t reset_delay;
+	int32_t timeout;
 	char *burner;
 	uint8_t *burner_buf;
 	uint32_t burner_len;
@@ -178,6 +180,7 @@ static struct {
 		.probe_timeout = DEFAULT_PROBE_TIMEOUT,
 		.reset_attempts = DEFAULT_RESET_ATTEMPTS,
 		.reset_delay = DEFAULT_RESET_DELAY,
+		.timeout = 0,
 		.burner = NULL,
 		.burner_len = 0,
 		.update_high = false,
@@ -397,6 +400,9 @@ main(int argc, char **argv)
 					break;
 				} else if (strcmp(name, "reset-delay") == 0) {
 					sscanf(optarg, "%d", &options.reset_delay);
+					break;
+				} else if (strcmp(name, "timeout") == 0) {
+					sscanf(optarg, "%d", &options.timeout);
 					break;
 				} else if (strcmp(name, "burner") == 0) {
 					options.burner = optarg;
@@ -802,7 +808,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	}
 
 	cskburn_serial_device_t *dev = NULL;
-	if ((ret = cskburn_serial_open(&dev, options.serial, options.chip)) != 0) {
+	if ((ret = cskburn_serial_open(&dev, options.serial, options.chip, options.timeout)) != 0) {
 		LOGE_RET(ret, "ERROR: Failed opening device");
 		goto err_open;
 	}

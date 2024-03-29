@@ -126,12 +126,21 @@ command_send(cskburn_serial_device_t *dev, uint8_t op, uint8_t *req_buf, uint32_
 static ssize_t
 command_recv(cskburn_serial_device_t *dev, uint8_t op, uint8_t **res_buf, uint32_t timeout)
 {
+	if (dev->timeout > 0 && op != CMD_SYNC) {
+		timeout = dev->timeout;
+	}
+
+	bool wait_forever = dev->timeout == -1 && op != CMD_SYNC;
+
 	uint64_t start = time_monotonic();
 	do {
 		ssize_t r = slip_read(dev->slip, dev->res_buf, MAX_RES_SLIP_LEN, timeout);
 		if (r == 0) {
 			continue;
 		} else if (r == -ETIMEDOUT) {
+			if (wait_forever) {
+				continue;
+			}
 			break;
 		} else if (r < 0) {
 			return r;
@@ -142,7 +151,7 @@ command_recv(cskburn_serial_device_t *dev, uint8_t op, uint8_t **res_buf, uint32
 			*res_buf = dev->res_buf;
 			return r;
 		}
-	} while (TIME_SINCE_MS(start) < timeout);
+	} while (TIME_SINCE_MS(start) < timeout || wait_forever);
 
 	return -ETIMEDOUT;
 }

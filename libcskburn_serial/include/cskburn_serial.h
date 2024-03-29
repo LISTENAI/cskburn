@@ -52,7 +52,8 @@ typedef enum {
  * @retval 0 if successful
  * @retval -errno on other errors from serial device
  */
-int cskburn_serial_open(cskburn_serial_device_t **dev, const char *path, uint32_t chip);
+int cskburn_serial_open(
+		cskburn_serial_device_t **dev, const char *path, uint32_t chip, int32_t timeout);
 
 /**
  * @brief Close CSK device
