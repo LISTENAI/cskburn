@@ -62,9 +62,9 @@
 #define TIMEOUT_FLASH_END 2000
 
 // Flash 擦除指令超时时间 (每 MB)
-// 实测约 405KB/s，即每 MB 约 2530ms
+// 实测约 222KB/s，即每 MB 约 4612
 // 取保守值
-#define TIMEOUT_FLASH_ERASE_PER_MB 4000
+#define TIMEOUT_FLASH_ERASE_PER_MB 10000
 
 // MD5 计算指令超时时间 (每 MB)
 // 实测约 1882KB/s，即每 MB 约 540ms
