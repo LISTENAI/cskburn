@@ -81,8 +81,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - { name: darwin-x64,   target: x86_64-apple-macos }
-          - { name: darwin-arm64, target: arm64-apple-macos  }
+          - { name: darwin-x64,       arch: x86_64 }
+          - { name: darwin-arm64,     arch: arm64  }
 
     steps:
       - uses: actions/checkout@v2
@@ -96,7 +96,7 @@ jobs:
       - name: Build
         uses: ./.github/actions/cmake-build
         env:
-          CFLAGS: -target ${{ matrix.target }}
+          CMAKE_OSX_ARCHITECTURES: ${{ matrix.arch }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
