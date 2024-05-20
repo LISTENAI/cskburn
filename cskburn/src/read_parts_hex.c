@@ -13,11 +13,11 @@
 static int append_part(cskburn_partition_t *parts, int *part_idx, uint32_t part_size_limit,
 		int parts_cnt_limit, const char *path, uint8_t *buf, uint32_t addr, uint32_t size);
 
-bool
+int
 read_parts_hex(char **argv, int argc, cskburn_partition_t *parts, int *parts_cnt,
 		uint32_t part_size_limit, int parts_cnt_limit, uint32_t base_addr)
 {
-	bool ret = false;
+	int ret = 0;
 
 	uint8_t *hex_buf = malloc(MAX_HEX_SIZE);
 	uint8_t *hex_ptr;
@@ -35,7 +35,8 @@ read_parts_hex(char **argv, int argc, cskburn_partition_t *parts, int *parts_cnt
 			hex_len = read_file(argv[i], hex_ptr, MAX_HEX_SIZE);
 			hex_parsed = 0;
 			if (hex_len == 0) {
-				LOGE_RET(-errno, "ERROR: Failed reading %s", argv[i]);
+				ret = -errno;
+				LOGE_RET(ret, "ERROR: Failed reading %s", argv[i]);
 				goto exit;
 			} else {
 				LOGD("Parsing HEX file: %s, size: %d", argv[i], hex_len);
@@ -79,12 +80,12 @@ read_parts_hex(char **argv, int argc, cskburn_partition_t *parts, int *parts_cnt
 					break;
 				} else {
 					LOGE("Failed parsing HEX file: %d", status);
+					ret = -EIO;
 					goto exit;
 				}
 			}
 		}
 	}
-	ret = true;
 
 exit:
 	LOGD("Parsed %d parts from HEXs", cnt);
