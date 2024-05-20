@@ -7,7 +7,7 @@
 #include "read_parts.h"
 #include "utils.h"
 
-bool
+int
 read_parts_bin(
 		char **argv, int argc, cskburn_partition_t *parts, int *parts_cnt, int parts_cnt_limit)
 {
@@ -27,7 +27,7 @@ read_parts_bin(
 		reader_t *reader = filereader_open(parts[cnt].path);
 		if (reader == NULL) {
 			LOGE_RET(-errno, "ERROR: Failed reading %s", parts[cnt].path);
-			return false;
+			return -errno;
 		}
 
 		parts[cnt].reader = reader;
@@ -36,5 +36,5 @@ read_parts_bin(
 		cnt++;
 	}
 	*parts_cnt += cnt;
-	return true;
+	return 0;
 }

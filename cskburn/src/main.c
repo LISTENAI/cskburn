@@ -317,7 +317,7 @@ main(int argc, char **argv)
 				sscanf(optarg, "%d", &options.chip);
 				if (options.chip != 6 && options.chip != 4 && options.chip != 3) {
 					LOGE("ERROR: Only 3, 4 or 6 of chip is supported");
-					return -1;
+					return EINVAL;
 				}
 				if (options.chip == 3) options.chip = 4;
 				break;
@@ -336,7 +336,7 @@ main(int argc, char **argv)
 					if (options.read_count >= MAX_FLASH_PARTS) {
 						LOGE("ERROR: Only up to %d partitions can be read at the same time",
 								MAX_FLASH_PARTS);
-						return -1;
+						return EINVAL;
 					}
 
 					uint16_t index = options.read_count;
@@ -345,7 +345,7 @@ main(int argc, char **argv)
 								&options.read_parts[index].size, &options.read_parts[index].path)) {
 						LOGE("ERROR: Argument of --read should be addr:size:path (e.g. -u "
 							 "0x00000000:102400:app.bin)");
-						return -1;
+						return EINVAL;
 					}
 
 					options.read_count++;
@@ -354,7 +354,7 @@ main(int argc, char **argv)
 					if (options.erase_count >= MAX_ERASE_PARTS) {
 						LOGE("ERROR: Only up to %d partitions can be erased at the same time",
 								MAX_ERASE_PARTS);
-						return -1;
+						return EINVAL;
 					}
 
 					uint16_t index = options.erase_count;
@@ -363,7 +363,7 @@ main(int argc, char **argv)
 								&options.erase_parts[index].size)) {
 						LOGE("ERROR: Argument of --erase should be addr:size (e.g. -u "
 							 "0x00000000:102400)");
-						return -1;
+						return EINVAL;
 					}
 
 					options.erase_count++;
@@ -375,7 +375,7 @@ main(int argc, char **argv)
 					if (options.verify_count >= MAX_VERIFY_PARTS) {
 						LOGE("ERROR: Only up to %d partitions can be verified at the same time",
 								MAX_VERIFY_PARTS);
-						return -1;
+						return EINVAL;
 					}
 
 					uint16_t index = options.verify_count;
@@ -384,7 +384,7 @@ main(int argc, char **argv)
 								&options.verify_parts[index].size)) {
 						LOGE("ERROR: Argument of --verify should be addr:size (e.g. -u "
 							 "0x00000000:102400)");
-						return -1;
+						return EINVAL;
 					}
 
 					options.verify_count++;
@@ -467,7 +467,7 @@ main(int argc, char **argv)
 				} else if (strcmp(name, "jump") == 0) {
 					if (!scan_int(optarg, &options.jump_address)) {
 						LOGE("ERROR: Invalid jump address");
-						return -1;
+						return EINVAL;
 					}
 					break;
 				} else if (strcmp(name, "no-reset") == 0) {
@@ -496,7 +496,7 @@ main(int argc, char **argv)
 		options.burner_len = read_file(options.burner, options.burner_buf, MAX_IMAGE_SIZE);
 		if (options.burner_len == 0) {
 			LOGE_RET(-errno, "ERROR: Failed reading %s", options.burner);
-			return -1;
+			return errno;
 		}
 	}
 
@@ -505,16 +505,16 @@ main(int argc, char **argv)
 	} else {
 #ifdef WITHOUT_USB
 		LOGE("ERROR: A port of serial device should be specified (e.g. -s %s)", example_serial_dev);
-		return -1;
+		return EINVAL;
 #else
 		if (options.chip == 6) {
 			LOGE("ERROR: USB burning is not supported by chip family 6");
-			return -1;
+			return ENOTSUP;
 		}
 		if (options.usb != NULL && strcmp(options.usb, "-") != 0) {
 			if (sscanf(options.usb, "%hu:%hu\n", &options.usb_bus, &options.usb_addr) != 2) {
 				LOGE("ERROR: Argument of -u/--usb should be <bus>:<device> (e.g. -u 020:004)");
-				return -1;
+				return EINVAL;
 			}
 		}
 		options.protocol = PROTO_USB;
@@ -525,35 +525,35 @@ main(int argc, char **argv)
 #ifndef WITHOUT_USB
 		if (options.protocol != PROTO_SERIAL) {
 			LOGE("ERROR: NAND is supported only in serial burning");
-			return -1;
+			return ENOTSUP;
 		}
 #endif
 		if (options.chip != 6) {
 			LOGE("ERROR: NAND is only supported by chip family 6");
-			return -1;
+			return ENOTSUP;
 		}
 		if (options.read_count > 0) {
 			LOGE("ERROR: Reading is not supported on NAND yet");
-			return -1;
+			return ENOTSUP;
 		}
 		if (options.erase_all || options.erase_count > 0) {
 			LOGE("ERROR: Erasing is not supported on NAND yet");
-			return -1;
+			return ENOTSUP;
 		}
 	} else if (options.target == TARGET_RAM) {
 #ifndef WITHOUT_USB
 		if (options.protocol != PROTO_SERIAL) {
 			LOGE("ERROR: RAM is supported only in serial burning");
-			return -1;
+			return ENOTSUP;
 		}
 #endif
 		if (options.erase_all || options.erase_count > 0) {
 			LOGE("ERROR: Erasing is not supported on RAM");
-			return -1;
+			return ENOTSUP;
 		}
 		if (options.verify_all || options.verify_count > 0) {
 			LOGE("ERROR: Verifying is not supported on RAM");
-			return -1;
+			return ENOTSUP;
 		}
 	}
 
@@ -563,7 +563,7 @@ main(int argc, char **argv)
 			if (usb_check()) {
 				return 0;
 			} else {
-				return -1;
+				return ENOENT;
 			}
 		}
 #endif
@@ -579,14 +579,12 @@ main(int argc, char **argv)
 	char **parts_argv = argv + optind;
 	int parts_argc = argc - optind;
 	memset(parts, 0, sizeof(parts));
-	if (!read_parts_bin(parts_argv, parts_argc, parts + parts_cnt, &parts_cnt,
-				MAX_FLASH_PARTS - parts_cnt)) {
-		ret = -1;
+	if ((ret = read_parts_bin(parts_argv, parts_argc, parts + parts_cnt, &parts_cnt,
+				 MAX_FLASH_PARTS - parts_cnt)) != 0) {
 		goto exit;
 	}
-	if (!read_parts_hex(parts_argv, parts_argc, parts + parts_cnt, &parts_cnt, MAX_IMAGE_SIZE,
-				MAX_FLASH_PARTS - parts_cnt, base_addr)) {
-		ret = -1;
+	if ((ret = read_parts_hex(parts_argv, parts_argc, parts + parts_cnt, &parts_cnt, MAX_IMAGE_SIZE,
+				 MAX_FLASH_PARTS - parts_cnt, base_addr)) != 0) {
 		goto exit;
 	}
 
@@ -601,8 +599,7 @@ main(int argc, char **argv)
 	}
 
 	if (options.protocol == PROTO_SERIAL) {
-		if (serial_burn(parts, parts_cnt) != 0) {
-			ret = -1;
+		if ((ret = serial_burn(parts, parts_cnt)) != 0) {
 			goto exit;
 		}
 #ifndef WITHOUT_USB
@@ -615,7 +612,7 @@ main(int argc, char **argv)
 			}
 		} else {
 			if (!usb_burn(parts, parts_cnt)) {
-				ret = -1;
+				ret = -EIO;
 				goto exit;
 			}
 		}
@@ -626,7 +623,7 @@ exit:
 	for (int i = 0; i < parts_cnt; i++) {
 		parts[i].reader->close(&parts[i].reader);
 	}
-	return ret;
+	return -ret;
 }
 
 static void
@@ -855,11 +852,13 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 			LOGE("ERROR: The starting boundary of read address (0x%08X) exceeds the capacity of "
 				 "flash (%llu MB)",
 					options.read_parts[i].addr, flash_size >> 20);
+			ret = -EINVAL;
 			goto err_enter;
 		} else if (options.read_parts[i].addr + options.read_parts[i].size > flash_size) {
 			LOGE("ERROR: The ending boundary of read address (0x%08X) exceeds the capacity of "
 				 "flash (%llu MB)",
 					options.read_parts[i].addr + options.read_parts[i].size, flash_size >> 20);
+			ret = -EINVAL;
 			goto err_enter;
 		}
 	}
@@ -867,19 +866,23 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	for (int i = 0; i < options.erase_count; i++) {
 		if (!is_aligned(options.erase_parts[i].addr, 4 * 1024)) {
 			LOGE("ERROR: Erase address (0x%08X) should be 4K aligned", options.erase_parts[i].addr);
+			ret = -EINVAL;
 			goto err_enter;
 		} else if (!is_aligned(options.erase_parts[i].size, 4 * 1024)) {
 			LOGE("ERROR: Erase size (0x%08X) should be 4K aligned", options.erase_parts[i].size);
+			ret = -EINVAL;
 			goto err_enter;
 		} else if (options.erase_parts[i].addr >= flash_size) {
 			LOGE("ERROR: The starting boundary of erase address (0x%08X) exceeds the capacity of "
 				 "flash (%llu MB)",
 					options.erase_parts[i].addr, flash_size >> 20);
+			ret = -EINVAL;
 			goto err_enter;
 		} else if (options.erase_parts[i].addr + options.erase_parts[i].size > flash_size) {
 			LOGE("ERROR: The ending boundary of erase address (0x%08X) exceeds the capacity of "
 				 "flash (%llu MB)",
 					options.erase_parts[i].addr + options.erase_parts[i].size, flash_size >> 20);
+			ret = -EINVAL;
 			goto err_enter;
 		}
 	}
@@ -889,12 +892,14 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 			if (!is_aligned(parts[i].addr, 512)) {
 				LOGE("ERROR: Address of partition %d (0x%08X) should be 512 bytes aligned", i + 1,
 						parts[i].addr);
+				ret = -EINVAL;
 				goto err_enter;
 			}
 		} else if (options.target == TARGET_FLASH) {
 			if (!is_aligned(parts[i].addr, 4 * 1024)) {
 				LOGE("ERROR: Address of partition %d (0x%08X) should be 4K aligned", i + 1,
 						parts[i].addr);
+				ret = -EINVAL;
 				goto err_enter;
 			}
 		}
@@ -904,11 +909,13 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 				LOGE("ERROR: The starting boundary of partition %d (0x%08X) exceeds the capacity "
 					 "of target (%llu MB)",
 						i + 1, parts[i].addr, flash_size >> 20);
+				ret = -EINVAL;
 				goto err_enter;
 			} else if (parts[i].addr + parts[i].reader->size > flash_size) {
 				LOGE("ERROR: The ending boundary of partition %d (0x%08X) exceeds the capacity of "
 					 "target (%llu MB)",
 						i + 1, parts[i].addr + parts[i].reader->size, flash_size >> 20);
+				ret = -EINVAL;
 				goto err_enter;
 			}
 		}
@@ -925,6 +932,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		writer_t *writer = filewriter_open(options.read_parts[i].path);
 		if (writer == NULL) {
 			LOGE_RET(-errno, "ERROR: Failed opening %s", options.read_parts[i].path);
+			ret = -errno;
 			goto err_enter;
 		}
 
@@ -990,6 +998,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 			char md5_str[MD5_SIZE * 2 + 1] = {0};
 			if (verify_finish(parts[i].reader, image_md5) != 0) {
 				LOGE("ERROR: Failed calculating MD5");
+				ret = -EIO;
 				goto err_write;
 			}
 			if ((ret = cskburn_serial_verify(dev, options.target, parts[i].addr,
