@@ -35,9 +35,9 @@ USB burning options:
     check for device presence (without burning)
 
 Serial burning options:
-  -b, --baud
+  -b, --baud <rate>
     baud rate used for serial burning (default: 3000000)
-  -C, --chip
+  -C, --chip <family>
     chip family, acceptable values: 3/4/6 (default: 4)
   --chip-id
     read unique chip ID
@@ -45,11 +45,18 @@ Serial burning options:
     verify all partitions after burning
   -n, --nand
     burn to NAND flash (CSK6 only)
+  --probe-timeout <ms>
+    timeout for probing device (default: 10000 ms)
+  --reset-attempts <n>
+    number of attempts to reset device during probing (default: 4)
+  --reset-delay <ms>
+    delay in milliseconds the reset line is held low (default: 500 ms)
   --timeout <ms>
-    override timeout for each operation, acceptable values:
-    -1: no timeout
-     0: use default strategy
-    >0: timeout in milliseconds
+    override timeout for each operation (default: 0), acceptable values:
+      -1: no timeout
+       0: use default strategy
+       n: timeout after n milliseconds (n > 0)
+    this option does not affect the timeout of probing device, use --probe-timeout if needed
 
 Advanced operations (serial only):
   --erase <addr:size>

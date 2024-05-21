@@ -239,10 +239,10 @@ print_help(const char *progname)
 #endif
 
 	LOGI("Serial burning options:");
-	LOGI("  -b, --baud");
+	LOGI("  -b, --baud <rate>");
 	LOGI("    baud rate used for serial burning (default: %d)", DEFAULT_BAUD);
 #ifndef WITHOUT_USB
-	LOGI("  -C, --chip");
+	LOGI("  -C, --chip <family>");
 	LOGI("    chip family, acceptable values: 3/4/6 (default: %d)", DEFAULT_CHIP);
 #endif
 	LOGI("  --chip-id");
@@ -251,11 +251,21 @@ print_help(const char *progname)
 	LOGI("    verify all partitions after burning");
 	LOGI("  -n, --nand");
 	LOGI("    burn to NAND flash (CSK6 only)");
+	LOGI("  --probe-timeout <ms>");
+	LOGI("    timeout for probing device (default: %d ms)", DEFAULT_PROBE_TIMEOUT);
+	LOGI("  --reset-attempts <n>");
+	LOGI("    number of attempts to reset device during probing (default: %d)",
+			DEFAULT_RESET_ATTEMPTS);
+	LOGI("  --reset-delay <ms>");
+	LOGI("    delay in milliseconds the reset line is held low (default: %d ms)",
+			DEFAULT_RESET_DELAY);
 	LOGI("  --timeout <ms>");
-	LOGI("    override timeout for each operation, acceptable values:");
-	LOGI("    -1: no timeout");
-	LOGI("     0: use default strategy");
-	LOGI("    >0: timeout in milliseconds");
+	LOGI("    override timeout for each operation (default: 0), acceptable values:");
+	LOGI("      -1: no timeout");
+	LOGI("       0: use default strategy");
+	LOGI("       n: timeout after n milliseconds (n > 0)");
+	LOGI("    this option does not affect the timeout of probing device, use "
+		 "--probe-timeout if needed");
 	LOGI("");
 
 	LOGI("Advanced operations (serial only):");
