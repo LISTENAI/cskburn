@@ -82,7 +82,6 @@ static const char option_string[] = {
 		"w"
 		"C:"
 		"n"
-		"t:"
 		"r"
 #ifndef WITHOUT_USB
 		"u:"
@@ -333,9 +332,6 @@ main(int argc, char **argv)
 			case 'r':
 				options.target = TARGET_RAM;
 				break;
-			case 't':
-				sscanf(optarg, "%d", &options.timeout);
-				break;
 			case 0: { /* long-only options */
 				const char *name = long_options[long_index].name;
 				if (strcmp(name, "chip-id") == 0) {
@@ -409,6 +405,9 @@ main(int argc, char **argv)
 					break;
 				} else if (strcmp(name, "reset-delay") == 0) {
 					sscanf(optarg, "%d", &options.reset_delay);
+					break;
+				} else if (strcmp(name, "timeout") == 0) {
+					sscanf(optarg, "%d", &options.timeout);
 					break;
 				} else if (strcmp(name, "burner") == 0) {
 					options.burner = optarg;
