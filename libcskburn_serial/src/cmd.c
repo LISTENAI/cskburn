@@ -126,7 +126,7 @@ command_send(cskburn_serial_device_t *dev, uint8_t op, uint8_t *req_buf, uint32_
 static ssize_t
 command_recv(cskburn_serial_device_t *dev, uint8_t op, uint8_t **res_buf, uint32_t timeout)
 {
-	if (dev->timeout > 0) {
+	if (dev->timeout > 0 && op != CMD_SYNC) {
 		timeout = dev->timeout;
 	}
 
@@ -146,7 +146,7 @@ command_recv(cskburn_serial_device_t *dev, uint8_t op, uint8_t **res_buf, uint32
 			*res_buf = dev->res_buf;
 			return r;
 		}
-	} while (dev->timeout == -1 || TIME_SINCE_MS(start) < timeout);
+	} while (TIME_SINCE_MS(start) < timeout || (dev->timeout == -1 && op != CMD_SYNC));
 
 	return -ETIMEDOUT;
 }
