@@ -354,7 +354,7 @@ cskburn_serial_read(cskburn_serial_device_t *dev, cskburn_serial_target_t target
 	uint64_t t1 = time_monotonic();
 
 	uint8_t buffer[FLASH_READ_SIZE];
-	uint32_t offset, read_size;
+	uint32_t offset = 0, read_size;
 	while (offset < size) {
 		if ((ret = cmd_read_flash(dev, addr + offset, FLASH_READ_SIZE, buffer, &read_size)) != 0) {
 			return ret;
