@@ -8,6 +8,18 @@
 struct _serial_dev_t;
 typedef struct _serial_dev_t serial_dev_t;
 
+typedef enum {
+	SERIAL_RTS_OFF,  // DISABLE RTS
+	SERIAL_RTS_ON,  // ENABLE RTS
+	SERIAL_RTS_FLOW  // RTS FLOW
+} serial_rts_state_t;
+
+typedef enum {
+	SERIAL_DTR_OFF,  // DISABLE DTR
+	SERIAL_DTR_ON,  // ENABLE DTR
+	SERIAL_DTR_FLOW  // DTR FLOW
+} serial_dtr_state_t;
+
 int serial_open(const char *path, serial_dev_t **dev);
 void serial_close(serial_dev_t **dev);
 
@@ -39,5 +51,23 @@ int serial_set_rts(serial_dev_t *dev, bool active);
  * @return 0 if succeed
  */
 int serial_set_dtr(serial_dev_t *dev, bool active);
+
+/**
+ * @brief  Config RTS state
+ *
+ * @param dev serial device
+ * @param state SERIAL_RTS_OFF, SERIAL_RTS_ON, SERIAL_RTS_FLOW
+ * @return 0 if succeed
+ */
+int serial_config_rts_state(serial_dev_t *dev, serial_rts_state_t state);
+
+/**
+ * @brief  Config DTR state
+ *
+ * @param dev serial device
+ * @param state SERIAL_DTR_OFF, SERIAL_DTR_ON, SERIAL_DTR_FLOW
+ * @return 0 if succeed
+ */
+int serial_config_dtr_state(serial_dev_t *dev, serial_dtr_state_t state);
 
 #endif  // __LIB_SERIAL__

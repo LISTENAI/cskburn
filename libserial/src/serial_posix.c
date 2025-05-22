@@ -228,3 +228,68 @@ serial_set_dtr(serial_dev_t *dev, bool val)
 {
 	return set_modem_control(dev->fd, TIOCM_DTR, val);
 }
+
+int
+serial_config_rts_state(serial_dev_t *dev, serial_rts_state_t state)
+{
+	int status;
+	struct termios tio;
+
+	if (ioctl(dev->fd, TIOCMGET, &status) == -1) {
+		return -errno;
+	}
+
+	switch (state) {
+		case SERIAL_RTS_OFF:
+			status &= ~TIOCM_RTS;
+			break;
+		case SERIAL_RTS_ON:
+			status |= TIOCM_RTS;
+			break;
+		case SERIAL_RTS_FLOW:
+			if (tcgetattr(dev->fd, &tio) == -1) {
+				return -errno;
+			}
+			tio.c_cflag |= CRTSCTS;
+			if (tcsetattr(dev->fd, TCSANOW, &tio) == -1) {
+				return -errno;
+			}
+			return 0;
+		default:
+			return -EINVAL;
+	}
+
+	if (ioctl(dev->fd, TIOCMSET, &status) == -1) {
+		return -errno;
+	}
+
+	return 0;
+}
+
+int
+serial_config_dtr_state(serial_dev_t *dev, serial_dtr_state_t state)
+{
+	int status;
+	if (ioctl(dev->fd, TIOCMGET, &status) == -1) {
+		return -errno;
+	}
+
+	switch (state) {
+		case SERIAL_DTR_OFF:
+			status &= ~TIOCM_DTR;
+			break;
+		case SERIAL_DTR_ON:
+			status |= TIOCM_DTR;
+			break;
+		case SERIAL_DTR_FLOW:
+			return -ENOTSUP;
+		default:
+			return -EINVAL;
+	}
+
+	if (ioctl(dev->fd, TIOCMSET, &status) == -1) {
+		return -errno;
+	}
+
+	return 0;
+}
