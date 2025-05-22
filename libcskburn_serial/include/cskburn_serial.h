@@ -35,6 +35,16 @@ typedef struct {
 	uint8_t _reserved;
 } nand_config_t;
 #pragma pack()
+
+#pragma pack(1)
+typedef struct {
+	uint32_t sctcnts;
+	uint32_t sctsize;
+	uint32_t erasize;
+	uint32_t cardtype;
+} card_info_t;
+#pragma pack()
+
 typedef enum {
 	CHIP_TYPE_3 = 3,
 	CHIP_TYPE_4 = 4,
@@ -47,6 +57,7 @@ typedef enum {
 	TARGET_FLASH = 0,
 	TARGET_NAND = 1,
 	TARGET_RAM = 2,
+	TARGET_EMMC = 3,
 } cskburn_serial_target_t;
 
 /**
@@ -59,8 +70,8 @@ typedef enum {
  * @retval 0 if successful
  * @retval -errno on other errors from serial device
  */
-int cskburn_serial_open(
-		cskburn_serial_device_t **dev, const char *path, cskburn_serial_chip_t chip, int32_t timeout);
+int cskburn_serial_open(cskburn_serial_device_t **dev, const char *path, cskburn_serial_chip_t chip,
+		int32_t timeout);
 
 /**
  * @brief Close CSK device
@@ -126,4 +137,5 @@ int cskburn_serial_reset(cskburn_serial_device_t *dev, uint32_t reset_delay);
 
 void cskburn_serial_read_logs(cskburn_serial_device_t *dev, uint32_t baud);
 
+int cskburn_serial_get_emmc_info(cskburn_serial_device_t *dev, card_info_t *info);
 #endif  // __LIB_CSKBURN_SERIAL__
