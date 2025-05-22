@@ -544,6 +544,40 @@ cskburn_serial_erase(
 }
 
 int
+cskburn_serial_lock(cskburn_serial_device_t *dev, cskburn_serial_target_t target)
+{
+	int ret;
+
+	if (target == TARGET_FLASH) {
+		if ((ret = cmd_flash_lock(dev)) != 0) {
+			return ret;
+		}
+
+		return 0;
+	}
+
+	LOGE("ERROR: LOCK is not supported, target: %d", target);
+	return -EINVAL;
+}
+
+int
+cskburn_serial_unlock(cskburn_serial_device_t *dev, cskburn_serial_target_t target)
+{
+	int ret;
+
+	if (target == TARGET_FLASH) {
+		if ((ret = cmd_flash_unlock(dev)) != 0) {
+			return ret;
+		}
+
+		return 0;
+	}
+
+	LOGE("ERROR: UNLOCK is not supported, target: %d", target);
+	return -EINVAL;
+}
+
+int
 cskburn_serial_verify(cskburn_serial_device_t *dev, cskburn_serial_target_t target, uint32_t addr,
 		uint32_t size, uint8_t *md5)
 {
