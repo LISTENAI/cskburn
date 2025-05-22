@@ -594,7 +594,7 @@ int
 cmd_read_flash(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uint8_t *data,
 		uint32_t *data_len)
 {
-	uint8_t ret_buf[STATUS_BYTES_LEN + 64];
+	static uint8_t ret_buf[STATUS_BYTES_LEN + FLASH_READ_SIZE];
 	uint16_t ret_len = 0;
 
 	cmd_read_flash_t *cmd = (cmd_read_flash_t *)dev->req_cmd;

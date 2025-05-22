@@ -27,7 +27,7 @@ typedef enum {
 
 #define RAM_BLOCK_SIZE (2 * 1024)
 #define FLASH_BLOCK_SIZE (4 * 1024)
-#define FLASH_READ_SIZE (64)
+#define FLASH_READ_SIZE (4096)
 
 #define STATUS_BYTES_LEN 2
 

@@ -90,3 +90,11 @@ is_aligned(uint32_t addr, uint32_t align)
 {
 	return addr % align == 0;
 }
+
+uint32_t
+align_up(uint32_t value, uint32_t align)
+{
+	// align must be a power of 2 (such as 4, 8, 16...)
+	if (align == 0) return value;
+	return (value + align - 1) & ~(align - 1);
+}

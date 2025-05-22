@@ -104,9 +104,19 @@ int
 serial_set_speed(serial_dev_t *dev, uint32_t speed)
 {
 	int ret;
+	DCB dcb;
 
-	if ((ret = configure_port(dev->handle, speed)) != 0) {
-		return ret;
+	SecureZeroMemory(&dcb, sizeof(DCB));
+	dcb.DCBlength = sizeof(DCB);
+
+	if (GetCommState(dev->handle, &dcb) == 0) {
+		return -EIO;
+	}
+
+	dcb.BaudRate = speed;
+
+	if (SetCommState(dev->handle, &dcb) == 0) {
+		return -EIO;
 	}
 
 	if ((ret = serial_set_rts(dev, dev->rts)) != 0) {
@@ -153,47 +163,42 @@ serial_do_read(serial_dev_t *dev, void *buf, size_t count, uint64_t timeout)
 ssize_t
 serial_read(serial_dev_t *dev, void *buf, size_t count, uint64_t timeout)
 {
-	ssize_t read = 0;
-	ssize_t ret;
+	uint64_t start = GetTickCount64();
+	size_t total_read = 0;
+	bool is_first_attempt = true;
 
-	// Wait for the first byte to be available and read it
+	while (total_read < count) {
+		uint64_t elapsed = GetTickCount64() - start;
+		if (elapsed >= timeout) {
+			break;
+		}
 
-	ret = serial_do_read(dev, buf, 1, timeout);
-	if (ret < 0) {
-		return ret;
+		COMSTAT stat;
+		if (!ClearCommError(dev->handle, NULL, &stat)) {
+			return -EIO;
+		}
+
+		if (stat.cbInQue > 0) {
+			size_t to_read = min(count - total_read, (size_t)stat.cbInQue);
+			ssize_t ret = serial_do_read(dev, (char *)buf + total_read, to_read, timeout - elapsed);
+
+			if (ret < 0) return ret;
+			if (ret == 0) continue;
+
+			total_read += ret;
+			is_first_attempt = false;
+		} else {
+			if (!is_first_attempt) {
+				return total_read;
+			}
+
+			DWORD wait_time = min(10, (DWORD)(timeout - elapsed));
+			if (wait_time == 0) break;
+			Sleep(wait_time);
+		}
 	}
 
-	read += ret;
-	if (read == 0) {
-		return read;
-	}
-
-	// Get number of remaining bytes
-
-	DWORD errors;
-	COMSTAT stat;
-	if (ClearCommError(dev->handle, &errors, &stat) == 0) {
-		return -EIO;
-	}
-
-	if (stat.cbInQue == 0) {
-		return read;
-	}
-
-	buf = (uint8_t *)buf + 1;
-	count = count + 1;
-	count = count < stat.cbInQue ? count : stat.cbInQue;
-
-	// Read the remaining bytes
-
-	ret = serial_do_read(dev, buf, count, timeout);
-	if (ret < 0) {
-		return ret;
-	}
-
-	read += ret;
-
-	return read;
+	return (total_read > 0) ? total_read : -ETIMEDOUT;
 }
 
 ssize_t
@@ -242,6 +247,70 @@ serial_set_dtr(serial_dev_t *dev, bool val)
 	dev->dtr = val;
 
 	if (EscapeCommFunction(dev->handle, val ? SETDTR : CLRDTR) == 0) {
+		return -EIO;
+	}
+
+	return 0;
+}
+
+int
+serial_config_rts_state(serial_dev_t *dev, serial_rts_state_t state)
+{
+	DCB dcb;
+	SecureZeroMemory(&dcb, sizeof(DCB));
+	dcb.DCBlength = sizeof(DCB);
+
+	if (!GetCommState(dev->handle, &dcb)) {
+		return -EIO;
+	}
+
+	switch (state) {
+		case SERIAL_RTS_OFF:
+			dcb.fRtsControl = RTS_CONTROL_DISABLE;
+			break;
+		case SERIAL_RTS_ON:
+			dcb.fRtsControl = RTS_CONTROL_ENABLE;
+			break;
+		case SERIAL_RTS_FLOW:
+			dcb.fRtsControl = RTS_CONTROL_HANDSHAKE;
+			break;
+		default:
+			return -EINVAL;
+	}
+
+	if (!SetCommState(dev->handle, &dcb)) {
+		return -EIO;
+	}
+
+	return 0;
+}
+
+int
+serial_config_dtr_state(serial_dev_t *dev, serial_dtr_state_t state)
+{
+	DCB dcb;
+	SecureZeroMemory(&dcb, sizeof(DCB));
+	dcb.DCBlength = sizeof(DCB);
+
+	if (!GetCommState(dev->handle, &dcb)) {
+		return -EIO;
+	}
+
+	switch (state) {
+		case SERIAL_DTR_OFF:
+			dcb.fDtrControl = DTR_CONTROL_DISABLE;
+			break;
+		case SERIAL_DTR_ON:
+			dcb.fDtrControl = DTR_CONTROL_ENABLE;
+			break;
+		case SERIAL_DTR_FLOW:
+			dcb.fDtrControl = DTR_CONTROL_HANDSHAKE;
+			break;
+		default:
+			return -EINVAL;
+	}
+
+	if (!SetCommState(dev->handle, &dcb)) {
 		return -EIO;
 	}
 

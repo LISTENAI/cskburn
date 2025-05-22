@@ -20,4 +20,6 @@ bool has_extname(char *path, const char *extname);
 
 bool is_aligned(uint32_t addr, uint32_t align);
 
+uint32_t align_up(uint32_t value, uint32_t align);
+
 #endif  // __CSKBURN_UTILS__
