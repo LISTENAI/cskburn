@@ -337,6 +337,10 @@ cskburn_serial_write(cskburn_serial_device_t *dev, cskburn_serial_target_t targe
 		if ((ret = cmd_mem_begin(dev, reader->size, blocks, FLASH_BLOCK_SIZE, addr) != 0)) {
 			return ret;
 		}
+	} else if (target == TARGET_EMMC) {
+		if ((ret = cmd_emmc_begin(dev, reader->size, blocks, FLASH_BLOCK_SIZE, addr) != 0)) {
+			return ret;
+		}
 	} else {
 		LOGE("ERROR: Unsupported target: %d", target);
 		return -EINVAL;
@@ -369,6 +373,10 @@ cskburn_serial_write(cskburn_serial_device_t *dev, cskburn_serial_target_t targe
 			if ((ret = cmd_mem_block(dev, buffer, length, i)) != 0) {
 				return ret;
 			}
+		} else if (target == TARGET_EMMC) {
+			if ((ret = cmd_emmc_block(dev, buffer, length, i)) != 0) {
+				return ret;
+			}
 		}
 
 		i++;
@@ -388,6 +396,10 @@ cskburn_serial_write(cskburn_serial_device_t *dev, cskburn_serial_target_t targe
 		}
 	} else if (target == TARGET_RAM) {
 		if ((ret = cmd_mem_finish(dev, jump ? OPTION_JUMP : OPTION_RUN, jump)) != 0) {
+			return ret;
+		}
+	} else if (target == TARGET_EMMC) {
+		if ((ret = cmd_emmc_finish(dev)) != 0) {
 			return ret;
 		}
 	}
@@ -422,6 +434,26 @@ cskburn_serial_read(cskburn_serial_device_t *dev, cskburn_serial_target_t target
 		if (target == TARGET_FLASH) {
 			if ((ret = cmd_read_flash(dev, addr + offset, max_read_size, buffer, &read_size)) !=
 					0) {
+				return ret;
+			}
+
+			if (offset + read_size > size) {
+				to_write = size - offset;
+			} else {
+				to_write = read_size;
+			}
+
+			if (writer->write(writer, buffer, to_write) != to_write) {
+				return -EIO;
+			}
+
+			offset += to_write;
+
+			if (on_progress != NULL) {
+				on_progress(offset, size);
+			}
+		} else if (target == TARGET_EMMC) {
+			if ((ret = cmd_read_emmc(dev, addr + offset, max_read_size, buffer, &read_size)) != 0) {
 				return ret;
 			}
 
@@ -494,6 +526,17 @@ cskburn_serial_erase(
 	} else if (target == TARGET_NAND) {
 		LOGE("ERROR: Erasing is not supported for NAND yet");
 		return -ENOTSUP;
+	} else if (target == TARGET_EMMC) {
+		uint64_t t1 = time_monotonic();
+
+		if ((ret = cmd_emmc_erase_region(dev, addr, size)) != 0) {
+			return ret;
+		}
+
+		uint64_t t2 = time_monotonic();
+		print_time_spent_with_speed("Erasing", t1, t2, size);
+
+		return 0;
 	}
 
 	LOGE("ERROR: Unsupported target: %d", target);
@@ -521,6 +564,17 @@ cskburn_serial_verify(cskburn_serial_device_t *dev, cskburn_serial_target_t targ
 		uint64_t t1 = time_monotonic();
 
 		if ((ret = cmd_nand_md5(dev, addr, size, md5)) != 0) {
+			return ret;
+		}
+
+		uint64_t t2 = time_monotonic();
+		print_time_spent_with_speed("Verifying", t1, t2, size);
+
+		return 0;
+	} else if (target == TARGET_EMMC) {
+		uint64_t t1 = time_monotonic();
+
+		if ((ret = cmd_emmc_md5(dev, addr, size, md5)) != 0) {
 			return ret;
 		}
 
@@ -608,4 +662,16 @@ cskburn_serial_read_logs(cskburn_serial_device_t *dev, uint32_t baud)
 		fwrite(buffer, 1, r, stdout);
 		fflush(stdout);
 	}
+}
+
+int
+cskburn_serial_get_emmc_info(cskburn_serial_device_t *dev, card_info_t *info)
+{
+	int ret;
+
+	if ((ret = cmd_emmc_get_info(dev, info)) != 0) {
+		return ret;
+	}
+
+	return 0;
 }

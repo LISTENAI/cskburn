@@ -35,6 +35,15 @@
 #define CMD_NAND_DATA 0x22
 #define CMD_NAND_END 0x23
 #define CMD_NAND_MD5 0x24
+
+#define CMD_EMMC_READ_CARD_INFO 0x41
+#define CMD_EMMC_BEGIN 0x42
+#define CMD_EMMC_DATA 0x43
+#define CMD_EMMC_END 0x44
+#define CMD_EMMC_MD5 0x45
+#define CMD_EMMC_READ_DATA 0x46
+#define CMD_EMMC_ERASE_DATA 0x47
+
 #define CMD_FLASH_ERASE_CHIP 0xD0
 #define CMD_FLASH_ERASE_REGION 0xD1
 #define CMD_READ_FLASH_ID 0xF3
@@ -645,6 +654,166 @@ cmd_change_baud(cskburn_serial_device_t *dev, uint32_t baud, uint32_t old_baud)
 		LOGD_RET(ret, "DEBUG: Failed to set baudrate");
 		return ret;
 	}
+
+	return 0;
+}
+
+int
+cmd_emmc_get_info(cskburn_serial_device_t *dev, card_info_t *info)
+{
+	uint8_t ret_buf[STATUS_BYTES_LEN + sizeof(card_info_t)];
+	uint16_t ret_len = 0;
+
+	int ret = command(dev, CMD_EMMC_READ_CARD_INFO, 0, CHECKSUM_NONE, NULL, ret_buf, &ret_len,
+			sizeof(ret_buf), TIMEOUT_DEFAULT);
+
+	if (ret != 0) {
+		return ret;
+	}
+
+	if (ret_len < STATUS_BYTES_LEN) {
+		LOGD("DEBUG: Interrupted serial read");
+		return -EIO;
+	}
+
+	if (ret_buf[0] != 0) {
+		LOGD("DEBUG: Unexpected device response: 0x%02X", ret_buf[1]);
+		return ret_buf[1];
+	}
+
+	memcpy(info, ret_buf + STATUS_BYTES_LEN, sizeof(card_info_t));
+
+	return 0;
+}
+
+int
+cmd_emmc_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks, uint32_t block_size,
+		uint32_t offset)
+{
+	cmd_flash_begin_t *cmd = (cmd_flash_begin_t *)dev->req_cmd;
+	memset(cmd, 0, sizeof(cmd_flash_begin_t));
+	cmd->size = size;
+	cmd->blocks = blocks;
+	cmd->block_size = block_size;
+	cmd->offset = offset;
+
+	return check_command(
+			dev, CMD_EMMC_BEGIN, sizeof(cmd_flash_begin_t), CHECKSUM_NONE, NULL, TIMEOUT_DEFAULT);
+}
+
+int
+cmd_emmc_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, uint32_t seq)
+{
+	cmd_flash_block_t *cmd = (cmd_flash_block_t *)dev->req_cmd;
+	memset(cmd, 0, sizeof(cmd_flash_block_t));
+	cmd->size = data_len;
+	cmd->seq = seq;
+	cmd->rev1 = 0;
+	cmd->rev2 = 0;
+
+	uint8_t *req_data = (uint8_t *)dev->req_cmd + sizeof(cmd_flash_block_t);
+	memcpy(req_data, data, data_len);
+
+	uint32_t in_len = sizeof(cmd_flash_block_t) + data_len;
+
+	int ret = check_command(
+			dev, CMD_EMMC_DATA, in_len, checksum(data, data_len), NULL, TIMEOUT_FLASH_DATA);
+
+	if (ret != 0) {
+		LOGD("DEBUG: Failed writing block %d", seq);
+	}
+
+	if (ret == 0x0A) {
+		msleep(250);
+	}
+
+	return ret;
+}
+
+int
+cmd_emmc_finish(cskburn_serial_device_t *dev)
+{
+	cmd_flash_finish_t *cmd = (cmd_flash_finish_t *)dev->req_cmd;
+	memset(cmd, 0, sizeof(cmd_flash_finish_t));
+
+	return check_command(
+			dev, CMD_EMMC_END, sizeof(uint32_t), CHECKSUM_NONE, NULL, TIMEOUT_FLASH_END);
+}
+
+int
+cmd_emmc_erase_region(cskburn_serial_device_t *dev, uint32_t address, uint32_t size)
+{
+	cmd_flash_erase_t *cmd = (cmd_flash_erase_t *)dev->req_cmd;
+	memset(cmd, 0, sizeof(cmd_flash_erase_t));
+	cmd->address = address;
+	cmd->size = size;
+
+	return check_command(dev, CMD_EMMC_ERASE_DATA, sizeof(cmd_flash_erase_t), CHECKSUM_NONE, NULL,
+			calc_timeout(size, TIMEOUT_FLASH_ERASE_PER_MB));
+}
+
+int
+cmd_emmc_md5(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uint8_t *md5)
+{
+	uint8_t ret_buf[STATUS_BYTES_LEN + 16];
+	uint16_t ret_len = 0;
+
+	cmd_flash_md5_t *cmd = (cmd_flash_md5_t *)dev->req_cmd;
+	memset(cmd, 0, sizeof(cmd_flash_md5_t));
+	cmd->address = address;
+	cmd->size = size;
+
+	int ret = command(dev, CMD_EMMC_MD5, sizeof(cmd_flash_md5_t), CHECKSUM_NONE, NULL, ret_buf,
+			&ret_len, sizeof(ret_buf), calc_timeout(size, TIMEOUT_FLASH_MD5SUM_PER_MB));
+	if (ret != 0) {
+		return ret;
+	}
+
+	if (ret_len < STATUS_BYTES_LEN) {
+		LOGD("DEBUG: Interrupted serial read");
+		return -EIO;
+	}
+
+	if (ret_buf[0] != 0) {
+		LOGD("DEBUG: Unexpected device response: 0x%02X", ret_buf[1]);
+		return ret_buf[1];
+	}
+
+	memcpy(md5, ret_buf + 2, 16);
+
+	return 0;
+}
+
+int
+cmd_read_emmc(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uint8_t *data,
+		uint32_t *data_len)
+{
+	static uint8_t ret_buf[STATUS_BYTES_LEN + FLASH_READ_SIZE];
+	uint16_t ret_len = 0;
+
+	cmd_read_flash_t *cmd = (cmd_read_flash_t *)dev->req_cmd;
+	memset(cmd, 0, sizeof(cmd_read_flash_t));
+	cmd->address = address;
+	cmd->size = size;
+
+	int ret = command(dev, CMD_EMMC_READ_DATA, sizeof(cmd_read_flash_t), CHECKSUM_NONE, NULL,
+			ret_buf, &ret_len, sizeof(ret_buf), TIMEOUT_FLASH_DATA);
+	if (ret != 0) {
+		return ret;
+	}
+
+	if (ret_len < STATUS_BYTES_LEN) {
+		LOGD("DEBUG: Interrupted serial read");
+		return -EIO;
+	}
+
+	if (ret_buf[0] != 0) {
+		LOGD("DEBUG: Unexpected device response: 0x%02X", ret_buf[1]);
+		return ret_buf[1];
+	}
+
+	*data_len = ret_len - STATUS_BYTES_LEN;
+	memcpy(data, ret_buf + STATUS_BYTES_LEN, *data_len);
 
 	return 0;
 }

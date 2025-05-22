@@ -78,6 +78,7 @@ static struct option long_options[] = {
 		{"nand-dat1", required_argument, NULL, 0},
 		{"nand-dat2", required_argument, NULL, 0},
 		{"nand-dat3", required_argument, NULL, 0},
+		{"emmc", no_argument, NULL, 0},
 		{"ram", no_argument, NULL, 'r'},
 		{"jump", required_argument, NULL, 0},
 		{"chip-id", no_argument, NULL, 0},
@@ -274,6 +275,8 @@ print_help(const char *progname)
 	LOGI("    verify all partitions after burning");
 	LOGI("  -n, --nand");
 	LOGI("    burn to NAND flash (CSK6 only)");
+	LOGI("  --emmc");
+	LOGI("    burn to eMMC (arcs only)");
 	LOGI("  --probe-timeout <ms>");
 	LOGI("    timeout for probing device (default: %d ms)", DEFAULT_PROBE_TIMEOUT);
 	LOGI("  --reset-attempts <n>");
@@ -520,6 +523,9 @@ main(int argc, char **argv)
 					break;
 				} else if (strcmp(name, "read-logs") == 0) {
 					sscanf(optarg, "%d", &options.read_logs_baud);
+					break;
+				} else if (strcmp(name, "emmc") == 0) {
+					options.target = TARGET_EMMC;
 					break;
 				} else {
 					print_help(argv[0]);
@@ -903,6 +909,19 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		}
 
 		LOGI("Detected NAND size: %" PRIu64 " MB", flash_size >> 20);
+	} else if (options.target == TARGET_EMMC) {
+		card_info_t card_info;
+
+		if ((ret = cskburn_serial_get_emmc_info(dev, &card_info)) != 0) {
+			LOGE_RET(ret, "ERROR: Failed get eMMC info");
+			goto err_enter;
+		}
+
+		LOGD("Detected eMMC info, sctcnts: 0x%x sctsize: 0x%x erasize: 0x%x cardtype: %u",
+				card_info.sctcnts, card_info.sctsize, card_info.erasize, card_info.cardtype);
+
+		flash_size = (uint64_t)card_info.sctcnts * card_info.sctsize;
+		LOGI("Detected eMMC size: %" PRIu64 " MB", flash_size >> 20);
 	}
 
 	for (int i = 0; i < options.read_count; i++) {
