@@ -122,6 +122,10 @@ int cskburn_serial_erase_all(cskburn_serial_device_t *dev, cskburn_serial_target
 int cskburn_serial_erase(
 		cskburn_serial_device_t *dev, cskburn_serial_target_t target, uint32_t addr, uint32_t size);
 
+int cskburn_serial_lock(cskburn_serial_device_t *dev, cskburn_serial_target_t target);
+
+int cskburn_serial_unlock(cskburn_serial_device_t *dev, cskburn_serial_target_t target);
+
 int cskburn_serial_verify(cskburn_serial_device_t *dev, cskburn_serial_target_t target,
 		uint32_t addr, uint32_t size, uint8_t *md5);
 

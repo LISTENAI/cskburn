@@ -46,6 +46,9 @@
 
 #define CMD_FLASH_ERASE_CHIP 0xD0
 #define CMD_FLASH_ERASE_REGION 0xD1
+#define CMD_FLASH_LOCK 0xD4
+#define CMD_FLASH_UNLOCK 0xD5
+
 #define CMD_READ_FLASH_ID 0xF3
 #define CMD_READ_CHIP_ID 0xF4
 
@@ -565,6 +568,18 @@ cmd_flash_erase_region(cskburn_serial_device_t *dev, uint32_t address, uint32_t 
 
 	return check_command(dev, CMD_FLASH_ERASE_REGION, sizeof(cmd_flash_erase_t), CHECKSUM_NONE,
 			NULL, calc_timeout(size, TIMEOUT_FLASH_ERASE_PER_MB));
+}
+
+int
+cmd_flash_lock(cskburn_serial_device_t *dev)
+{
+	return check_command(dev, CMD_FLASH_LOCK, 0, CHECKSUM_NONE, NULL, TIMEOUT_FLASH_DATA);
+}
+
+int
+cmd_flash_unlock(cskburn_serial_device_t *dev)
+{
+	return check_command(dev, CMD_FLASH_UNLOCK, 0, CHECKSUM_NONE, NULL, TIMEOUT_FLASH_DATA);
 }
 
 int
