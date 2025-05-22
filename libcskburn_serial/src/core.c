@@ -1,6 +1,7 @@
 #include "core.h"
 
 #include <errno.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,6 +16,9 @@
 
 #define BAUD_RATE_INIT 115200
 
+#define BURNER_LOAD_ADDR_DEFAULT 0
+#define BURNER_LOAD_ADDR_ARCS 0x20040000
+
 #define FLASH_BLOCK_TRIES 3
 
 extern uint8_t burner_serial_castor[];
@@ -23,8 +27,26 @@ extern uint32_t burner_serial_castor_len;
 extern uint8_t burner_serial_venus[];
 extern uint32_t burner_serial_venus_len;
 
+extern uint8_t burner_serial_arcs[];
+extern uint32_t burner_serial_arcs_len;
+
 static int init_flags = 0;
 static bool rts_active = SERIAL_LOW;
+
+static void
+print_time_spent(const char *usage, uint64_t t1, uint64_t t2)
+{
+	float spent = (float)(t2 - t1) / 1000.0f;
+	LOGD("%s took %.2fs", usage, spent);
+}
+
+static void
+print_time_spent_with_speed(const char *usage, uint64_t t1, uint64_t t2, uint32_t size)
+{
+	float spent = (float)(t2 - t1) / 1000.0f;
+	float speed = (float)size / 1024.0f / spent;
+	LOGD("%s took %.2fs, speed %.2f KB/s", usage, spent, speed);
+}
 
 void
 cskburn_serial_init(int flags)
@@ -130,6 +152,7 @@ cskburn_serial_enter(
 		cskburn_serial_device_t *dev, uint32_t baud_rate, uint8_t *burner, uint32_t len)
 {
 	int ret;
+	int load_addr = BURNER_LOAD_ADDR_DEFAULT;
 
 	if (burner == NULL || len == 0) {
 		if (dev->chip == CHIP_CASTOR) {
@@ -138,13 +161,22 @@ cskburn_serial_enter(
 		} else if (dev->chip == CHIP_VENUS) {
 			burner = burner_serial_venus;
 			len = burner_serial_venus_len;
+		} else if (dev->chip == CHIP_ARCS) {
+			burner = burner_serial_arcs;
+			len = burner_serial_arcs_len;
+			load_addr = BURNER_LOAD_ADDR_ARCS;
 		}
 	}
 
 	if (burner != NULL && len > 0) {
-		// For CSK6, CMD_CHANGE_BAUD is supported by the ROM, so take advantage
+		uint64_t t1 = time_monotonic();
+
+		// For CSK6 and ARCS CMD_CHANGE_BAUD is supported by the ROM, so take advantage
 		// of it to speed up the process.
-		if (dev->chip == CHIP_VENUS && baud_rate != BAUD_RATE_INIT) {
+		bool load_speedup =
+				(dev->chip == CHIP_VENUS || dev->chip == CHIP_ARCS) && baud_rate != BAUD_RATE_INIT;
+
+		if (load_speedup) {
 			if ((ret = cmd_change_baud(dev, baud_rate, BAUD_RATE_INIT)) != 0) {
 				LOGE_RET(ret, "ERROR: Failed changing baud rate");
 				return ret;
@@ -159,7 +191,7 @@ cskburn_serial_enter(
 		uint32_t offset, length;
 		uint32_t blocks = BLOCKS(len, RAM_BLOCK_SIZE);
 
-		if ((ret = cmd_mem_begin(dev, len, blocks, RAM_BLOCK_SIZE, 0)) != 0) {
+		if ((ret = cmd_mem_begin(dev, len, blocks, RAM_BLOCK_SIZE, load_addr)) != 0) {
 			return ret;
 		}
 
@@ -176,16 +208,19 @@ cskburn_serial_enter(
 			}
 		}
 
-		if ((ret = cmd_mem_finish(dev, OPTION_REBOOT, 0)) != 0) {
+		if ((ret = cmd_mem_finish(dev, OPTION_REBOOT, load_addr)) != 0) {
 			return ret;
 		}
 
 		// RAM proxy is up with default baud rate
-		if (dev->chip == CHIP_VENUS && baud_rate != BAUD_RATE_INIT) {
+		if (load_speedup) {
 			serial_set_speed(dev->serial, BAUD_RATE_INIT);
 		}
 
 		msleep(500);
+
+		uint64_t t2 = time_monotonic();
+		print_time_spent("Writing RAM loader", t1, t2);
 	}
 
 	if ((ret = try_sync(dev, 2000)) != 0) {
@@ -206,21 +241,6 @@ cskburn_serial_enter(
 	}
 
 	return 0;
-}
-
-static void
-print_time_spent(const char *usage, uint64_t t1, uint64_t t2)
-{
-	float spent = (float)(t2 - t1) / 1000.0f;
-	LOGD("%s took %.2fs", usage, spent);
-}
-
-static void
-print_time_spent_with_speed(const char *usage, uint64_t t1, uint64_t t2, uint32_t size)
-{
-	float spent = (float)(t2 - t1) / 1000.0f;
-	float speed = (float)size / 1024.0f / spent;
-	LOGD("%s took %.2fs, speed %.2f KB/s", usage, spent, speed);
 }
 
 static int

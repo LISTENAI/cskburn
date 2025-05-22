@@ -116,6 +116,7 @@ typedef enum {
 typedef enum {
 	CASTOR,
 	VENUS,
+	ARCS,
 	CHIP_COUNT,
 } cskburn_chip_t;
 
@@ -146,6 +147,15 @@ static const chip_features_t chip_features[] = {
 						.serial = CHIP_VENUS,
 						.nand = true,
 						.base_addr = 0x18000000,
+				},
+		[ARCS] =
+				{
+						.code = "arcs",
+						.name = "Arcs (LS26)",
+						.usb = false,
+						.serial = CHIP_ARCS,
+						.nand = false,
+						.base_addr = 0x30000000,
 				},
 };
 
@@ -378,6 +388,8 @@ main(int argc, char **argv)
 						   strstr(optarg, "csk6") == optarg || strstr(optarg, "CSK6") == optarg ||
 						   strcmp(optarg, "6") == 0) {
 					options.chip = &chip_features[VENUS];
+				} else if (strcmp(optarg, "arcs") == 0 || strcmp(optarg, "ARCS") == 0) {
+					options.chip = &chip_features[ARCS];
 				} else {
 					LOGE("ERROR: Unsupported chip family: %s", optarg);
 					return EINVAL;

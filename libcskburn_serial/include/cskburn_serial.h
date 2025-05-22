@@ -18,6 +18,7 @@ typedef struct _cskburn_serial_device_t cskburn_serial_device_t;
 typedef enum {
 	CHIP_CASTOR,
 	CHIP_VENUS,
+	CHIP_ARCS,
 } cskburn_serial_chip_t;
 
 #pragma pack(1)
