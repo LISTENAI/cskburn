@@ -84,6 +84,8 @@ static struct option long_options[] = {
 		{"read", required_argument, NULL, 0},
 		{"erase", required_argument, NULL, 0},
 		{"erase-all", no_argument, NULL, 0},
+		{"lock", no_argument, NULL, 0},
+		{"unlock", no_argument, NULL, 0},
 		{"verify", required_argument, NULL, 0},
 		{"verify-all", no_argument, NULL, 0},
 		{"probe-timeout", required_argument, NULL, 0},
@@ -163,6 +165,8 @@ static struct {
 		uint32_t size;
 	} erase_parts[MAX_ERASE_PARTS];
 	bool erase_all;
+	bool lock;
+	bool unlock;
 	uint16_t verify_count;
 	struct {
 		uint32_t addr;
@@ -198,6 +202,8 @@ static struct {
 		.read_count = 0,
 		.erase_count = 0,
 		.erase_all = false,
+		.lock = false,
+		.unlock = false,
 		.verify_count = 0,
 		.verify_all = false,
 		.probe_timeout = DEFAULT_PROBE_TIMEOUT,
@@ -298,6 +304,10 @@ print_help(const char *progname)
 	LOGI("    erase specified flash region");
 	LOGI("  --erase-all");
 	LOGI("    erase the entire flash");
+	LOGI("  --lock");
+	LOGI("    lock the flash");
+	LOGI("  --unlock");
+	LOGI("    unlock the flash");
 	LOGI("  --verify <addr:size>");
 	LOGI("    verify specified flash region");
 	LOGI("");
@@ -525,6 +535,12 @@ main(int argc, char **argv)
 					break;
 				} else if (strcmp(name, "emmc") == 0) {
 					options.target = TARGET_EMMC;
+					break;
+				} else if (strcmp(name, "lock") == 0) {
+					options.lock = true;
+					break;
+				} else if (strcmp(name, "unlock") == 0) {
+					options.unlock = true;
 					break;
 				} else {
 					print_help(argv[0]);
@@ -923,6 +939,13 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		LOGI("Detected eMMC size: %" PRIu64 " MB", flash_size >> 20);
 	}
 
+	if (options.unlock) {
+		if ((ret = cskburn_serial_unlock(dev, options.target)) != 0) {
+			LOGE_RET(ret, "ERROR: Failed locking device");
+			goto err_enter;
+		}
+	}
+
 	for (int i = 0; i < options.read_count; i++) {
 		if (options.read_parts[i].addr >= flash_size) {
 			LOGE("ERROR: The starting boundary of read address (0x%08X) exceeds the capacity of "
@@ -1104,6 +1127,13 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 				ret = -EIO;
 				goto err_write;
 			}
+		}
+	}
+
+	if (options.lock) {
+		if ((ret = cskburn_serial_lock(dev, options.target)) != 0) {
+			LOGE_RET(ret, "ERROR: Failed unlocking device");
+			goto err_enter;
 		}
 	}
 
