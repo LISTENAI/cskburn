@@ -35,6 +35,13 @@ typedef struct {
 	uint8_t _reserved;
 } nand_config_t;
 #pragma pack()
+typedef enum {
+	CHIP_TYPE_3 = 3,
+	CHIP_TYPE_4 = 4,
+	CHIP_TYPE_6 = 6,
+	CHIP_TYPE_ARCS,
+	CHIP_TYPE_UNKNOWN = 0xFF,
+} cskburn_serial_chip_t;
 
 typedef enum {
 	TARGET_FLASH = 0,
@@ -53,7 +60,7 @@ typedef enum {
  * @retval -errno on other errors from serial device
  */
 int cskburn_serial_open(
-		cskburn_serial_device_t **dev, const char *path, uint32_t chip, int32_t timeout);
+		cskburn_serial_device_t **dev, const char *path, cskburn_serial_chip_t chip, int32_t timeout);
 
 /**
  * @brief Close CSK device
