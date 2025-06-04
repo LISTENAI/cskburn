@@ -17,7 +17,7 @@ runs:
         echo '${{ inputs.install }}' | tr ' ' '\n' | sort > cache-key
         date -u '+%Y%m' >> cache-key
       shell: bash
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4
       id: cache-mingw64
       with:
         path: D:\msys64

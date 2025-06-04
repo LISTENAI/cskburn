@@ -2,8 +2,6 @@ name: build
 
 on:
   push:
-    branches: '*'
-    tags: 'v*.*'
   pull_request:
 
 jobs:
@@ -20,19 +18,20 @@ jobs:
           - { name: linux-arm64-musl, image: alpine,  platform: linux/arm64   }
 
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2.1.0
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
       - name: Prepare builder image
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v6
         with:
           platforms: ${{ matrix.platform }}
           file: .github/Dockerfile.${{ matrix.image }}
@@ -59,7 +58,7 @@ jobs:
             '
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: cskburn-${{ matrix.name }}
           path: build/cskburn/cskburn
@@ -85,13 +84,14 @@ jobs:
           - { name: darwin-arm64,     arch: arm64  }
 
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
 
       - name: Setup Ninja
-        uses: ashutoshvarma/setup-ninja@master
+        uses: ashutoshvarma/setup-ninja@v1.1
 
       - name: Build
         uses: ./.github/actions/cmake-build
@@ -99,7 +99,7 @@ jobs:
           CMAKE_OSX_ARCHITECTURES: ${{ matrix.arch }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: cskburn-${{ matrix.name }}
           path: build/cskburn/cskburn
@@ -124,7 +124,8 @@ jobs:
           - { name: win32-x64, os: windows-latest }
 
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
@@ -147,7 +148,7 @@ jobs:
           shell: ${{ steps.setup-mingw64.outputs.shell }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: cskburn-${{ matrix.name }}
           path: build/cskburn/cskburn.exe
@@ -174,13 +175,14 @@ jobs:
           - { name: android-arm64-v8a,    abi: arm64-v8a    }
 
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: recursive
 
       - name: Setup Ninja
-        uses: ashutoshvarma/setup-ninja@master
+        uses: ashutoshvarma/setup-ninja@v1.1
 
       - name: Setup NDK
         id: setup-ndk
@@ -197,7 +199,7 @@ jobs:
             -DCMAKE_ANDROID_NDK=${{ steps.setup-ndk.outputs.ndk-path }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: cskburn-android-${{ matrix.abi }}
           path: build/cskburn/cskburn
