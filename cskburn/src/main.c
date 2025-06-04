@@ -1,7 +1,9 @@
 #include <errno.h>
 #include <getopt.h>
+#include <inttypes.h>
 #include <libgen.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -28,7 +30,28 @@
 #define DEFAULT_RESET_ATTEMPTS 4
 #define DEFAULT_RESET_DELAY 500
 
-#define DEFAULT_CHIP 4
+#define DEFAULT_CHIP CHIP_TYPE_4
+
+typedef struct {
+	cskburn_serial_chip_t chip;
+	const char *name;
+} chip_type_mapping_t;
+
+static const chip_type_mapping_t chip_type_map[] = {
+		{CHIP_TYPE_3, "3"},
+		{CHIP_TYPE_4, "4"},
+		{CHIP_TYPE_6, "6"},
+		{CHIP_TYPE_ARCS, "arcs"},
+};
+
+static inline const char *
+chip_to_str(int chip)
+{
+	for (size_t i = 0; i < sizeof(chip_type_map) / sizeof(chip_type_map[0]); i++) {
+		if (chip_type_map[i].chip == chip) return chip_type_map[i].name;
+	}
+	return "unknown";
+}
 
 static struct option long_options[] = {
 		{"help", no_argument, NULL, 'h'},
@@ -55,12 +78,15 @@ static struct option long_options[] = {
 		{"nand-dat1", required_argument, NULL, 0},
 		{"nand-dat2", required_argument, NULL, 0},
 		{"nand-dat3", required_argument, NULL, 0},
+		{"emmc", no_argument, NULL, 0},
 		{"ram", no_argument, NULL, 'r'},
 		{"jump", required_argument, NULL, 0},
 		{"chip-id", no_argument, NULL, 0},
 		{"read", required_argument, NULL, 0},
 		{"erase", required_argument, NULL, 0},
 		{"erase-all", no_argument, NULL, 0},
+		{"lock", no_argument, NULL, 0},
+		{"unlock", no_argument, NULL, 0},
 		{"verify", required_argument, NULL, 0},
 		{"verify-all", no_argument, NULL, 0},
 		{"probe-timeout", required_argument, NULL, 0},
@@ -118,7 +144,7 @@ static struct {
 	bool repeat;
 	cskburn_protocol_t protocol;
 	cskburn_action_t action;
-	uint32_t chip;
+	cskburn_serial_chip_t chip;
 #ifndef WITHOUT_USB
 	char *usb;
 	int16_t usb_bus;
@@ -140,6 +166,8 @@ static struct {
 		uint32_t size;
 	} erase_parts[MAX_ERASE_PARTS];
 	bool erase_all;
+	bool lock;
+	bool unlock;
 	uint16_t verify_count;
 	struct {
 		uint32_t addr;
@@ -160,7 +188,7 @@ static struct {
 } options = {
 		.progress = true,
 		.wait = false,
-		.chip = 4,
+		.chip = DEFAULT_CHIP,
 #ifndef WITHOUT_USB
 		.repeat = false,
 		.action = ACTION_NONE,
@@ -175,6 +203,8 @@ static struct {
 		.read_count = 0,
 		.erase_count = 0,
 		.erase_all = false,
+		.lock = false,
+		.unlock = false,
 		.verify_count = 0,
 		.verify_all = false,
 		.probe_timeout = DEFAULT_PROBE_TIMEOUT,
@@ -243,7 +273,7 @@ print_help(const char *progname)
 	LOGI("    baud rate used for serial burning (default: %d)", DEFAULT_BAUD);
 #ifndef WITHOUT_USB
 	LOGI("  -C, --chip <family>");
-	LOGI("    chip family, acceptable values: 3/4/6 (default: %d)", DEFAULT_CHIP);
+	LOGI("    chip family, acceptable values: 3/4/6/arcs (default: %s)", chip_to_str(DEFAULT_CHIP));
 #endif
 	LOGI("  --chip-id");
 	LOGI("    read unique chip ID");
@@ -251,6 +281,8 @@ print_help(const char *progname)
 	LOGI("    verify all partitions after burning");
 	LOGI("  -n, --nand");
 	LOGI("    burn to NAND flash (CSK6 only)");
+	LOGI("  --emmc");
+	LOGI("    burn to eMMC (arcs only)");
 	LOGI("  --probe-timeout <ms>");
 	LOGI("    timeout for probing device (default: %d ms)", DEFAULT_PROBE_TIMEOUT);
 	LOGI("  --reset-attempts <n>");
@@ -273,6 +305,10 @@ print_help(const char *progname)
 	LOGI("    erase specified flash region");
 	LOGI("  --erase-all");
 	LOGI("    erase the entire flash");
+	LOGI("  --lock");
+	LOGI("    lock the flash");
+	LOGI("  --unlock");
+	LOGI("    unlock the flash");
 	LOGI("  --verify <addr:size>");
 	LOGI("    verify specified flash region");
 	LOGI("");
@@ -329,12 +365,19 @@ main(int argc, char **argv)
 				options.action = ACTION_CHECK;
 				break;
 			case 'C':
-				sscanf(optarg, "%d", &options.chip);
-				if (options.chip != 6 && options.chip != 4 && options.chip != 3) {
-					LOGE("ERROR: Only 3, 4 or 6 of chip is supported");
+				if (strcmp(optarg, "arcs") == 0) {
+					options.chip = CHIP_TYPE_ARCS;
+				} else {
+					if (!scan_int(optarg, &options.chip)) {
+						LOGE("ERROR: Only 3, 4, 6 or arcs of chip is supported");
+						return EINVAL;
+					}
+				}
+				if (options.chip != 6 && options.chip != 4 && options.chip != 3 &&
+						options.chip != CHIP_TYPE_ARCS) {
+					LOGE("ERROR: Only 3, 4, 6 or arcs of chip is supported");
 					return EINVAL;
 				}
-				if (options.chip == 3) options.chip = 4;
 				break;
 			case 'n':
 				options.target = TARGET_NAND;
@@ -491,6 +534,15 @@ main(int argc, char **argv)
 				} else if (strcmp(name, "read-logs") == 0) {
 					sscanf(optarg, "%d", &options.read_logs_baud);
 					break;
+				} else if (strcmp(name, "emmc") == 0) {
+					options.target = TARGET_EMMC;
+					break;
+				} else if (strcmp(name, "lock") == 0) {
+					options.lock = true;
+					break;
+				} else if (strcmp(name, "unlock") == 0) {
+					options.unlock = true;
+					break;
 				} else {
 					print_help(argv[0]);
 					return 0;
@@ -611,6 +663,19 @@ main(int argc, char **argv)
 			LOGI("Partition %d: 0x%08X (%.2f KB) - %s", i + 1, parts[i].addr,
 					(float)parts[i].reader->size / 1024.0f, parts[i].path);
 		}
+	}
+
+	if (options.chip == CHIP_TYPE_ARCS && options.target == TARGET_FLASH) {
+		if (options.erase_count + parts_cnt > MAX_ERASE_PARTS) {
+			LOGE("ERROR: Only up to %d partitions can be erased at the same time", MAX_ERASE_PARTS);
+			ret = EINVAL;
+			goto exit;
+		}
+		for (int i = options.erase_count; i < options.erase_count + parts_cnt; i++) {
+			options.erase_parts[i].addr = parts[i].addr;
+			options.erase_parts[i].size = align_up(parts[i].reader->size, 4096);
+		}
+		options.erase_count += parts_cnt;
 	}
 
 	if (options.protocol == PROTO_SERIAL) {
@@ -852,28 +917,62 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 
 		LOGD("flash-id: %02X%02X%02X", (flash_id) & 0xFF, (flash_id >> 8) & 0xFF,
 				(flash_id >> 16) & 0xFF);
-		LOGI("Detected flash size: %llu MB", flash_size >> 20);
+		LOGI("Detected flash size: %" PRIu64 " MB", flash_size >> 20);
 	} else if (options.target == TARGET_NAND) {
 		if ((ret = cskburn_serial_init_nand(dev, &nand_config, &flash_size)) != 0) {
 			LOGE_RET(ret, "ERROR: Failed initializing NAND");
 			goto err_enter;
 		}
 
-		LOGI("Detected NAND size: %llu MB", flash_size >> 20);
+		LOGI("Detected NAND size: %" PRIu64 " MB", flash_size >> 20);
+	} else if (options.target == TARGET_EMMC) {
+		card_info_t card_info;
+
+		if ((ret = cskburn_serial_get_emmc_info(dev, &card_info)) != 0) {
+			LOGE_RET(ret, "ERROR: Failed get eMMC info");
+			goto err_enter;
+		}
+
+		LOGD("Detected eMMC info, sctcnts: 0x%x sctsize: 0x%x erasize: 0x%x cardtype: %u",
+				card_info.sctcnts, card_info.sctsize, card_info.erasize, card_info.cardtype);
+
+		flash_size = (uint64_t)card_info.sctcnts * card_info.sctsize;
+		LOGI("Detected eMMC size: %" PRIu64 " MB", flash_size >> 20);
+	}
+
+	if (options.unlock) {
+		if ((ret = cskburn_serial_unlock(dev, options.target)) != 0) {
+			LOGE_RET(ret, "ERROR: Failed locking device");
+			goto err_enter;
+		}
 	}
 
 	for (int i = 0; i < options.read_count; i++) {
 		if (options.read_parts[i].addr >= flash_size) {
 			LOGE("ERROR: The starting boundary of read address (0x%08X) exceeds the capacity of "
-				 "flash (%llu MB)",
+				 "flash (%" PRIu64 " MB)",
 					options.read_parts[i].addr, flash_size >> 20);
 			ret = -EINVAL;
 			goto err_enter;
 		} else if (options.read_parts[i].addr + options.read_parts[i].size > flash_size) {
 			LOGE("ERROR: The ending boundary of read address (0x%08X) exceeds the capacity of "
-				 "flash (%llu MB)",
+				 "flash (%" PRIu64 " MB)",
 					options.read_parts[i].addr + options.read_parts[i].size, flash_size >> 20);
 			ret = -EINVAL;
+			goto err_enter;
+		}
+	}
+
+	for (int i = 0; i < options.verify_count; i++) {
+		if (options.verify_parts[i].addr >= flash_size) {
+			LOGE("ERROR: The starting boundary of verify address (0x%08X) exceeds the capacity of "
+				 "flash (%" PRIu64 " MB)",
+					options.verify_parts[i].addr, flash_size >> 20);
+			goto err_enter;
+		} else if (options.verify_parts[i].addr + options.verify_parts[i].size > flash_size) {
+			LOGE("ERROR: The ending boundary of verify address (0x%08X) exceeds the capacity of "
+				 "flash (%" PRIu64 " MB)",
+					options.verify_parts[i].addr + options.verify_parts[i].size, flash_size >> 20);
 			goto err_enter;
 		}
 	}
@@ -889,13 +988,13 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 			goto err_enter;
 		} else if (options.erase_parts[i].addr >= flash_size) {
 			LOGE("ERROR: The starting boundary of erase address (0x%08X) exceeds the capacity of "
-				 "flash (%llu MB)",
+				 "flash (%" PRIu64 " MB)",
 					options.erase_parts[i].addr, flash_size >> 20);
 			ret = -EINVAL;
 			goto err_enter;
 		} else if (options.erase_parts[i].addr + options.erase_parts[i].size > flash_size) {
 			LOGE("ERROR: The ending boundary of erase address (0x%08X) exceeds the capacity of "
-				 "flash (%llu MB)",
+				 "flash (%" PRIu64 " MB)",
 					options.erase_parts[i].addr + options.erase_parts[i].size, flash_size >> 20);
 			ret = -EINVAL;
 			goto err_enter;
@@ -922,13 +1021,13 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		if (options.target == TARGET_FLASH || options.target == TARGET_NAND) {
 			if (parts[i].addr >= flash_size) {
 				LOGE("ERROR: The starting boundary of partition %d (0x%08X) exceeds the capacity "
-					 "of target (%llu MB)",
+					 "of target (%" PRIu64 " MB)",
 						i + 1, parts[i].addr, flash_size >> 20);
 				ret = -EINVAL;
 				goto err_enter;
 			} else if (parts[i].addr + parts[i].reader->size > flash_size) {
 				LOGE("ERROR: The ending boundary of partition %d (0x%08X) exceeds the capacity of "
-					 "target (%llu MB)",
+					 "target (%" PRIu64 " MB)",
 						i + 1, parts[i].addr + parts[i].reader->size, flash_size >> 20);
 				ret = -EINVAL;
 				goto err_enter;
@@ -1029,6 +1128,13 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 				ret = -EIO;
 				goto err_write;
 			}
+		}
+	}
+
+	if (options.lock) {
+		if ((ret = cskburn_serial_lock(dev, options.target)) != 0) {
+			LOGE_RET(ret, "ERROR: Failed unlocking device");
+			goto err_enter;
 		}
 	}
 

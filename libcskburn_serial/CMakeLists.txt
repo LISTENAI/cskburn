@@ -5,6 +5,7 @@ set(SRCS
     src/cmd.c
     src/burner_4_img.c
     src/burner_6_img.c
+    src/burner_arcs_img.c
 )
 
 add_library(${PROJECT_NAME} STATIC ${SRCS})
