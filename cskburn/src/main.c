@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <getopt.h>
+#include <inttypes.h>
 #include <libgen.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -852,26 +853,26 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 
 		LOGD("flash-id: %02X%02X%02X", (flash_id) & 0xFF, (flash_id >> 8) & 0xFF,
 				(flash_id >> 16) & 0xFF);
-		LOGI("Detected flash size: %llu MB", flash_size >> 20);
+		LOGI("Detected flash size: %" PRIu64 " MB", flash_size >> 20);
 	} else if (options.target == TARGET_NAND) {
 		if ((ret = cskburn_serial_init_nand(dev, &nand_config, &flash_size)) != 0) {
 			LOGE_RET(ret, "ERROR: Failed initializing NAND");
 			goto err_enter;
 		}
 
-		LOGI("Detected NAND size: %llu MB", flash_size >> 20);
+		LOGI("Detected NAND size: %" PRIu64 " MB", flash_size >> 20);
 	}
 
 	for (int i = 0; i < options.read_count; i++) {
 		if (options.read_parts[i].addr >= flash_size) {
 			LOGE("ERROR: The starting boundary of read address (0x%08X) exceeds the capacity of "
-				 "flash (%llu MB)",
+				 "flash (%" PRIu64 " MB)",
 					options.read_parts[i].addr, flash_size >> 20);
 			ret = -EINVAL;
 			goto err_enter;
 		} else if (options.read_parts[i].addr + options.read_parts[i].size > flash_size) {
 			LOGE("ERROR: The ending boundary of read address (0x%08X) exceeds the capacity of "
-				 "flash (%llu MB)",
+				 "flash (%" PRIu64 " MB)",
 					options.read_parts[i].addr + options.read_parts[i].size, flash_size >> 20);
 			ret = -EINVAL;
 			goto err_enter;
@@ -889,13 +890,13 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 			goto err_enter;
 		} else if (options.erase_parts[i].addr >= flash_size) {
 			LOGE("ERROR: The starting boundary of erase address (0x%08X) exceeds the capacity of "
-				 "flash (%llu MB)",
+				 "flash (%" PRIu64 " MB)",
 					options.erase_parts[i].addr, flash_size >> 20);
 			ret = -EINVAL;
 			goto err_enter;
 		} else if (options.erase_parts[i].addr + options.erase_parts[i].size > flash_size) {
 			LOGE("ERROR: The ending boundary of erase address (0x%08X) exceeds the capacity of "
-				 "flash (%llu MB)",
+				 "flash (%" PRIu64 " MB)",
 					options.erase_parts[i].addr + options.erase_parts[i].size, flash_size >> 20);
 			ret = -EINVAL;
 			goto err_enter;
@@ -922,13 +923,13 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		if (options.target == TARGET_FLASH || options.target == TARGET_NAND) {
 			if (parts[i].addr >= flash_size) {
 				LOGE("ERROR: The starting boundary of partition %d (0x%08X) exceeds the capacity "
-					 "of target (%llu MB)",
+					 "of target (%" PRIu64 " MB)",
 						i + 1, parts[i].addr, flash_size >> 20);
 				ret = -EINVAL;
 				goto err_enter;
 			} else if (parts[i].addr + parts[i].reader->size > flash_size) {
 				LOGE("ERROR: The ending boundary of partition %d (0x%08X) exceeds the capacity of "
-					 "target (%llu MB)",
+					 "target (%" PRIu64 " MB)",
 						i + 1, parts[i].addr + parts[i].reader->size, flash_size >> 20);
 				ret = -EINVAL;
 				goto err_enter;
