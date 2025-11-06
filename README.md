@@ -69,7 +69,7 @@ Advanced operations (serial only):
     verify specified flash region
 
 Example:
-    cskburn -C venus -s /dev/cu.usbserial-0001 -b 15000000 --verify-all 0x0 app.bin 0x100000 res.bin
+    cskburn -C venus -s /dev/cu.usbserial-0001 -b 1500000 --verify-all 0x0 app.bin 0x100000 res.bin
 ```
 
 ## 编译

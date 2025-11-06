@@ -318,7 +318,7 @@ print_help(const char *progname)
 	LOGI("");
 
 	LOGI("Example:");
-	LOGI("    cskburn -C venus -s %s -b 15000000 --verify-all 0x0 app.bin 0x100000 res.bin",
+	LOGI("    cskburn -C venus -s %s -b 1500000 --verify-all 0x0 app.bin 0x100000 res.bin",
 			example_serial_dev);
 }
 
