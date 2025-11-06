@@ -1,4 +1,5 @@
-FROM debian:10
+FROM debian:bullseye
+# GLIBC 2.31, same as Ubuntu 20.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
