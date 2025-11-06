@@ -38,7 +38,9 @@ Serial burning options:
   -b, --baud <rate>
     baud rate used for serial burning (default: 3000000)
   -C, --chip <family>
-    chip family, acceptable values: 3/4/6 (default: 4)
+    chip family (default: castor), acceptable values:
+      castor: Castor (CSK3/CSK4)
+      venus: Venus (CSK6)
   --chip-id
     read unique chip ID
   --verify-all
@@ -67,7 +69,7 @@ Advanced operations (serial only):
     verify specified flash region
 
 Example:
-    cskburn -C 6 -s /dev/cu.usbserial-0001 -b 15000000 --verify-all 0x0 app.bin 0x100000 res.bin
+    cskburn -C venus -s /dev/cu.usbserial-0001 -b 15000000 --verify-all 0x0 app.bin 0x100000 res.bin
 ```
 
 ## 编译

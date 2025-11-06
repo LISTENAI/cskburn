@@ -13,7 +13,7 @@ struct _cskburn_serial_device_t {
 	void *req_cmd;
 	uint8_t *req_buf;
 	uint8_t *res_buf;
-	uint32_t chip;
+	cskburn_serial_chip_t chip;
 	int32_t timeout;
 };
 

@@ -3,8 +3,8 @@ project(cskburn_serial)
 set(SRCS
     src/core.c
     src/cmd.c
-    src/burner_4_img.c
-    src/burner_6_img.c
+    src/burner_castor_img.c
+    src/burner_venus_img.c
 )
 
 add_library(${PROJECT_NAME} STATIC ${SRCS})

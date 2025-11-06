@@ -29,7 +29,7 @@
 #define DEFAULT_RESET_ATTEMPTS 4
 #define DEFAULT_RESET_DELAY 500
 
-#define DEFAULT_CHIP 4
+#define DEFAULT_CHIP CASTOR
 
 static struct option long_options[] = {
 		{"help", no_argument, NULL, 'h'},
@@ -113,13 +113,49 @@ typedef enum {
 	ACTION_CHECK,
 } cskburn_action_t;
 
+typedef enum {
+	CASTOR,
+	VENUS,
+	CHIP_COUNT,
+} cskburn_chip_t;
+
+typedef struct {
+	const char *code;
+	const char *name;
+	bool usb;
+	cskburn_serial_chip_t serial;
+	bool nand;
+	uint32_t base_addr;
+} chip_features_t;
+
+static const chip_features_t chip_features[] = {
+		[CASTOR] =
+				{
+						.code = "castor",
+						.name = "Castor (CSK3/CSK4)",
+						.usb = true,
+						.serial = CHIP_CASTOR,
+						.nand = false,
+						.base_addr = 0x80000000,
+				},
+		[VENUS] =
+				{
+						.code = "venus",
+						.name = "Venus (CSK6)",
+						.usb = true,
+						.serial = CHIP_VENUS,
+						.nand = true,
+						.base_addr = 0x18000000,
+				},
+};
+
 static struct {
 	bool progress;
 	bool wait;
 	bool repeat;
 	cskburn_protocol_t protocol;
 	cskburn_action_t action;
-	uint32_t chip;
+	const chip_features_t *chip;
 #ifndef WITHOUT_USB
 	char *usb;
 	int16_t usb_bus;
@@ -161,7 +197,7 @@ static struct {
 } options = {
 		.progress = true,
 		.wait = false,
-		.chip = 4,
+		.chip = &chip_features[DEFAULT_CHIP],
 #ifndef WITHOUT_USB
 		.repeat = false,
 		.action = ACTION_NONE,
@@ -244,7 +280,10 @@ print_help(const char *progname)
 	LOGI("    baud rate used for serial burning (default: %d)", DEFAULT_BAUD);
 #ifndef WITHOUT_USB
 	LOGI("  -C, --chip <family>");
-	LOGI("    chip family, acceptable values: 3/4/6 (default: %d)", DEFAULT_CHIP);
+	LOGI("    chip family (default: %s), acceptable values:", chip_features[DEFAULT_CHIP].code);
+	for (int i = 0; i < CHIP_COUNT; i++) {
+		LOGI("      %s: %s", chip_features[i].code, chip_features[i].name);
+	}
 #endif
 	LOGI("  --chip-id");
 	LOGI("    read unique chip ID");
@@ -279,7 +318,7 @@ print_help(const char *progname)
 	LOGI("");
 
 	LOGI("Example:");
-	LOGI("    cskburn -C 6 -s %s -b 15000000 --verify-all 0x0 app.bin 0x100000 res.bin",
+	LOGI("    cskburn -C venus -s %s -b 15000000 --verify-all 0x0 app.bin 0x100000 res.bin",
 			example_serial_dev);
 }
 
@@ -330,12 +369,19 @@ main(int argc, char **argv)
 				options.action = ACTION_CHECK;
 				break;
 			case 'C':
-				sscanf(optarg, "%d", &options.chip);
-				if (options.chip != 6 && options.chip != 4 && options.chip != 3) {
-					LOGE("ERROR: Only 3, 4 or 6 of chip is supported");
+				if (strcmp(optarg, "castor") == 0 || strcmp(optarg, "CASTOR") == 0 ||
+						strstr(optarg, "csk3") == optarg || strstr(optarg, "CSK3") == optarg ||
+						strstr(optarg, "csk4") == optarg || strstr(optarg, "CSK4") == optarg ||
+						strcmp(optarg, "3") == 0 || strcmp(optarg, "4") == 0) {
+					options.chip = &chip_features[CASTOR];
+				} else if (strcmp(optarg, "venus") == 0 || strcmp(optarg, "VENUS") == 0 ||
+						   strstr(optarg, "csk6") == optarg || strstr(optarg, "CSK6") == optarg ||
+						   strcmp(optarg, "6") == 0) {
+					options.chip = &chip_features[VENUS];
+				} else {
+					LOGE("ERROR: Unsupported chip family: %s", optarg);
 					return EINVAL;
 				}
-				if (options.chip == 3) options.chip = 4;
 				break;
 			case 'n':
 				options.target = TARGET_NAND;
@@ -523,8 +569,8 @@ main(int argc, char **argv)
 		LOGE("ERROR: A port of serial device should be specified (e.g. -s %s)", example_serial_dev);
 		return EINVAL;
 #else
-		if (options.chip == 6) {
-			LOGE("ERROR: USB burning is not supported by chip family 6");
+		if (!options.chip->usb) {
+			LOGE("ERROR: USB burning is not supported by %s", options.chip->name);
 			return ENOTSUP;
 		}
 		if (options.usb != NULL && strcmp(options.usb, "-") != 0) {
@@ -544,8 +590,8 @@ main(int argc, char **argv)
 			return ENOTSUP;
 		}
 #endif
-		if (options.chip != 6) {
-			LOGE("ERROR: NAND is only supported by chip family 6");
+		if (!options.chip->nand) {
+			LOGE("ERROR: NAND is only supported by %s", options.chip->name);
 			return ENOTSUP;
 		}
 		if (options.read_count > 0) {
@@ -587,8 +633,6 @@ main(int argc, char **argv)
 
 	int ret = 0;
 
-	uint32_t base_addr = options.chip == 6 ? 0x18000000 : 0x80000000;
-
 	cskburn_partition_t parts[MAX_FLASH_PARTS];
 	int parts_cnt = 0;
 
@@ -600,7 +644,7 @@ main(int argc, char **argv)
 		goto exit;
 	}
 	if ((ret = read_parts_hex(parts_argv, parts_argc, parts + parts_cnt, &parts_cnt, MAX_IMAGE_SIZE,
-				 MAX_FLASH_PARTS - parts_cnt, base_addr)) != 0) {
+				 MAX_FLASH_PARTS - parts_cnt, options.chip->base_addr)) != 0) {
 		goto exit;
 	}
 
@@ -821,7 +865,8 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	}
 
 	cskburn_serial_device_t *dev = NULL;
-	if ((ret = cskburn_serial_open(&dev, options.serial, options.chip, options.timeout)) != 0) {
+	if ((ret = cskburn_serial_open(&dev, options.serial, options.chip->serial, options.timeout)) !=
+			0) {
 		LOGE_RET(ret, "ERROR: Failed opening device");
 		goto err_open;
 	}

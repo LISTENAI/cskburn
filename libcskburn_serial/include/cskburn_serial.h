@@ -15,6 +15,11 @@ void cskburn_serial_init(int flags);
 struct _cskburn_serial_device_t;
 typedef struct _cskburn_serial_device_t cskburn_serial_device_t;
 
+typedef enum {
+	CHIP_CASTOR,
+	CHIP_VENUS,
+} cskburn_serial_chip_t;
+
 #pragma pack(1)
 typedef struct {
 	uint8_t set : 1;
@@ -52,8 +57,8 @@ typedef enum {
  * @retval 0 if successful
  * @retval -errno on other errors from serial device
  */
-int cskburn_serial_open(
-		cskburn_serial_device_t **dev, const char *path, uint32_t chip, int32_t timeout);
+int cskburn_serial_open(cskburn_serial_device_t **dev, const char *path, cskburn_serial_chip_t chip,
+		int32_t timeout);
 
 /**
  * @brief Close CSK device

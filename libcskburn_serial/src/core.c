@@ -17,11 +17,11 @@
 
 #define FLASH_BLOCK_TRIES 3
 
-extern uint8_t burner_serial_4[];
-extern uint32_t burner_serial_4_len;
+extern uint8_t burner_serial_castor[];
+extern uint32_t burner_serial_castor_len;
 
-extern uint8_t burner_serial_6[];
-extern uint32_t burner_serial_6_len;
+extern uint8_t burner_serial_venus[];
+extern uint32_t burner_serial_venus_len;
 
 static int init_flags = 0;
 static bool rts_active = SERIAL_LOW;
@@ -34,7 +34,8 @@ cskburn_serial_init(int flags)
 }
 
 int
-cskburn_serial_open(cskburn_serial_device_t **dev, const char *path, uint32_t chip, int32_t timeout)
+cskburn_serial_open(cskburn_serial_device_t **dev, const char *path, cskburn_serial_chip_t chip,
+		int32_t timeout)
 {
 	int ret;
 
@@ -131,19 +132,19 @@ cskburn_serial_enter(
 	int ret;
 
 	if (burner == NULL || len == 0) {
-		if (dev->chip == 3 || dev->chip == 4) {
-			burner = burner_serial_4;
-			len = burner_serial_4_len;
-		} else if (dev->chip == 6) {
-			burner = burner_serial_6;
-			len = burner_serial_6_len;
+		if (dev->chip == CHIP_CASTOR) {
+			burner = burner_serial_castor;
+			len = burner_serial_castor_len;
+		} else if (dev->chip == CHIP_VENUS) {
+			burner = burner_serial_venus;
+			len = burner_serial_venus_len;
 		}
 	}
 
 	if (burner != NULL && len > 0) {
 		// For CSK6, CMD_CHANGE_BAUD is supported by the ROM, so take advantage
 		// of it to speed up the process.
-		if (dev->chip == 6 && baud_rate != BAUD_RATE_INIT) {
+		if (dev->chip == CHIP_VENUS && baud_rate != BAUD_RATE_INIT) {
 			if ((ret = cmd_change_baud(dev, baud_rate, BAUD_RATE_INIT)) != 0) {
 				LOGE_RET(ret, "ERROR: Failed changing baud rate");
 				return ret;
@@ -180,7 +181,7 @@ cskburn_serial_enter(
 		}
 
 		// RAM proxy is up with default baud rate
-		if (dev->chip == 6 && baud_rate != BAUD_RATE_INIT) {
+		if (dev->chip == CHIP_VENUS && baud_rate != BAUD_RATE_INIT) {
 			serial_set_speed(dev->serial, BAUD_RATE_INIT);
 		}
 
