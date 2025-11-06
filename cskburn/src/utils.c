@@ -85,6 +85,13 @@ has_extname(char *path, const char *extname)
 	return strncasecmp(path + path_len - extn_len, extname, extn_len) == 0;
 }
 
+uint32_t
+align_up(uint32_t addr, uint32_t align)
+{
+	if (align == 0) return addr;
+	return (addr + align - 1) & ~(align - 1);
+}
+
 bool
 is_aligned(uint32_t addr, uint32_t align)
 {

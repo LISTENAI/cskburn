@@ -127,6 +127,7 @@ typedef struct {
 	cskburn_serial_chip_t serial;
 	bool nand;
 	uint32_t base_addr;
+	bool flash_auto_erase;
 } chip_features_t;
 
 static const chip_features_t chip_features[] = {
@@ -138,6 +139,7 @@ static const chip_features_t chip_features[] = {
 						.serial = CHIP_CASTOR,
 						.nand = false,
 						.base_addr = 0x80000000,
+						.flash_auto_erase = true,
 				},
 		[VENUS] =
 				{
@@ -147,6 +149,7 @@ static const chip_features_t chip_features[] = {
 						.serial = CHIP_VENUS,
 						.nand = true,
 						.base_addr = 0x18000000,
+						.flash_auto_erase = true,
 				},
 		[ARCS] =
 				{
@@ -156,6 +159,7 @@ static const chip_features_t chip_features[] = {
 						.serial = CHIP_ARCS,
 						.nand = false,
 						.base_addr = 0x30000000,
+						.flash_auto_erase = false,
 				},
 };
 
@@ -1069,6 +1073,16 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	uint32_t jump_addr = 0;
 
 	for (int i = 0; i < parts_cnt; i++) {
+		if (options.target == TARGET_FLASH && !options.chip->flash_auto_erase) {
+			uint32_t size = align_up(parts[i].reader->size, 4 * 1024);
+			LOGI("Erasing region 0x%08X-0x%08X...", parts[i].addr, parts[i].addr + size);
+			if ((ret = cskburn_serial_erase(dev, options.target, parts[i].addr, size)) != 0) {
+				LOGE_RET(ret, "ERROR: Failed erasing region 0x%08X-0x%08X", parts[i].addr,
+						parts[i].addr + size);
+				goto err_write;
+			}
+		}
+
 		jump_addr = (options.target == TARGET_RAM && i == parts_cnt - 1) ? options.jump_address : 0;
 
 		LOGI("Burning partition %d/%d... (0x%08X, %.2f KB)", i + 1, parts_cnt, parts[i].addr,

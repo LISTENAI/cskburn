@@ -18,6 +18,8 @@ void md5_to_str(char *buf, uint8_t *md5);
 
 bool has_extname(char *path, const char *extname);
 
+uint32_t align_up(uint32_t addr, uint32_t align);
+
 bool is_aligned(uint32_t addr, uint32_t align);
 
 #endif  // __CSKBURN_UTILS__
