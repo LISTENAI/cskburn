@@ -960,6 +960,20 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		}
 	}
 
+	for (int i = 0; i < options.verify_count; i++) {
+		if (options.verify_parts[i].addr >= flash_size) {
+			LOGE("ERROR: The starting boundary of verify address (0x%08X) exceeds the capacity of "
+				 "flash (%" PRIu64 " MB)",
+					options.verify_parts[i].addr, flash_size >> 20);
+			goto err_enter;
+		} else if (options.verify_parts[i].addr + options.verify_parts[i].size > flash_size) {
+			LOGE("ERROR: The ending boundary of verify address (0x%08X) exceeds the capacity of "
+				 "flash (%" PRIu64 " MB)",
+					options.verify_parts[i].addr + options.verify_parts[i].size, flash_size >> 20);
+			goto err_enter;
+		}
+	}
+
 	for (int i = 0; i < parts_cnt; i++) {
 		if (options.target == TARGET_NAND) {
 			if (!is_aligned(parts[i].addr, 512)) {
