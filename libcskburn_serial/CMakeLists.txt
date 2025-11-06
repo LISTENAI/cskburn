@@ -3,8 +3,6 @@ project(cskburn_serial)
 set(SRCS
     src/core.c
     src/cmd.c
-    src/burner_castor_img.c
-    src/burner_venus_img.c
 )
 
 add_library(${PROJECT_NAME} STATIC ${SRCS})
@@ -23,3 +21,7 @@ target_link_libraries(${PROJECT_NAME} io)
 if($ENV{TRACE_DATA})
     target_compile_options(${PROJECT_NAME} PRIVATE -DTRACE_DATA=$ENV{TRACE_DATA})
 endif()
+
+include(target_embed_binary.cmake)
+target_embed_binary(${PROJECT_NAME} burner_serial_castor  ${CMAKE_CURRENT_SOURCE_DIR}/burner_castor.bin)
+target_embed_binary(${PROJECT_NAME} burner_serial_venus   ${CMAKE_CURRENT_SOURCE_DIR}/burner_venus.bin)

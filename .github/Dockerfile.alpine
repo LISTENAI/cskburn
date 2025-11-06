@@ -1,4 +1,12 @@
 FROM alpine:3.15
 
-RUN apk update && \
-    apk add git cmake make ninja g++ libtool musl-dev linux-headers
+RUN apk update && apk add \
+    cmake \
+    g++ \
+    git \
+    libtool \
+    linux-headers \
+    make \
+    musl-dev \
+    ninja \
+    python3
