@@ -53,6 +53,22 @@ memreader_feed(reader_t *reader, const uint8_t *buf, uint32_t size)
 }
 
 uint32_t
+memreader_fill(reader_t *reader, uint8_t value, uint32_t size)
+{
+	memreader_ctx_t *ctx = (memreader_ctx_t *)reader->ctx;
+	if (ctx->feed_off >= ctx->capacity) {
+		return 0;
+	}
+	if (ctx->feed_off + size > ctx->capacity) {
+		size = ctx->capacity - ctx->feed_off;
+	}
+	memset(ctx->buffer + ctx->feed_off, value, size);
+	ctx->feed_off += size;
+	reader->size = ctx->feed_off;
+	return size;
+}
+
+uint32_t
 memreader_read(reader_t *reader, uint8_t *buf, uint32_t size)
 {
 	memreader_ctx_t *ctx = (memreader_ctx_t *)reader->ctx;

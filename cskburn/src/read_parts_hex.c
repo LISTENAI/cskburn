@@ -106,6 +106,14 @@ append_part(cskburn_partition_t *parts, int *part_idx, uint32_t part_size_limit,
 	cskburn_partition_t *part = &parts[idx];
 
 	if (part->reader != NULL) {
+		if (part->addr + part->reader->size < addr &&
+				align_up(part->addr + part->reader->size, FLASH_ALIGN) >= addr) {
+			uint32_t to_fill = addr - (part->addr + part->reader->size);
+			memreader_fill(part->reader, 0xFF, to_fill);
+			LOG_TRACE("Filled gap of %" PRIu32 " bytes in part %d to align to address 0x%08X",
+					to_fill, idx, addr);
+		}
+
 		if (part->addr + part->reader->size == addr) {
 			memreader_feed(part->reader, buf, size);
 			LOG_TRACE("Part %d, addr: 0x%08X, size: %" PRIu32 " (append)", idx, part->addr,
