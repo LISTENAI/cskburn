@@ -651,10 +651,10 @@ main(int argc, char **argv)
 
 	cskburn_partition_t parts[MAX_FLASH_PARTS];
 	int parts_cnt = 0;
+	memset(parts, 0, sizeof(parts));
 
 	char **parts_argv = argv + optind;
 	int parts_argc = argc - optind;
-	memset(parts, 0, sizeof(parts));
 	if ((ret = read_parts_bin(parts_argv, parts_argc, parts + parts_cnt, &parts_cnt,
 				 MAX_FLASH_PARTS - parts_cnt)) != 0) {
 		goto exit;
@@ -941,11 +941,11 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	}
 
 	for (int i = 0; i < options.erase_count; i++) {
-		if (!is_aligned(options.erase_parts[i].addr, 4 * 1024)) {
+		if (!is_aligned(options.erase_parts[i].addr, FLASH_ALIGN)) {
 			LOGE("ERROR: Erase address (0x%08X) should be 4K aligned", options.erase_parts[i].addr);
 			ret = -EINVAL;
 			goto err_enter;
-		} else if (!is_aligned(options.erase_parts[i].size, 4 * 1024)) {
+		} else if (!is_aligned(options.erase_parts[i].size, FLASH_ALIGN)) {
 			LOGE("ERROR: Erase size (0x%08X) should be 4K aligned", options.erase_parts[i].size);
 			ret = -EINVAL;
 			goto err_enter;
@@ -980,14 +980,14 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 
 	for (int i = 0; i < parts_cnt; i++) {
 		if (options.target == TARGET_NAND) {
-			if (!is_aligned(parts[i].addr, 512)) {
+			if (!is_aligned(parts[i].addr, NAND_ALIGN)) {
 				LOGE("ERROR: Address of partition %d (0x%08X) should be 512 bytes aligned", i + 1,
 						parts[i].addr);
 				ret = -EINVAL;
 				goto err_enter;
 			}
 		} else if (options.target == TARGET_FLASH) {
-			if (!is_aligned(parts[i].addr, 4 * 1024)) {
+			if (!is_aligned(parts[i].addr, FLASH_ALIGN)) {
 				LOGE("ERROR: Address of partition %d (0x%08X) should be 4K aligned", i + 1,
 						parts[i].addr);
 				ret = -EINVAL;
@@ -1074,7 +1074,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 
 	for (int i = 0; i < parts_cnt; i++) {
 		if (options.target == TARGET_FLASH && !options.chip->flash_auto_erase) {
-			uint32_t size = align_up(parts[i].reader->size, 4 * 1024);
+			uint32_t size = align_up(parts[i].reader->size, FLASH_ALIGN);
 			LOGI("Erasing region 0x%08X-0x%08X...", parts[i].addr, parts[i].addr + size);
 			if ((ret = cskburn_serial_erase(dev, options.target, parts[i].addr, size)) != 0) {
 				LOGE_RET(ret, "ERROR: Failed erasing region 0x%08X-0x%08X", parts[i].addr,

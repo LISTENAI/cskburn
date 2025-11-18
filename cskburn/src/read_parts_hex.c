@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -39,7 +40,7 @@ read_parts_hex(char **argv, int argc, cskburn_partition_t *parts, int *parts_cnt
 				LOGE_RET(ret, "ERROR: Failed reading %s", argv[i]);
 				goto exit;
 			} else {
-				LOGD("Parsing HEX file: %s, size: %d", argv[i], hex_len);
+				LOGD("Parsing HEX file: %s, size: %" PRIu32, argv[i], hex_len);
 			}
 
 			reset_hex_parser();
@@ -55,7 +56,8 @@ read_parts_hex(char **argv, int argc, cskburn_partition_t *parts, int *parts_cnt
 				}
 				if (status == HEX_PARSE_OK) {
 					if (bin_size > 0) {
-						LOG_TRACE("Parsed HEX, addr: 0x%08X, size: %d (OK)", bin_addr, bin_size);
+						LOG_TRACE("Parsed HEX, addr: 0x%08X, size: %" PRIu32 " (OK)", bin_addr,
+								bin_size);
 						cnt += append_part(parts, &idx, part_size_limit, parts_cnt_limit, argv[i],
 								bin_buf, bin_addr, bin_size);
 						idx++;
@@ -63,8 +65,8 @@ read_parts_hex(char **argv, int argc, cskburn_partition_t *parts, int *parts_cnt
 					break;
 				} else if (status == HEX_PARSE_UNALIGNED) {
 					if (bin_size > 0) {
-						LOG_TRACE("Parsed HEX, addr: 0x%08X, size: %d (UNALIGNED)", bin_addr,
-								bin_size);
+						LOG_TRACE("Parsed HEX, addr: 0x%08X, size: %" PRIu32 " (UNALIGNED)",
+								bin_addr, bin_size);
 						cnt += append_part(parts, &idx, part_size_limit, parts_cnt_limit, argv[i],
 								bin_buf, bin_addr, bin_size);
 					}
@@ -72,7 +74,8 @@ read_parts_hex(char **argv, int argc, cskburn_partition_t *parts, int *parts_cnt
 					hex_ptr += hex_parsed;
 				} else if (status == HEX_PARSE_EOF) {
 					if (bin_size > 0) {
-						LOG_TRACE("Parsed HEX, addr: 0x%08X, size: %d (EOF)", bin_addr, bin_size);
+						LOG_TRACE("Parsed HEX, addr: 0x%08X, size: %" PRIu32 " (EOF)", bin_addr,
+								bin_size);
 						cnt += append_part(parts, &idx, part_size_limit, parts_cnt_limit, argv[i],
 								bin_buf, bin_addr, bin_size);
 						idx++;
@@ -105,7 +108,7 @@ append_part(cskburn_partition_t *parts, int *part_idx, uint32_t part_size_limit,
 	if (part->reader != NULL) {
 		if (part->addr + part->reader->size == addr) {
 			memreader_feed(part->reader, buf, size);
-			LOG_TRACE("Part %d, addr: 0x%08X, size: %d (append)", idx, part->addr,
+			LOG_TRACE("Part %d, addr: 0x%08X, size: %" PRIu32 " (append)", idx, part->addr,
 					part->reader->size);
 			return 0;
 		} else {
@@ -126,6 +129,7 @@ append_part(cskburn_partition_t *parts, int *part_idx, uint32_t part_size_limit,
 	part->reader = memreader_alloc(part_size_limit);
 	memreader_feed(part->reader, buf, size);
 	part->addr = addr;
-	LOG_TRACE("Part %d, addr: 0x%08X, size: %d (new)", idx, part->addr, part->reader->size);
+	LOG_TRACE(
+			"Part %d, addr: 0x%08X, size: %" PRIu32 " (new)", idx, part->addr, part->reader->size);
 	return 1;
 }

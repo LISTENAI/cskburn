@@ -92,6 +92,13 @@ align_up(uint32_t addr, uint32_t align)
 	return (addr + align - 1) & ~(align - 1);
 }
 
+uint32_t
+align_down(uint32_t addr, uint32_t align)
+{
+	if (align == 0) return addr;
+	return addr & ~(align - 1);
+}
+
 bool
 is_aligned(uint32_t addr, uint32_t align)
 {
