@@ -27,7 +27,7 @@ configure_port(HANDLE handle, DWORD baud_rate)
 	dcb.ByteSize = 8;
 	dcb.Parity = NOPARITY;
 	dcb.StopBits = ONESTOPBIT;
-	dcb.fRtsControl = RTS_CONTROL_ENABLE;
+	dcb.fRtsControl = RTS_CONTROL_DISABLE;
 	dcb.fDtrControl = DTR_CONTROL_DISABLE;
 
 	if (SetCommState(handle, &dcb) == 0) {
