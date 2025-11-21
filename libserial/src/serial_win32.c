@@ -12,7 +12,7 @@ struct _serial_dev_t {
 };
 
 static int
-configure_port(HANDLE handle, DWORD baud_rate)
+configure_port(HANDLE handle, DWORD baud_rate, bool rts, bool dtr)
 {
 	DCB dcb;
 
@@ -27,8 +27,8 @@ configure_port(HANDLE handle, DWORD baud_rate)
 	dcb.ByteSize = 8;
 	dcb.Parity = NOPARITY;
 	dcb.StopBits = ONESTOPBIT;
-	dcb.fRtsControl = RTS_CONTROL_DISABLE;
-	dcb.fDtrControl = DTR_CONTROL_DISABLE;
+	dcb.fRtsControl = rts ? RTS_CONTROL_ENABLE : RTS_CONTROL_DISABLE;
+	dcb.fDtrControl = dtr ? DTR_CONTROL_ENABLE : DTR_CONTROL_DISABLE;
 
 	if (SetCommState(handle, &dcb) == 0) {
 		return -EIO;
@@ -61,7 +61,7 @@ serial_open(const char *path, serial_dev_t **dev)
 		return -ENODEV;
 	}
 
-	ret = configure_port(handle, CBR_115200);
+	ret = configure_port(handle, CBR_115200, false, false);
 	if (ret != 0) {
 		CloseHandle(handle);
 		return ret;
@@ -105,15 +105,7 @@ serial_set_speed(serial_dev_t *dev, uint32_t speed)
 {
 	int ret;
 
-	if ((ret = configure_port(dev->handle, speed)) != 0) {
-		return ret;
-	}
-
-	if ((ret = serial_set_rts(dev, dev->rts)) != 0) {
-		return ret;
-	}
-
-	if ((ret = serial_set_dtr(dev, dev->dtr)) != 0) {
+	if ((ret = configure_port(dev->handle, speed, dev->rts, dev->dtr)) != 0) {
 		return ret;
 	}
 
