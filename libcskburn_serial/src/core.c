@@ -135,16 +135,19 @@ cskburn_serial_connect(cskburn_serial_device_t *dev, uint32_t reset_delay, uint3
 	}
 
 	if (dev->chip == CHIP_ARCS) {
-		serial_set_dtr(dev->serial, SERIAL_HIGH);  // UPDATE=HIGH
-		serial_set_rts(dev->serial, SERIAL_HIGH);  // RESET=HIGH
-		msleep(10);
-		serial_set_dtr(dev->serial, SERIAL_LOW);  // UPDATE=LOW
+		// Hold RESET first, so holding BOOT won't harm the chip
+		serial_set_rts(dev->serial, SERIAL_LOW);  // RESET=LOW
+		serial_set_dtr(dev->serial, SERIAL_HIGH);  // BOOT=HIGH
 		msleep(50);
 		serial_set_rts(dev->serial, SERIAL_LOW);  // RESET=LOW
+		serial_set_dtr(dev->serial, SERIAL_LOW);  // BOOT=LOW
 		msleep(reset_delay);
 		serial_set_rts(dev->serial, SERIAL_HIGH);  // RESET=HIGH
+		serial_set_dtr(dev->serial, SERIAL_LOW);  // BOOT=LOW, again to push RTS out
 		msleep(50);
-		serial_set_dtr(dev->serial, SERIAL_HIGH);
+		// Make sure to release BOOT so TX frees up
+		serial_set_rts(dev->serial, SERIAL_HIGH);  // RESET=HIGH
+		serial_set_dtr(dev->serial, SERIAL_HIGH);  // BOOT=HIGH
 	} else {
 		serial_set_rts(dev->serial, !rts_active);  // UPDATE=HIGH
 		serial_set_dtr(dev->serial, SERIAL_HIGH);  // RESET=HIGH
@@ -530,10 +533,11 @@ int
 cskburn_serial_reset(cskburn_serial_device_t *dev, uint32_t reset_delay)
 {
 	if (dev->chip == CHIP_ARCS) {
-		serial_set_dtr(dev->serial, SERIAL_HIGH);  // UPDATE=HIGH
 		serial_set_rts(dev->serial, SERIAL_LOW);  // RESET=LOW
+		serial_set_dtr(dev->serial, SERIAL_HIGH);  // UPDATE=HIGH
 		msleep(reset_delay);
 		serial_set_rts(dev->serial, SERIAL_HIGH);  // RESET=HIGH
+		serial_set_dtr(dev->serial, SERIAL_HIGH);  // UPDATE=HIGH, again to push RTS out
 	} else {
 		serial_set_rts(dev->serial, !rts_active);  // UPDATE=HIGH
 		serial_set_dtr(dev->serial, SERIAL_LOW);  // RESET=LOW
