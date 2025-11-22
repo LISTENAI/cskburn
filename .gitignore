@@ -1,6 +1,36 @@
 .DS_Store
 /build
+/build-*
 /.vscode
+/.idea
 
 /*.bin
 /*.hex
+
+# Compiled objects
+*.o
+*.a
+*.so
+*.dll
+*.dylib
+
+# Editor backup files
+*.swp
+*.swo
+*~
+
+# Debug and profiling
+*.dSYM/
+vgcore.*
+core
+*.log
+
+# Temporary files
+*.tmp
+*.bak
+*.orig
+
+# CMake artifacts
+CMakeCache.txt
+CMakeFiles/
+compile_commands.json
