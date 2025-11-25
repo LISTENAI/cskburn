@@ -179,11 +179,14 @@ cskburn_serial_enter(
 		} else if (dev->chip == CHIP_ARCS) {
 			burner = burner_serial_arcs;
 			len = burner_serial_arcs_len;
-			load_addr = BURNER_LOAD_ADDR_ARCS;
 		}
 	}
 
 	if (burner != NULL && len > 0) {
+		if (dev->chip == CHIP_ARCS) {
+			load_addr = BURNER_LOAD_ADDR_ARCS;
+		}
+
 		uint64_t t1 = time_monotonic();
 
 		// For CSK6 and ARCS CMD_CHANGE_BAUD is supported by the ROM, so take advantage
