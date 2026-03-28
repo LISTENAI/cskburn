@@ -7,6 +7,16 @@ cskburn
 
 ## 使用
 
+### AI Skill
+
+太长不想看？让你的 AI 编程助手代劳：
+
+```bash
+npx skills add LISTENAI/cskburn
+```
+
+### 详细参数
+
 ```
 Usage: cskburn [<options>] <addr1> <file1> [<addr2> <file2> ...]
        cskburn [<options>] --verify <addr1>:<size1> [--verify <addr2>:<size2> ...]
