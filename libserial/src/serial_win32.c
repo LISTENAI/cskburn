@@ -173,7 +173,7 @@ serial_read(serial_dev_t *dev, void *buf, size_t count, uint64_t timeout)
 	}
 
 	buf = (uint8_t *)buf + 1;
-	count = count + 1;
+	count = count - 1;
 	count = count < stat.cbInQue ? count : stat.cbInQue;
 
 	// Read the remaining bytes
