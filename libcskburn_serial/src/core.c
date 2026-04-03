@@ -526,7 +526,11 @@ cskburn_serial_get_flash_info(
 		return -ENODEV;
 	}
 
-	*flash_size = 2 << (((*flash_id >> 16) & 0xFF) - 1);
+	uint8_t capacity = (*flash_id >> 16) & 0xFF;
+	if (capacity == 0 || capacity > 31) {
+		return -ENODEV;
+	}
+	*flash_size = 2 << (capacity - 1);
 	return 0;
 }
 
