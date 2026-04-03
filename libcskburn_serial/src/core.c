@@ -16,8 +16,6 @@
 
 #define BAUD_RATE_INIT 115200
 
-#define BURNER_LOAD_ADDR_DEFAULT 0
-#define BURNER_LOAD_ADDR_ARCS 0x20040000
 
 #define FLASH_BLOCK_TRIES 3
 
@@ -183,10 +181,10 @@ sync:
 
 int
 cskburn_serial_enter(
-		cskburn_serial_device_t *dev, uint32_t baud_rate, uint8_t *burner, uint32_t len)
+		cskburn_serial_device_t *dev, uint32_t baud_rate, uint8_t *burner, uint32_t len,
+		uint32_t load_addr)
 {
 	int ret;
-	int load_addr = BURNER_LOAD_ADDR_DEFAULT;
 
 	if (burner == NULL || len == 0) {
 		if (dev->chip == CHIP_CASTOR) {
@@ -202,10 +200,6 @@ cskburn_serial_enter(
 	}
 
 	if (burner != NULL && len > 0) {
-		if (dev->chip == CHIP_ARCS) {
-			load_addr = BURNER_LOAD_ADDR_ARCS;
-		}
-
 		uint64_t t1 = time_monotonic();
 
 		// For CSK6 and ARCS CMD_CHANGE_BAUD is supported by the ROM, so take advantage

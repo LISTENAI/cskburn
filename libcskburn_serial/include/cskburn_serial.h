@@ -94,8 +94,8 @@ int cskburn_serial_connect(
  * @retval -ETIMEDOUT if timeout
  * @retval -errno on other errors from serial device
  */
-int cskburn_serial_enter(
-		cskburn_serial_device_t *dev, uint32_t baud_rate, uint8_t *burner, uint32_t len);
+int cskburn_serial_enter(cskburn_serial_device_t *dev, uint32_t baud_rate, uint8_t *burner,
+		uint32_t len, uint32_t load_addr);
 
 int cskburn_serial_write(cskburn_serial_device_t *dev, cskburn_serial_target_t target,
 		uint32_t addr, reader_t *reader, uint32_t jump,

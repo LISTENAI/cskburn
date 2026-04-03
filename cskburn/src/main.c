@@ -24,6 +24,8 @@
 #define ENTER_TRIES 5
 
 #define DEFAULT_BAUD 3000000
+#define BURNER_LOAD_ADDR_DEFAULT 0
+#define BURNER_LOAD_ADDR_ARCS 0x20040000
 
 #define DEFAULT_PROBE_TIMEOUT 10 * 1000
 #define DEFAULT_RESET_ATTEMPTS 4
@@ -127,6 +129,8 @@ typedef struct {
 	cskburn_serial_chip_t serial;
 	bool nand;
 	uint32_t base_addr;
+	uint32_t burner_load_addr;
+	uint32_t default_baud;
 	bool flash_auto_erase;
 } chip_features_t;
 
@@ -139,6 +143,8 @@ static const chip_features_t chip_features[] = {
 						.serial = CHIP_CASTOR,
 						.nand = false,
 						.base_addr = 0x80000000,
+						.burner_load_addr = BURNER_LOAD_ADDR_DEFAULT,
+						.default_baud = DEFAULT_BAUD,
 						.flash_auto_erase = true,
 				},
 		[VENUS] =
@@ -149,6 +155,8 @@ static const chip_features_t chip_features[] = {
 						.serial = CHIP_VENUS,
 						.nand = true,
 						.base_addr = 0x18000000,
+						.burner_load_addr = BURNER_LOAD_ADDR_DEFAULT,
+						.default_baud = DEFAULT_BAUD,
 						.flash_auto_erase = true,
 				},
 		[ARCS] =
@@ -159,6 +167,8 @@ static const chip_features_t chip_features[] = {
 						.serial = CHIP_ARCS,
 						.nand = false,
 						.base_addr = 0x30000000,
+						.burner_load_addr = BURNER_LOAD_ADDR_ARCS,
+						.default_baud = DEFAULT_BAUD,
 						.flash_auto_erase = false,
 				},
 };
@@ -220,7 +230,7 @@ static struct {
 		.usb_addr = -1,
 #endif
 		.serial = NULL,
-		.serial_baud = DEFAULT_BAUD,
+		.serial_baud = 0,
 		.target = TARGET_FLASH,
 		.read_chip_id = false,
 		.read_count = 0,
@@ -291,7 +301,8 @@ print_help(const char *progname)
 
 	LOGI("Serial burning options:");
 	LOGI("  -b, --baud <rate>");
-	LOGI("    baud rate used for serial burning (default: %d)", DEFAULT_BAUD);
+	LOGI("    baud rate used for serial burning (default: %d)",
+			chip_features[DEFAULT_CHIP].default_baud);
 #ifndef WITHOUT_USB
 	LOGI("  -C, --chip <family>");
 	LOGI("    chip family (default: %s), acceptable values:", chip_features[DEFAULT_CHIP].code);
@@ -605,6 +616,10 @@ main(int argc, char **argv)
 		}
 	}
 
+	if (options.serial_baud == 0) {
+		options.serial_baud = options.chip->default_baud;
+	}
+
 	if (options.burner != NULL) {
 		options.burner_buf = (uint8_t *)malloc(MAX_IMAGE_SIZE);
 		options.burner_len = read_file(options.burner, options.burner_buf, MAX_IMAGE_SIZE);
@@ -876,8 +891,8 @@ serial_connect(cskburn_serial_device_t *dev)
 			}
 		}
 		LOGI("Entering update mode...");
-		if ((ret = cskburn_serial_enter(
-					 dev, options.serial_baud, options.burner_buf, options.burner_len)) != 0) {
+		if ((ret = cskburn_serial_enter(dev, options.serial_baud, options.burner_buf,
+					 options.burner_len, options.chip->burner_load_addr)) != 0) {
 			if (!options.wait && i >= options.reset_attempts) {
 				LOGE("ERROR: Failed entering update mode");
 				return ret;
