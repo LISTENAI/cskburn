@@ -377,7 +377,10 @@ main(int argc, char **argv)
 				options.serial = optarg;
 				break;
 			case 'b':
-				sscanf(optarg, "%d", &options.serial_baud);
+				if (sscanf(optarg, "%d", &options.serial_baud) != 1) {
+					LOGE("ERROR: Invalid baud rate: %s", optarg);
+					return EINVAL;
+				}
 				break;
 			case 'c':
 				options.action = ACTION_CHECK;
@@ -471,16 +474,28 @@ main(int argc, char **argv)
 					options.verify_all = true;
 					break;
 				} else if (strcmp(name, "probe-timeout") == 0) {
-					sscanf(optarg, "%d", &options.probe_timeout);
+					if (sscanf(optarg, "%d", &options.probe_timeout) != 1) {
+						LOGE("ERROR: Invalid value for --probe-timeout: %s", optarg);
+						return EINVAL;
+					}
 					break;
 				} else if (strcmp(name, "reset-attempts") == 0) {
-					sscanf(optarg, "%d", &options.reset_attempts);
+					if (sscanf(optarg, "%d", &options.reset_attempts) != 1) {
+						LOGE("ERROR: Invalid value for --reset-attempts: %s", optarg);
+						return EINVAL;
+					}
 					break;
 				} else if (strcmp(name, "reset-delay") == 0) {
-					sscanf(optarg, "%d", &options.reset_delay);
+					if (sscanf(optarg, "%d", &options.reset_delay) != 1) {
+						LOGE("ERROR: Invalid value for --reset-delay: %s", optarg);
+						return EINVAL;
+					}
 					break;
 				} else if (strcmp(name, "timeout") == 0) {
-					sscanf(optarg, "%d", &options.timeout);
+					if (sscanf(optarg, "%d", &options.timeout) != 1) {
+						LOGE("ERROR: Invalid value for --timeout: %s", optarg);
+						return EINVAL;
+					}
 					break;
 				} else if (strcmp(name, "burner") == 0) {
 					options.burner = optarg;
@@ -502,42 +517,60 @@ main(int argc, char **argv)
 					break;
 				} else if (strcmp(name, "nand-cmd") == 0) {
 					int pad, pin;
-					sscanf(optarg, "%d:%d", &pad, &pin);
+					if (sscanf(optarg, "%d:%d", &pad, &pin) != 2) {
+						LOGE("ERROR: Invalid value for --nand-cmd, expected pad:pin");
+						return EINVAL;
+					}
 					nand_config.sd_cmd.set = 1;
 					nand_config.sd_cmd.pad = pad;
 					nand_config.sd_cmd.pin = pin;
 					break;
 				} else if (strcmp(name, "nand-clk") == 0) {
 					int pad, pin;
-					sscanf(optarg, "%d:%d", &pad, &pin);
+					if (sscanf(optarg, "%d:%d", &pad, &pin) != 2) {
+						LOGE("ERROR: Invalid value for --nand-clk, expected pad:pin");
+						return EINVAL;
+					}
 					nand_config.sd_clk.set = 1;
 					nand_config.sd_clk.pad = pad;
 					nand_config.sd_clk.pin = pin;
 					break;
 				} else if (strcmp(name, "nand-dat0") == 0) {
 					int pad, pin;
-					sscanf(optarg, "%d:%d", &pad, &pin);
+					if (sscanf(optarg, "%d:%d", &pad, &pin) != 2) {
+						LOGE("ERROR: Invalid value for --nand-dat0, expected pad:pin");
+						return EINVAL;
+					}
 					nand_config.sd_dat0.set = 1;
 					nand_config.sd_dat0.pad = pad;
 					nand_config.sd_dat0.pin = pin;
 					break;
 				} else if (strcmp(name, "nand-dat1") == 0) {
 					int pad, pin;
-					sscanf(optarg, "%d:%d", &pad, &pin);
+					if (sscanf(optarg, "%d:%d", &pad, &pin) != 2) {
+						LOGE("ERROR: Invalid value for --nand-dat1, expected pad:pin");
+						return EINVAL;
+					}
 					nand_config.sd_dat1.set = 1;
 					nand_config.sd_dat1.pad = pad;
 					nand_config.sd_dat1.pin = pin;
 					break;
 				} else if (strcmp(name, "nand-dat2") == 0) {
 					int pad, pin;
-					sscanf(optarg, "%d:%d", &pad, &pin);
+					if (sscanf(optarg, "%d:%d", &pad, &pin) != 2) {
+						LOGE("ERROR: Invalid value for --nand-dat2, expected pad:pin");
+						return EINVAL;
+					}
 					nand_config.sd_dat2.set = 1;
 					nand_config.sd_dat2.pad = pad;
 					nand_config.sd_dat2.pin = pin;
 					break;
 				} else if (strcmp(name, "nand-dat3") == 0) {
 					int pad, pin;
-					sscanf(optarg, "%d:%d", &pad, &pin);
+					if (sscanf(optarg, "%d:%d", &pad, &pin) != 2) {
+						LOGE("ERROR: Invalid value for --nand-dat3, expected pad:pin");
+						return EINVAL;
+					}
 					nand_config.sd_dat3.set = 1;
 					nand_config.sd_dat3.pad = pad;
 					nand_config.sd_dat3.pin = pin;
@@ -552,7 +585,10 @@ main(int argc, char **argv)
 					options.no_reset = true;
 					break;
 				} else if (strcmp(name, "read-logs") == 0) {
-					sscanf(optarg, "%d", &options.read_logs_baud);
+					if (sscanf(optarg, "%d", &options.read_logs_baud) != 1) {
+						LOGE("ERROR: Invalid value for --read-logs: %s", optarg);
+						return EINVAL;
+					}
 					break;
 				} else {
 					print_help(argv[0]);
