@@ -296,7 +296,7 @@ cmd_read_chip_id(cskburn_serial_device_t *dev, uint8_t *id)
 		return ret;
 	}
 
-	if (ret_len < STATUS_BYTES_LEN) {
+	if (ret_len < STATUS_BYTES_LEN + CHIP_ID_LEN) {
 		LOGD("DEBUG: Interrupted serial read");
 		return -EIO;
 	}
@@ -421,7 +421,7 @@ cmd_nand_md5(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uint
 		return ret;
 	}
 
-	if (ret_len < STATUS_BYTES_LEN) {
+	if (ret_len < STATUS_BYTES_LEN + 16) {
 		LOGD("DEBUG: Interrupted serial read");
 		return -EIO;
 	}
@@ -575,7 +575,7 @@ cmd_flash_md5sum(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, 
 		return ret;
 	}
 
-	if (ret_len < STATUS_BYTES_LEN) {
+	if (ret_len < STATUS_BYTES_LEN + 16) {
 		LOGD("DEBUG: Interrupted serial read");
 		return -EIO;
 	}
