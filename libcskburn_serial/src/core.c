@@ -73,10 +73,18 @@ cskburn_serial_open(cskburn_serial_device_t **dev, const char *path, cskburn_ser
 	}
 
 	(*dev) = (cskburn_serial_device_t *)calloc(1, sizeof(cskburn_serial_device_t));
+	if (*dev == NULL) {
+		goto err_dev;
+	}
+
 	(*dev)->serial = serial;
 	(*dev)->slip = slip;
 	(*dev)->req_buf = (uint8_t *)calloc(1, MAX_REQ_RAW_LEN);
 	(*dev)->res_buf = (uint8_t *)calloc(1, MAX_RES_RAW_LEN);
+	if ((*dev)->req_buf == NULL || (*dev)->res_buf == NULL) {
+		goto err_buf;
+	}
+
 	(*dev)->req_hdr = (*dev)->req_buf;
 	(*dev)->req_cmd = (*dev)->req_buf + sizeof(csk_command_t);
 	(*dev)->chip = chip;
@@ -84,10 +92,17 @@ cskburn_serial_open(cskburn_serial_device_t **dev, const char *path, cskburn_ser
 
 	return 0;
 
-err_slip:
+err_buf:
+	free((*dev)->req_buf);
+	free((*dev)->res_buf);
+	free(*dev);
+	*dev = NULL;
+err_dev:
 	slip_deinit(&slip);
+err_slip:
+	serial_close(&serial);
 err_serial:
-	return ret;
+	return ret != 0 ? ret : -ENOMEM;
 }
 
 void

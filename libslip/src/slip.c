@@ -33,6 +33,10 @@ slip_dev_t *
 slip_init(serial_dev_t *serial, size_t tx_buf_len, size_t rx_buf_len)
 {
 	slip_dev_t *slip = calloc(1, sizeof(slip_dev_t));
+	if (slip == NULL) {
+		return NULL;
+	}
+
 	slip->serial = serial;
 
 	slip->tx_len = tx_buf_len;
@@ -40,6 +44,13 @@ slip_init(serial_dev_t *serial, size_t tx_buf_len, size_t rx_buf_len)
 
 	slip->rx_len = rx_buf_len;
 	slip->rx_buf = calloc(1, rx_buf_len);
+
+	if (slip->tx_buf == NULL || slip->rx_buf == NULL) {
+		free(slip->tx_buf);
+		free(slip->rx_buf);
+		free(slip);
+		return NULL;
+	}
 
 	return slip;
 }

@@ -26,6 +26,12 @@ read_parts_hex(char **argv, int argc, cskburn_partition_t *parts, int *parts_cnt
 	uint32_t hex_parsed = 0;
 
 	uint8_t *bin_buf = malloc(part_size_limit);
+
+	if (hex_buf == NULL || bin_buf == NULL) {
+		free(hex_buf);
+		free(bin_buf);
+		return -ENOMEM;
+	}
 	uint32_t bin_addr = 0;
 	uint32_t bin_size = 0;
 
@@ -133,8 +139,16 @@ append_part(cskburn_partition_t *parts, int *part_idx, uint32_t part_size_limit,
 	}
 
 	part->path = malloc(260 + 11);
+	if (part->path == NULL) {
+		return 0;
+	}
 	sprintf(part->path, "%s@0x%08X", path, addr);
 	part->reader = memreader_alloc(part_size_limit);
+	if (part->reader == NULL) {
+		free(part->path);
+		part->path = NULL;
+		return 0;
+	}
 	memreader_feed(part->reader, buf, size);
 	part->addr = addr;
 	LOG_TRACE(
