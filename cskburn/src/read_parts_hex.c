@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <inttypes.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -142,7 +143,7 @@ append_part(cskburn_partition_t *parts, int *part_idx, uint32_t part_size_limit,
 	if (part->path == NULL) {
 		return 0;
 	}
-	sprintf(part->path, "%s@0x%08X", path, addr);
+	snprintf(part->path, 260 + 11, "%s@0x%08X", path, addr);
 	part->reader = memreader_alloc(part_size_limit);
 	if (part->reader == NULL) {
 		free(part->path);
