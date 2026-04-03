@@ -358,6 +358,23 @@ static bool usb_check(void);
 static bool usb_burn(cskburn_partition_t *parts, int parts_cnt);
 #endif
 
+static int
+validate_flash_bounds(uint32_t addr, uint32_t size, uint64_t flash_size, const char *op)
+{
+	if (addr >= flash_size) {
+		LOGE("ERROR: The starting boundary of %s address (0x%08X) exceeds the capacity of "
+			 "flash (%" PRIu64 " MB)",
+				op, addr, flash_size >> 20);
+		return -EINVAL;
+	} else if ((uint64_t)addr + size > flash_size) {
+		LOGE("ERROR: The ending boundary of %s address (0x%08X) exceeds the capacity of "
+			 "flash (%" PRIu64 " MB)",
+				op, addr + size, flash_size >> 20);
+		return -EINVAL;
+	}
+	return 0;
+}
+
 static int serial_burn(cskburn_partition_t *parts, int parts_cnt);
 
 int
@@ -978,17 +995,8 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	}
 
 	for (int i = 0; i < options.read_count; i++) {
-		if (options.read_parts[i].addr >= flash_size) {
-			LOGE("ERROR: The starting boundary of read address (0x%08X) exceeds the capacity of "
-				 "flash (%" PRIu64 " MB)",
-					options.read_parts[i].addr, flash_size >> 20);
-			ret = -EINVAL;
-			goto err_enter;
-		} else if (options.read_parts[i].addr + options.read_parts[i].size > flash_size) {
-			LOGE("ERROR: The ending boundary of read address (0x%08X) exceeds the capacity of "
-				 "flash (%" PRIu64 " MB)",
-					options.read_parts[i].addr + options.read_parts[i].size, flash_size >> 20);
-			ret = -EINVAL;
+		if ((ret = validate_flash_bounds(options.read_parts[i].addr, options.read_parts[i].size,
+					 flash_size, "read")) != 0) {
 			goto err_enter;
 		}
 	}
@@ -1002,31 +1010,15 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 			LOGE("ERROR: Erase size (0x%08X) should be 4K aligned", options.erase_parts[i].size);
 			ret = -EINVAL;
 			goto err_enter;
-		} else if (options.erase_parts[i].addr >= flash_size) {
-			LOGE("ERROR: The starting boundary of erase address (0x%08X) exceeds the capacity of "
-				 "flash (%" PRIu64 " MB)",
-					options.erase_parts[i].addr, flash_size >> 20);
-			ret = -EINVAL;
-			goto err_enter;
-		} else if (options.erase_parts[i].addr + options.erase_parts[i].size > flash_size) {
-			LOGE("ERROR: The ending boundary of erase address (0x%08X) exceeds the capacity of "
-				 "flash (%" PRIu64 " MB)",
-					options.erase_parts[i].addr + options.erase_parts[i].size, flash_size >> 20);
-			ret = -EINVAL;
+		} else if ((ret = validate_flash_bounds(options.erase_parts[i].addr,
+							options.erase_parts[i].size, flash_size, "erase")) != 0) {
 			goto err_enter;
 		}
 	}
 
 	for (int i = 0; i < options.verify_count; i++) {
-		if (options.verify_parts[i].addr >= flash_size) {
-			LOGE("ERROR: The starting boundary of verify address (0x%08X) exceeds the capacity of "
-				 "flash (%" PRIu64 " MB)",
-					options.verify_parts[i].addr, flash_size >> 20);
-			goto err_enter;
-		} else if (options.verify_parts[i].addr + options.verify_parts[i].size > flash_size) {
-			LOGE("ERROR: The ending boundary of verify address (0x%08X) exceeds the capacity of "
-				 "flash (%" PRIu64 " MB)",
-					options.verify_parts[i].addr + options.verify_parts[i].size, flash_size >> 20);
+		if ((ret = validate_flash_bounds(options.verify_parts[i].addr, options.verify_parts[i].size,
+					 flash_size, "verify")) != 0) {
 			goto err_enter;
 		}
 	}
