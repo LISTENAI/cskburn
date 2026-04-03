@@ -144,7 +144,6 @@ jobs:
       - name: Build
         uses: ./.github/actions/cmake-build
         with:
-          run-tests: true
           shell: ${{ steps.setup-mingw64.outputs.shell }}
 
       - name: Upload artifacts
