@@ -1,4 +1,4 @@
-find_package(Python3)
+find_package(Python3 REQUIRED)
 
 function(target_embed_binary TARGET VAR_NAME FILE)
     set(gen_c ${CMAKE_CURRENT_BINARY_DIR}/${VAR_NAME}_img.c)
