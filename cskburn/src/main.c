@@ -753,7 +753,7 @@ print_progress(int32_t wrote_bytes, uint32_t total_bytes)
 			   (wrote_bytes % (4 * 1024) == 0 || (uint32_t)wrote_bytes == total_bytes)) {
 		printf("%.2f KB / %.2f KB (%.2f%%)  \r", (float)wrote_bytes / 1024.0f,
 				(float)total_bytes / 1024.0f, (float)wrote_bytes / (float)total_bytes * 100.0f);
-		if (wrote_bytes == total_bytes) {
+		if ((uint32_t)wrote_bytes == total_bytes) {
 			printf("\n");
 		}
 		fflush(stdout);
@@ -861,7 +861,7 @@ serial_connect(cskburn_serial_device_t *dev)
 {
 	int ret;
 
-	for (int i = 0; options.wait || i < options.reset_attempts + 1; i++) {
+	for (uint32_t i = 0; options.wait || i < options.reset_attempts + 1; i++) {
 		uint32_t reset_delay = i == 0 ? 0 : options.reset_delay;
 		uint32_t probe_timeout = i == 0 ? 100 : options.probe_timeout;
 		if ((ret = cskburn_serial_connect(dev, reset_delay, probe_timeout)) != 0) {
@@ -878,7 +878,7 @@ serial_connect(cskburn_serial_device_t *dev)
 		LOGI("Entering update mode...");
 		if ((ret = cskburn_serial_enter(
 					 dev, options.serial_baud, options.burner_buf, options.burner_len)) != 0) {
-			if (!options.wait && i == options.reset_attempts) {
+			if (!options.wait && i >= options.reset_attempts) {
 				LOGE("ERROR: Failed entering update mode");
 				return ret;
 			} else {

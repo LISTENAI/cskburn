@@ -29,7 +29,7 @@ static const char *errids[] = {
 const char *
 errid(int errnum)
 {
-	if (errnum < 0 || errnum >= ERRID_MAX) return "UNKNOWN";
+	if (errnum < 0 || (size_t)errnum >= ERRID_MAX) return "UNKNOWN";
 	const char *errid = errids[errnum];
 	if (errid == NULL) return "UNKNOWN";
 	return errid;

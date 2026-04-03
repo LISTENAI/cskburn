@@ -138,7 +138,7 @@ try_sync(cskburn_serial_device_t *dev, int timeout)
 		} else if (ret != -ETIMEDOUT) {
 			return ret;
 		}
-	} while (TIME_SINCE_MS(start) < timeout);
+	} while (TIME_SINCE_MS(start) < (uint32_t)timeout);
 	return -ETIMEDOUT;
 }
 

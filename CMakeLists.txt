@@ -3,6 +3,11 @@ cmake_minimum_required(VERSION 3.10)
 project(CSKBurnKit)
 enable_testing()
 
+set(CMAKE_C_STANDARD 11)
+if(NOT MSVC)
+    add_compile_options(-Wall -Wextra -Wno-unused-parameter)
+endif()
+
 if(WIN32)
     add_subdirectory(third/libusb-win32)
     add_subdirectory(third/libusb-win32-compat)

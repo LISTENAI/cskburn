@@ -134,7 +134,7 @@ send_mem_command(void *handle, uint8_t *buf, uint32_t data_len)
 		return false;
 	}
 
-	if (xferred < sizeof(resp)) {
+	if ((size_t)xferred < sizeof(resp)) {
 		LOGD("DEBUG: USB read interrupted");
 		return false;
 	}
