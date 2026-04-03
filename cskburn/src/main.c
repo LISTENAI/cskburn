@@ -712,7 +712,8 @@ print_progress(int32_t wrote_bytes, uint32_t total_bytes)
 		}
 		printf("  \r");
 		fflush(stdout);
-	} else if (wrote_bytes % (4 * 1024) == 0 || wrote_bytes == total_bytes) {
+	} else if (total_bytes > 0 &&
+			   (wrote_bytes % (4 * 1024) == 0 || (uint32_t)wrote_bytes == total_bytes)) {
 		printf("%.2f KB / %.2f KB (%.2f%%)  \r", (float)wrote_bytes / 1024.0f,
 				(float)total_bytes / 1024.0f, (float)wrote_bytes / (float)total_bytes * 100.0f);
 		if (wrote_bytes == total_bytes) {
