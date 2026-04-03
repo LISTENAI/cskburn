@@ -399,6 +399,10 @@ cskburn_serial_read(cskburn_serial_device_t *dev, cskburn_serial_target_t target
 			return ret;
 		}
 
+		if (read_size == 0) {
+			return -EIO;
+		}
+
 		if (writer->write(writer, buffer, read_size) != read_size) {
 			return -EIO;
 		}
