@@ -12,7 +12,7 @@ read_parts_bin(
 		char **argv, int argc, cskburn_partition_t *parts, int *parts_cnt, int parts_cnt_limit)
 {
 	int i = 0, cnt = 0;
-	while (i < argc - 1 && cnt <= parts_cnt_limit) {
+	while (i < argc - 1 && cnt < parts_cnt_limit) {
 		if (!scan_int(argv[i], &parts[cnt].addr)) {
 			i++;
 			continue;
