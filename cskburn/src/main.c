@@ -5,6 +5,12 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(_WIN32) || defined(_WIN64)
+int _isatty(int);
+#define isatty _isatty
+#else
+#include <unistd.h>
+#endif
 
 #include "log.h"
 #include "msleep.h"
@@ -774,18 +780,22 @@ exit:
 static void
 print_progress(int32_t wrote_bytes, uint32_t total_bytes)
 {
+	bool tty = isatty(fileno(stdout));
+
 	if (wrote_bytes < 0) {
 		printf("Erasing");
 		for (int i = 0; i <= -wrote_bytes; i++) {
 			printf(".");
 		}
-		printf("  \r");
+		printf(tty ? "  \r" : "\n");
 		fflush(stdout);
 	} else if (total_bytes > 0 &&
 			   (wrote_bytes % (4 * 1024) == 0 || (uint32_t)wrote_bytes == total_bytes)) {
-		printf("%.2f KB / %.2f KB (%.2f%%)  \r", (float)wrote_bytes / 1024.0f,
+		printf("%.2f KB / %.2f KB (%.2f%%)", (float)wrote_bytes / 1024.0f,
 				(float)total_bytes / 1024.0f, (float)wrote_bytes / (float)total_bytes * 100.0f);
-		if ((uint32_t)wrote_bytes == total_bytes) {
+		if (tty) {
+			printf((uint32_t)wrote_bytes == total_bytes ? "\n" : "  \r");
+		} else {
 			printf("\n");
 		}
 		fflush(stdout);
