@@ -44,7 +44,7 @@ serial_open(const char *path, serial_dev_t **dev)
 	int ret;
 
 	if (strncmp(path, "\\\\.\\", 4) == 0) {
-		strncpy(full_path, path, MAX_PATH);
+		snprintf(full_path, MAX_PATH, "%s", path);
 	} else {
 		snprintf(full_path, MAX_PATH, "\\\\.\\%s", path);
 	}
