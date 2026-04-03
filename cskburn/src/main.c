@@ -424,8 +424,8 @@ main(int argc, char **argv)
 
 					if (!scan_addr_size_name(optarg, &options.read_parts[index].addr,
 								&options.read_parts[index].size, &options.read_parts[index].path)) {
-						LOGE("ERROR: Argument of --read should be addr:size:path (e.g. -u "
-							 "0x00000000:102400:app.bin)");
+						LOGE("ERROR: Argument of --read should be addr:size:path (e.g. "
+							 "--read 0x00000000:102400:app.bin)");
 						return EINVAL;
 					}
 
@@ -442,8 +442,8 @@ main(int argc, char **argv)
 
 					if (!scan_addr_size(optarg, &options.erase_parts[index].addr,
 								&options.erase_parts[index].size)) {
-						LOGE("ERROR: Argument of --erase should be addr:size (e.g. -u "
-							 "0x00000000:102400)");
+						LOGE("ERROR: Argument of --erase should be addr:size (e.g. "
+							 "--erase 0x00000000:102400)");
 						return EINVAL;
 					}
 
@@ -463,8 +463,8 @@ main(int argc, char **argv)
 
 					if (!scan_addr_size(optarg, &options.verify_parts[index].addr,
 								&options.verify_parts[index].size)) {
-						LOGE("ERROR: Argument of --verify should be addr:size (e.g. -u "
-							 "0x00000000:102400)");
+						LOGE("ERROR: Argument of --verify should be addr:size (e.g. "
+							 "--verify 0x00000000:102400)");
 						return EINVAL;
 					}
 
