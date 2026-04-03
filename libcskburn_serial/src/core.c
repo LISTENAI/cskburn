@@ -440,14 +440,16 @@ cskburn_serial_read(cskburn_serial_device_t *dev, cskburn_serial_target_t target
 }
 
 int
-cskburn_serial_erase_all(cskburn_serial_device_t *dev, cskburn_serial_target_t target)
+cskburn_serial_erase_all(
+		cskburn_serial_device_t *dev, cskburn_serial_target_t target, uint64_t flash_size)
 {
 	int ret;
 
 	if (target == TARGET_FLASH) {
 		uint64_t t1 = time_monotonic();
 
-		if ((ret = cmd_flash_erase_chip(dev)) != 0) {
+		uint32_t flash_size_mb = (uint32_t)(flash_size >> 20);
+		if ((ret = cmd_flash_erase_chip(dev, flash_size_mb)) != 0) {
 			return ret;
 		}
 

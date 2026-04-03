@@ -539,11 +539,13 @@ cmd_flash_finish(cskburn_serial_device_t *dev)
 }
 
 int
-cmd_flash_erase_chip(cskburn_serial_device_t *dev)
+cmd_flash_erase_chip(cskburn_serial_device_t *dev, uint32_t flash_size_mb)
 {
-	// TODO: 暂时假定 32MB flash
-	return check_command(
-			dev, CMD_FLASH_ERASE_CHIP, 0, CHECKSUM_NONE, NULL, TIMEOUT_FLASH_ERASE_PER_MB * 32);
+	if (flash_size_mb == 0) {
+		flash_size_mb = 32;
+	}
+	return check_command(dev, CMD_FLASH_ERASE_CHIP, 0, CHECKSUM_NONE, NULL,
+			TIMEOUT_FLASH_ERASE_PER_MB * flash_size_mb);
 }
 
 int

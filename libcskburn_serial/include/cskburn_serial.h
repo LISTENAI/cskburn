@@ -105,7 +105,8 @@ int cskburn_serial_read(cskburn_serial_device_t *dev, cskburn_serial_target_t ta
 		uint32_t size, writer_t *writer,
 		void (*on_progress)(int32_t read_bytes, uint32_t total_bytes));
 
-int cskburn_serial_erase_all(cskburn_serial_device_t *dev, cskburn_serial_target_t target);
+int cskburn_serial_erase_all(
+		cskburn_serial_device_t *dev, cskburn_serial_target_t target, uint64_t flash_size);
 
 int cskburn_serial_erase(
 		cskburn_serial_device_t *dev, cskburn_serial_target_t target, uint32_t addr, uint32_t size);

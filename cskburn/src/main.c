@@ -1077,7 +1077,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 
 	if (options.erase_all) {
 		LOGI("Erasing entire flash...");
-		if ((ret = cskburn_serial_erase_all(dev, options.target)) != 0) {
+		if ((ret = cskburn_serial_erase_all(dev, options.target, flash_size)) != 0) {
 			LOGE_RET(ret, "ERROR: Failed erasing device");
 			goto err_enter;
 		}
