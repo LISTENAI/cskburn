@@ -19,9 +19,26 @@ target_link_libraries(${PROJECT_NAME} cskburn_serial)
 
 target_link_libraries(${PROJECT_NAME} mbedtls)
 
-execute_process(COMMAND git describe --tags --abbrev=0 OUTPUT_VARIABLE GIT_TAG OUTPUT_STRIP_TRAILING_WHITESPACE)
-execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
-execute_process(COMMAND git rev-list --count HEAD OUTPUT_VARIABLE GIT_INCREMENT OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND git describe --tags --abbrev=0
+    OUTPUT_VARIABLE GIT_TAG OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET RESULT_VARIABLE _git_tag_ret)
+if(NOT _git_tag_ret EQUAL 0)
+    set(GIT_TAG "unknown")
+endif()
+
+execute_process(COMMAND git rev-parse --short HEAD
+    OUTPUT_VARIABLE GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET RESULT_VARIABLE _git_commit_ret)
+if(NOT _git_commit_ret EQUAL 0)
+    set(GIT_COMMIT "unknown")
+endif()
+
+execute_process(COMMAND git rev-list --count HEAD
+    OUTPUT_VARIABLE GIT_INCREMENT OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET RESULT_VARIABLE _git_inc_ret)
+if(NOT _git_inc_ret EQUAL 0)
+    set(GIT_INCREMENT 0)
+endif()
 
 target_compile_options(
     ${PROJECT_NAME} PRIVATE
