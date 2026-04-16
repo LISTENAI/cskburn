@@ -7,7 +7,8 @@
 #include "cskburn_errors.h"
 #include "io.h"
 
-#define FLAG_INVERT_RTS (1 << 0)
+#define FLAG_INVERT_RTS    (1 << 0)
+#define FLAG_CROSS_COUPLED (1 << 1)
 
 #define CHIP_ID_LEN 8
 
