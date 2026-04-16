@@ -29,6 +29,7 @@ extern uint32_t burner_serial_arcs_len;
 
 static int init_flags = 0;
 static bool rts_active = SERIAL_LOW;
+static bool cross_coupled = false;
 
 static void
 print_time_spent(const char *usage, uint64_t t1, uint64_t t2)
@@ -50,6 +51,7 @@ cskburn_serial_init(int flags)
 {
 	init_flags = flags;
 	rts_active = (flags & FLAG_INVERT_RTS) ? SERIAL_HIGH : SERIAL_LOW;
+	cross_coupled = (flags & FLAG_CROSS_COUPLED) != 0;
 }
 
 static int
@@ -170,7 +172,24 @@ cskburn_serial_connect(cskburn_serial_device_t *dev, uint32_t reset_delay, uint3
 		goto sync;
 	}
 
-	if (dev->chip == CHIP_ARCS) {
+	if (cross_coupled) {
+		// Cross-coupled NPN circuit (Q1/Q2 S8050)
+		// ① Hold RESET: DTR=HIGH, RTS=LOW → Q1 on, PRST=LOW
+		if (serial_set_dtr(dev->serial, SERIAL_HIGH) != 0) {
+			return -EIO;
+		}
+		serial_set_rts(dev->serial, SERIAL_LOW);
+		msleep(reset_delay);
+
+		// ② Release RESET + pull RXD low: DTR=LOW, RTS=HIGH → Q2 on, RXD=LOW
+		serial_set_dtr(dev->serial, SERIAL_LOW);
+		serial_set_rts(dev->serial, SERIAL_HIGH);
+		msleep(50);
+
+		// ③ Release RXD: DTR=LOW, RTS=LOW → both off, UART free
+		serial_set_dtr(dev->serial, SERIAL_LOW);
+		serial_set_rts(dev->serial, SERIAL_LOW);
+	} else if (dev->chip == CHIP_ARCS) {
 		// Hold RESET first, so holding BOOT won't harm the chip
 		if (serial_set_rts(dev->serial, SERIAL_LOW) != 0) {  // RESET=LOW
 			return -CSKBURN_ERR_RESET_PIN_FAILED;
@@ -610,7 +629,19 @@ cskburn_serial_init_nand(cskburn_serial_device_t *dev, nand_config_t *config, ui
 int
 cskburn_serial_reset(cskburn_serial_device_t *dev, uint32_t reset_delay)
 {
-	if (dev->chip == CHIP_ARCS) {
+	if (cross_coupled) {
+		// Cross-coupled NPN circuit: pulse PRST only
+		// DTR=HIGH, RTS=LOW → Q1 on, PRST=LOW
+		if (serial_set_dtr(dev->serial, SERIAL_HIGH) != 0) {
+			return -EIO;
+		}
+		serial_set_rts(dev->serial, SERIAL_LOW);
+		msleep(reset_delay);
+
+		// Release: DTR=LOW, RTS=LOW → both off
+		serial_set_dtr(dev->serial, SERIAL_LOW);
+		serial_set_rts(dev->serial, SERIAL_LOW);
+	} else if (dev->chip == CHIP_ARCS) {
 		if (serial_set_rts(dev->serial, SERIAL_LOW) != 0) {  // RESET=LOW
 			return -CSKBURN_ERR_RESET_PIN_FAILED;
 		}
