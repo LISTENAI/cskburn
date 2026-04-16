@@ -106,6 +106,7 @@ static struct option long_options[] = {
 		{"fail-delay", required_argument, NULL, 0},
 		{"burner", required_argument, NULL, 0},
 		{"update-high", no_argument, NULL, 0},
+		{"reset-strategy", required_argument, NULL, 0},
 		{"no-reset", no_argument, NULL, 0},
 		{"read-logs", required_argument, NULL, 0},
 		{"reset-nanokit", no_argument, NULL, 0},  // 不再需要，但是留着以便向后兼容
@@ -247,6 +248,7 @@ static struct {
 	uint8_t *burner_buf;
 	uint32_t burner_len;
 	bool update_high;
+	char *reset_strategy;
 	uint32_t jump_address;
 	bool no_reset;
 	uint32_t read_logs_baud;
@@ -277,6 +279,7 @@ static struct {
 		.burner = NULL,
 		.burner_len = 0,
 		.update_high = false,
+		.reset_strategy = NULL,
 		.jump_address = 0,
 		.no_reset = false,
 		.read_logs_baud = 0,
@@ -363,6 +366,10 @@ print_help(const char *progname)
 	LOGI("       n: timeout after n milliseconds (n > 0)");
 	LOGI("    this option does not affect the timeout of probing device, use "
 		 "--probe-timeout if needed");
+	LOGI("  --reset-strategy <strategy>");
+	LOGI("    reset strategy for entering burn mode (default: direct), acceptable values:");
+	LOGI("      direct: default pin-driven reset (DTR/RTS directly mapped)");
+	LOGI("      cross-coupled: cross-coupled NPN transistor circuit (Q1/Q2 S8050)");
 	LOGI("");
 
 	LOGI("Advanced operations (serial only):");
@@ -561,6 +568,16 @@ main(int argc, char **argv)
 					break;
 				} else if (strcmp(name, "update-high") == 0) {
 					options.update_high = true;
+					break;
+				} else if (strcmp(name, "reset-strategy") == 0) {
+					if (strcmp(optarg, "direct") != 0 &&
+							strcmp(optarg, "cross-coupled") != 0) {
+						LOGE("ERROR: Invalid value for --reset-strategy: %s, "
+							 "acceptable values: direct, cross-coupled",
+								optarg);
+						return EINVAL;
+					}
+					options.reset_strategy = optarg;
 					break;
 				} else if (strcmp(name, "reset-nanokit") == 0) {
 					LOGI("WARNING: --reset-nanokit is no longer needed");
@@ -968,6 +985,9 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 
 	int flags = 0;
 	if (options.update_high) flags |= FLAG_INVERT_RTS;
+	if (options.reset_strategy != NULL && strcmp(options.reset_strategy, "cross-coupled") == 0) {
+		flags |= FLAG_CROSS_COUPLED;
+	}
 	cskburn_serial_init(flags);
 
 	if (options.target == TARGET_NAND) {
