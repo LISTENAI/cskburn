@@ -29,6 +29,32 @@ int _isatty(int);
 #define MAX_VERIFY_PARTS 20
 #define ENTER_TRIES 5
 
+/* One-line error output with machine-parseable code.
+ *   E<code>  for known cskburn error codes (4-digit decimal)
+ *   D<byte>  for positive device-reported status bytes (2-digit hex)
+ */
+#define ERR(code) LOGE("ERROR [E%04d]: %s", (code), cskburn_strerror(-(code)))
+#define ERR_CTX(code, fmt, ...) \
+	LOGE("ERROR [E%04d]: %s: " fmt, (code), cskburn_strerror(-(code)), ##__VA_ARGS__)
+#define ERR_RET(ret, fmt, ...)                                                              \
+	do {                                                                                    \
+		int _r = (ret);                                                                     \
+		if (_r > 0) {                                                                       \
+			LOGE("ERROR [D%02X]: Device reported error: " fmt, (uint8_t)_r, ##__VA_ARGS__); \
+		} else {                                                                            \
+			LOGE("ERROR [E%04d]: %s: " fmt, -_r, cskburn_strerror(_r), ##__VA_ARGS__);      \
+		}                                                                                   \
+	} while (0)
+#define ERR_RET_NO_CTX(ret)                                            \
+	do {                                                               \
+		int _r = (ret);                                                \
+		if (_r > 0) {                                                  \
+			LOGE("ERROR [D%02X]: Device reported error", (uint8_t)_r); \
+		} else {                                                       \
+			LOGE("ERROR [E%04d]: %s", -_r, cskburn_strerror(_r));      \
+		}                                                              \
+	} while (0)
+
 #define DEFAULT_BAUD 3000000
 #define BURNER_LOAD_ADDR_DEFAULT 0
 #define BURNER_LOAD_ADDR_ARCS 0x20040000
@@ -368,15 +394,14 @@ static int
 validate_flash_bounds(uint32_t addr, uint32_t size, uint64_t flash_size, const char *op)
 {
 	if (addr >= flash_size) {
-		LOGE("ERROR: The starting boundary of %s address (0x%08X) exceeds the capacity of "
-			 "flash (%" PRIu64 " MB)",
-				op, addr, flash_size >> 20);
-		return -EINVAL;
+		ERR_CTX(CSKBURN_ERR_ARG_ADDR_OUT_OF_BOUNDS,
+				"%s start 0x%08X beyond flash capacity %" PRIu64 " MB", op, addr, flash_size >> 20);
+		return -CSKBURN_ERR_ARG_ADDR_OUT_OF_BOUNDS;
 	} else if ((uint64_t)addr + size > flash_size) {
-		LOGE("ERROR: The ending boundary of %s address (0x%08X) exceeds the capacity of "
-			 "flash (%" PRIu64 " MB)",
-				op, addr + size, flash_size >> 20);
-		return -EINVAL;
+		ERR_CTX(CSKBURN_ERR_ARG_ADDR_OUT_OF_BOUNDS,
+				"%s end 0x%08X beyond flash capacity %" PRIu64 " MB", op, addr + size,
+				flash_size >> 20);
+		return -CSKBURN_ERR_ARG_ADDR_OUT_OF_BOUNDS;
 	}
 	return 0;
 }
@@ -412,8 +437,8 @@ main(int argc, char **argv)
 				break;
 			case 'b':
 				if (sscanf(optarg, "%d", &options.serial_baud) != 1) {
-					LOGE("ERROR: Invalid baud rate: %s", optarg);
-					return EINVAL;
+					ERR_CTX(CSKBURN_ERR_ARG_INVALID, "--baud: %s", optarg);
+					return CSKBURN_ERR_ARG_INVALID;
 				}
 				break;
 			case 'c':
@@ -432,8 +457,8 @@ main(int argc, char **argv)
 				} else if (strcmp(optarg, "arcs") == 0 || strcmp(optarg, "ARCS") == 0) {
 					options.chip = &chip_features[ARCS];
 				} else {
-					LOGE("ERROR: Unsupported chip family: %s", optarg);
-					return EINVAL;
+					ERR_CTX(CSKBURN_ERR_ARG_INVALID, "--chip: %s", optarg);
+					return CSKBURN_ERR_ARG_INVALID;
 				}
 				break;
 			case 'n':
@@ -449,36 +474,36 @@ main(int argc, char **argv)
 					break;
 				} else if (strcmp(name, "read") == 0) {
 					if (options.read_count >= MAX_FLASH_PARTS) {
-						LOGE("ERROR: Only up to %d partitions can be read at the same time",
+						ERR_CTX(CSKBURN_ERR_ARG_TOO_MANY_PARTS, "--read limit is %d",
 								MAX_FLASH_PARTS);
-						return EINVAL;
+						return CSKBURN_ERR_ARG_TOO_MANY_PARTS;
 					}
 
 					uint16_t index = options.read_count;
 
 					if (!scan_addr_size_name(optarg, &options.read_parts[index].addr,
 								&options.read_parts[index].size, &options.read_parts[index].path)) {
-						LOGE("ERROR: Argument of --read should be addr:size:path (e.g. "
-							 "--read 0x00000000:102400:app.bin)");
-						return EINVAL;
+						ERR_CTX(CSKBURN_ERR_ARG_INVALID,
+								"--read must be addr:size:path (e.g. 0x0:102400:app.bin)");
+						return CSKBURN_ERR_ARG_INVALID;
 					}
 
 					options.read_count++;
 					break;
 				} else if (strcmp(name, "erase") == 0) {
 					if (options.erase_count >= MAX_ERASE_PARTS) {
-						LOGE("ERROR: Only up to %d partitions can be erased at the same time",
+						ERR_CTX(CSKBURN_ERR_ARG_TOO_MANY_PARTS, "--erase limit is %d",
 								MAX_ERASE_PARTS);
-						return EINVAL;
+						return CSKBURN_ERR_ARG_TOO_MANY_PARTS;
 					}
 
 					uint16_t index = options.erase_count;
 
 					if (!scan_addr_size(optarg, &options.erase_parts[index].addr,
 								&options.erase_parts[index].size)) {
-						LOGE("ERROR: Argument of --erase should be addr:size (e.g. "
-							 "--erase 0x00000000:102400)");
-						return EINVAL;
+						ERR_CTX(CSKBURN_ERR_ARG_INVALID,
+								"--erase must be addr:size (e.g. 0x0:102400)");
+						return CSKBURN_ERR_ARG_INVALID;
 					}
 
 					options.erase_count++;
@@ -488,18 +513,18 @@ main(int argc, char **argv)
 					break;
 				} else if (strcmp(name, "verify") == 0) {
 					if (options.verify_count >= MAX_VERIFY_PARTS) {
-						LOGE("ERROR: Only up to %d partitions can be verified at the same time",
+						ERR_CTX(CSKBURN_ERR_ARG_TOO_MANY_PARTS, "--verify limit is %d",
 								MAX_VERIFY_PARTS);
-						return EINVAL;
+						return CSKBURN_ERR_ARG_TOO_MANY_PARTS;
 					}
 
 					uint16_t index = options.verify_count;
 
 					if (!scan_addr_size(optarg, &options.verify_parts[index].addr,
 								&options.verify_parts[index].size)) {
-						LOGE("ERROR: Argument of --verify should be addr:size (e.g. "
-							 "--verify 0x00000000:102400)");
-						return EINVAL;
+						ERR_CTX(CSKBURN_ERR_ARG_INVALID,
+								"--verify must be addr:size (e.g. 0x0:102400)");
+						return CSKBURN_ERR_ARG_INVALID;
 					}
 
 					options.verify_count++;
@@ -509,26 +534,26 @@ main(int argc, char **argv)
 					break;
 				} else if (strcmp(name, "probe-timeout") == 0) {
 					if (sscanf(optarg, "%d", &options.probe_timeout) != 1) {
-						LOGE("ERROR: Invalid value for --probe-timeout: %s", optarg);
-						return EINVAL;
+						ERR_CTX(CSKBURN_ERR_ARG_INVALID, "--probe-timeout: %s", optarg);
+						return CSKBURN_ERR_ARG_INVALID;
 					}
 					break;
 				} else if (strcmp(name, "reset-attempts") == 0) {
 					if (sscanf(optarg, "%d", &options.reset_attempts) != 1) {
-						LOGE("ERROR: Invalid value for --reset-attempts: %s", optarg);
-						return EINVAL;
+						ERR_CTX(CSKBURN_ERR_ARG_INVALID, "--reset-attempts: %s", optarg);
+						return CSKBURN_ERR_ARG_INVALID;
 					}
 					break;
 				} else if (strcmp(name, "reset-delay") == 0) {
 					if (sscanf(optarg, "%d", &options.reset_delay) != 1) {
-						LOGE("ERROR: Invalid value for --reset-delay: %s", optarg);
-						return EINVAL;
+						ERR_CTX(CSKBURN_ERR_ARG_INVALID, "--reset-delay: %s", optarg);
+						return CSKBURN_ERR_ARG_INVALID;
 					}
 					break;
 				} else if (strcmp(name, "timeout") == 0) {
 					if (sscanf(optarg, "%d", &options.timeout) != 1) {
-						LOGE("ERROR: Invalid value for --timeout: %s", optarg);
-						return EINVAL;
+						ERR_CTX(CSKBURN_ERR_ARG_INVALID, "--timeout: %s", optarg);
+						return CSKBURN_ERR_ARG_INVALID;
 					}
 					break;
 				} else if (strcmp(name, "burner") == 0) {
@@ -552,8 +577,8 @@ main(int argc, char **argv)
 				} else if (strcmp(name, "nand-cmd") == 0) {
 					int pad, pin;
 					if (sscanf(optarg, "%d:%d", &pad, &pin) != 2) {
-						LOGE("ERROR: Invalid value for --nand-cmd, expected pad:pin");
-						return EINVAL;
+						ERR_CTX(CSKBURN_ERR_ARG_INVALID, "--nand-cmd expects pad:pin");
+						return CSKBURN_ERR_ARG_INVALID;
 					}
 					nand_config.sd_cmd.set = 1;
 					nand_config.sd_cmd.pad = pad;
@@ -562,8 +587,8 @@ main(int argc, char **argv)
 				} else if (strcmp(name, "nand-clk") == 0) {
 					int pad, pin;
 					if (sscanf(optarg, "%d:%d", &pad, &pin) != 2) {
-						LOGE("ERROR: Invalid value for --nand-clk, expected pad:pin");
-						return EINVAL;
+						ERR_CTX(CSKBURN_ERR_ARG_INVALID, "--nand-clk expects pad:pin");
+						return CSKBURN_ERR_ARG_INVALID;
 					}
 					nand_config.sd_clk.set = 1;
 					nand_config.sd_clk.pad = pad;
@@ -572,8 +597,8 @@ main(int argc, char **argv)
 				} else if (strcmp(name, "nand-dat0") == 0) {
 					int pad, pin;
 					if (sscanf(optarg, "%d:%d", &pad, &pin) != 2) {
-						LOGE("ERROR: Invalid value for --nand-dat0, expected pad:pin");
-						return EINVAL;
+						ERR_CTX(CSKBURN_ERR_ARG_INVALID, "--nand-dat0 expects pad:pin");
+						return CSKBURN_ERR_ARG_INVALID;
 					}
 					nand_config.sd_dat0.set = 1;
 					nand_config.sd_dat0.pad = pad;
@@ -582,8 +607,8 @@ main(int argc, char **argv)
 				} else if (strcmp(name, "nand-dat1") == 0) {
 					int pad, pin;
 					if (sscanf(optarg, "%d:%d", &pad, &pin) != 2) {
-						LOGE("ERROR: Invalid value for --nand-dat1, expected pad:pin");
-						return EINVAL;
+						ERR_CTX(CSKBURN_ERR_ARG_INVALID, "--nand-dat1 expects pad:pin");
+						return CSKBURN_ERR_ARG_INVALID;
 					}
 					nand_config.sd_dat1.set = 1;
 					nand_config.sd_dat1.pad = pad;
@@ -592,8 +617,8 @@ main(int argc, char **argv)
 				} else if (strcmp(name, "nand-dat2") == 0) {
 					int pad, pin;
 					if (sscanf(optarg, "%d:%d", &pad, &pin) != 2) {
-						LOGE("ERROR: Invalid value for --nand-dat2, expected pad:pin");
-						return EINVAL;
+						ERR_CTX(CSKBURN_ERR_ARG_INVALID, "--nand-dat2 expects pad:pin");
+						return CSKBURN_ERR_ARG_INVALID;
 					}
 					nand_config.sd_dat2.set = 1;
 					nand_config.sd_dat2.pad = pad;
@@ -602,8 +627,8 @@ main(int argc, char **argv)
 				} else if (strcmp(name, "nand-dat3") == 0) {
 					int pad, pin;
 					if (sscanf(optarg, "%d:%d", &pad, &pin) != 2) {
-						LOGE("ERROR: Invalid value for --nand-dat3, expected pad:pin");
-						return EINVAL;
+						ERR_CTX(CSKBURN_ERR_ARG_INVALID, "--nand-dat3 expects pad:pin");
+						return CSKBURN_ERR_ARG_INVALID;
 					}
 					nand_config.sd_dat3.set = 1;
 					nand_config.sd_dat3.pad = pad;
@@ -611,8 +636,8 @@ main(int argc, char **argv)
 					break;
 				} else if (strcmp(name, "jump") == 0) {
 					if (!scan_int(optarg, &options.jump_address)) {
-						LOGE("ERROR: Invalid jump address");
-						return EINVAL;
+						ERR_CTX(CSKBURN_ERR_ARG_INVALID, "--jump: %s", optarg);
+						return CSKBURN_ERR_ARG_INVALID;
 					}
 					break;
 				} else if (strcmp(name, "no-reset") == 0) {
@@ -620,8 +645,8 @@ main(int argc, char **argv)
 					break;
 				} else if (strcmp(name, "read-logs") == 0) {
 					if (sscanf(optarg, "%d", &options.read_logs_baud) != 1) {
-						LOGE("ERROR: Invalid value for --read-logs: %s", optarg);
-						return EINVAL;
+						ERR_CTX(CSKBURN_ERR_ARG_INVALID, "--read-logs: %s", optarg);
+						return CSKBURN_ERR_ARG_INVALID;
 					}
 					break;
 				} else {
@@ -647,8 +672,8 @@ main(int argc, char **argv)
 		options.burner_buf = (uint8_t *)malloc(MAX_IMAGE_SIZE);
 		options.burner_len = read_file(options.burner, options.burner_buf, MAX_IMAGE_SIZE);
 		if (options.burner_len == 0) {
-			LOGE_RET(-errno, "ERROR: Failed reading %s", options.burner);
-			return errno;
+			ERR_CTX(CSKBURN_ERR_FILE_READ_FAILED, "%s", options.burner);
+			return CSKBURN_ERR_FILE_READ_FAILED;
 		}
 	}
 
@@ -656,17 +681,18 @@ main(int argc, char **argv)
 		options.protocol = PROTO_SERIAL;
 	} else {
 #ifdef WITHOUT_USB
-		LOGE("ERROR: A port of serial device should be specified (e.g. -s %s)", example_serial_dev);
-		return EINVAL;
+		ERR_CTX(CSKBURN_ERR_ARG_NO_SERIAL, "use -s (e.g. -s %s)", example_serial_dev);
+		return CSKBURN_ERR_ARG_NO_SERIAL;
 #else
 		if (!options.chip->usb) {
-			LOGE("ERROR: USB burning is not supported by %s", options.chip->name);
-			return ENOTSUP;
+			ERR_CTX(CSKBURN_ERR_ARG_UNSUPPORTED_OP, "USB is not supported by %s",
+					options.chip->name);
+			return CSKBURN_ERR_ARG_UNSUPPORTED_OP;
 		}
 		if (options.usb != NULL && strcmp(options.usb, "-") != 0) {
 			if (sscanf(options.usb, "%hu:%hu\n", &options.usb_bus, &options.usb_addr) != 2) {
-				LOGE("ERROR: Argument of -u/--usb should be <bus>:<device> (e.g. -u 020:004)");
-				return EINVAL;
+				ERR_CTX(CSKBURN_ERR_ARG_INVALID, "--usb must be <bus>:<device> (e.g. 020:004)");
+				return CSKBURN_ERR_ARG_INVALID;
 			}
 		}
 		options.protocol = PROTO_USB;
@@ -676,36 +702,37 @@ main(int argc, char **argv)
 	if (options.target == TARGET_NAND) {
 #ifndef WITHOUT_USB
 		if (options.protocol != PROTO_SERIAL) {
-			LOGE("ERROR: NAND is supported only in serial burning");
-			return ENOTSUP;
+			ERR_CTX(CSKBURN_ERR_ARG_UNSUPPORTED_OP, "NAND requires serial burning (-s)");
+			return CSKBURN_ERR_ARG_UNSUPPORTED_OP;
 		}
 #endif
 		if (!options.chip->nand) {
-			LOGE("ERROR: NAND is only supported by %s", options.chip->name);
-			return ENOTSUP;
+			ERR_CTX(CSKBURN_ERR_ARG_UNSUPPORTED_OP, "NAND is not supported by %s",
+					options.chip->name);
+			return CSKBURN_ERR_ARG_UNSUPPORTED_OP;
 		}
 		if (options.read_count > 0) {
-			LOGE("ERROR: Reading is not supported on NAND yet");
-			return ENOTSUP;
+			ERR_CTX(CSKBURN_ERR_ARG_UNSUPPORTED_OP, "reading NAND is not implemented");
+			return CSKBURN_ERR_ARG_UNSUPPORTED_OP;
 		}
 		if (options.erase_all || options.erase_count > 0) {
-			LOGE("ERROR: Erasing is not supported on NAND yet");
-			return ENOTSUP;
+			ERR_CTX(CSKBURN_ERR_ARG_UNSUPPORTED_OP, "erasing NAND is not implemented");
+			return CSKBURN_ERR_ARG_UNSUPPORTED_OP;
 		}
 	} else if (options.target == TARGET_RAM) {
 #ifndef WITHOUT_USB
 		if (options.protocol != PROTO_SERIAL) {
-			LOGE("ERROR: RAM is supported only in serial burning");
-			return ENOTSUP;
+			ERR_CTX(CSKBURN_ERR_ARG_UNSUPPORTED_OP, "RAM requires serial burning (-s)");
+			return CSKBURN_ERR_ARG_UNSUPPORTED_OP;
 		}
 #endif
 		if (options.erase_all || options.erase_count > 0) {
-			LOGE("ERROR: Erasing is not supported on RAM");
-			return ENOTSUP;
+			ERR_CTX(CSKBURN_ERR_ARG_UNSUPPORTED_OP, "erasing is not supported on RAM");
+			return CSKBURN_ERR_ARG_UNSUPPORTED_OP;
 		}
 		if (options.verify_all || options.verify_count > 0) {
-			LOGE("ERROR: Verifying is not supported on RAM");
-			return ENOTSUP;
+			ERR_CTX(CSKBURN_ERR_ARG_UNSUPPORTED_OP, "verifying is not supported on RAM");
+			return CSKBURN_ERR_ARG_UNSUPPORTED_OP;
 		}
 	}
 
@@ -911,7 +938,7 @@ serial_connect(cskburn_serial_device_t *dev)
 				LOGI("Waiting for device...");
 			}
 			if (!options.wait && i == options.reset_attempts) {
-				LOGE("ERROR: Failed opening device");
+				ERR_RET_NO_CTX(ret);
 				return ret;
 			} else {
 				continue;
@@ -921,7 +948,7 @@ serial_connect(cskburn_serial_device_t *dev)
 		if ((ret = cskburn_serial_enter(dev, options.serial_baud, options.burner_buf,
 					 options.burner_len, options.chip->burner_load_addr)) != 0) {
 			if (!options.wait && i >= options.reset_attempts) {
-				LOGE("ERROR: Failed entering update mode");
+				ERR_RET_NO_CTX(ret);
 				return ret;
 			} else {
 				msleep(2000);
@@ -963,7 +990,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	cskburn_serial_device_t *dev = NULL;
 	if ((ret = cskburn_serial_open(&dev, options.serial, options.chip->serial, options.timeout)) !=
 			0) {
-		LOGE_RET(ret, "ERROR: Failed opening device");
+		ERR_RET(ret, "%s", options.serial);
 		goto err_open;
 	}
 
@@ -974,7 +1001,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	if (options.read_chip_id) {
 		uint8_t id[CHIP_ID_LEN] = {0};
 		if ((ret = cskburn_serial_read_chip_id(dev, id)) != 0) {
-			LOGE_RET(ret, "ERROR: Failed reading device");
+			ERR_RET_NO_CTX(ret);
 			goto err_enter;
 		}
 
@@ -988,7 +1015,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		uint32_t flash_id = 0;
 
 		if ((ret = cskburn_serial_get_flash_info(dev, &flash_id, &flash_size)) != 0) {
-			LOGE_RET(ret, "ERROR: Failed detecting flash type");
+			ERR_RET(ret, "flash-id=0x%06X", flash_id & 0xFFFFFF);
 			goto err_enter;
 		}
 
@@ -997,7 +1024,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		LOGI("Detected flash size: %" PRIu64 " MB", flash_size >> 20);
 	} else if (options.target == TARGET_NAND) {
 		if ((ret = cskburn_serial_init_nand(dev, &nand_config, &flash_size)) != 0) {
-			LOGE_RET(ret, "ERROR: Failed initializing NAND");
+			ERR_RET_NO_CTX(ret);
 			goto err_enter;
 		}
 
@@ -1013,12 +1040,14 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 
 	for (int i = 0; i < options.erase_count; i++) {
 		if (!is_aligned(options.erase_parts[i].addr, FLASH_ALIGN)) {
-			LOGE("ERROR: Erase address (0x%08X) should be 4K aligned", options.erase_parts[i].addr);
-			ret = -EINVAL;
+			ERR_CTX(CSKBURN_ERR_ARG_ADDR_UNALIGNED, "erase addr 0x%08X is not 4K-aligned",
+					options.erase_parts[i].addr);
+			ret = -CSKBURN_ERR_ARG_ADDR_UNALIGNED;
 			goto err_enter;
 		} else if (!is_aligned(options.erase_parts[i].size, FLASH_ALIGN)) {
-			LOGE("ERROR: Erase size (0x%08X) should be 4K aligned", options.erase_parts[i].size);
-			ret = -EINVAL;
+			ERR_CTX(CSKBURN_ERR_ARG_ADDR_UNALIGNED, "erase size 0x%08X is not 4K-aligned",
+					options.erase_parts[i].size);
+			ret = -CSKBURN_ERR_ARG_ADDR_UNALIGNED;
 			goto err_enter;
 		} else if ((ret = validate_flash_bounds(options.erase_parts[i].addr,
 							options.erase_parts[i].size, flash_size, "erase")) != 0) {
@@ -1036,32 +1065,32 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	for (int i = 0; i < parts_cnt; i++) {
 		if (options.target == TARGET_NAND) {
 			if (!is_aligned(parts[i].addr, NAND_ALIGN)) {
-				LOGE("ERROR: Address of partition %d (0x%08X) should be 512 bytes aligned", i + 1,
-						parts[i].addr);
-				ret = -EINVAL;
+				ERR_CTX(CSKBURN_ERR_ARG_ADDR_UNALIGNED,
+						"partition %d addr 0x%08X is not 512B-aligned", i + 1, parts[i].addr);
+				ret = -CSKBURN_ERR_ARG_ADDR_UNALIGNED;
 				goto err_enter;
 			}
 		} else if (options.target == TARGET_FLASH) {
 			if (!is_aligned(parts[i].addr, FLASH_ALIGN)) {
-				LOGE("ERROR: Address of partition %d (0x%08X) should be 4K aligned", i + 1,
-						parts[i].addr);
-				ret = -EINVAL;
+				ERR_CTX(CSKBURN_ERR_ARG_ADDR_UNALIGNED,
+						"partition %d addr 0x%08X is not 4K-aligned", i + 1, parts[i].addr);
+				ret = -CSKBURN_ERR_ARG_ADDR_UNALIGNED;
 				goto err_enter;
 			}
 		}
 
 		if (options.target == TARGET_FLASH || options.target == TARGET_NAND) {
 			if (parts[i].addr >= flash_size) {
-				LOGE("ERROR: The starting boundary of partition %d (0x%08X) exceeds the capacity "
-					 "of target (%" PRIu64 " MB)",
-						i + 1, parts[i].addr, flash_size >> 20);
-				ret = -EINVAL;
+				ERR_CTX(CSKBURN_ERR_ARG_ADDR_OUT_OF_BOUNDS,
+						"partition %d start 0x%08X beyond target capacity %" PRIu64 " MB", i + 1,
+						parts[i].addr, flash_size >> 20);
+				ret = -CSKBURN_ERR_ARG_ADDR_OUT_OF_BOUNDS;
 				goto err_enter;
 			} else if (parts[i].addr + parts[i].reader->size > flash_size) {
-				LOGE("ERROR: The ending boundary of partition %d (0x%08X) exceeds the capacity of "
-					 "target (%" PRIu64 " MB)",
-						i + 1, parts[i].addr + parts[i].reader->size, flash_size >> 20);
-				ret = -EINVAL;
+				ERR_CTX(CSKBURN_ERR_ARG_ADDR_OUT_OF_BOUNDS,
+						"partition %d end 0x%08X beyond target capacity %" PRIu64 " MB", i + 1,
+						parts[i].addr + parts[i].reader->size, flash_size >> 20);
+				ret = -CSKBURN_ERR_ARG_ADDR_OUT_OF_BOUNDS;
 				goto err_enter;
 			}
 		}
@@ -1077,15 +1106,15 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 
 		writer_t *writer = filewriter_open(options.read_parts[i].path);
 		if (writer == NULL) {
-			LOGE_RET(-errno, "ERROR: Failed opening %s", options.read_parts[i].path);
-			ret = -errno;
+			ERR_CTX(CSKBURN_ERR_FILE_WRITE_FAILED, "%s", options.read_parts[i].path);
+			ret = -CSKBURN_ERR_FILE_WRITE_FAILED;
 			goto err_enter;
 		}
 
 		LOGI("Reading region 0x%08X-0x%08X...", addr, addr + size);
 		if ((ret = cskburn_serial_read(dev, options.target, addr, size, writer,
 					 options.progress ? print_progress : NULL)) != 0) {
-			LOGE_RET(ret, "ERROR: Failed reading region 0x%08X-0x%08X", addr, addr + size);
+			ERR_RET(ret, "region 0x%08X-0x%08X", addr, addr + size);
 			goto err_enter;
 		}
 
@@ -1095,7 +1124,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	if (options.erase_all) {
 		LOGI("Erasing entire flash...");
 		if ((ret = cskburn_serial_erase_all(dev, options.target, flash_size)) != 0) {
-			LOGE_RET(ret, "ERROR: Failed erasing device");
+			ERR_RET_NO_CTX(ret);
 			goto err_enter;
 		}
 	} else {
@@ -1104,7 +1133,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 			uint32_t size = options.erase_parts[i].size;
 			LOGI("Erasing region 0x%08X-0x%08X...", addr, addr + size);
 			if ((ret = cskburn_serial_erase(dev, options.target, addr, size)) != 0) {
-				LOGE_RET(ret, "ERROR: Failed erasing region 0x%08X-0x%08X", addr, addr + size);
+				ERR_RET(ret, "region 0x%08X-0x%08X", addr, addr + size);
 				goto err_enter;
 			}
 		}
@@ -1117,7 +1146,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 			uint32_t addr = options.verify_parts[i].addr;
 			uint32_t size = options.verify_parts[i].size;
 			if ((ret = cskburn_serial_verify(dev, options.target, addr, size, md5)) != 0) {
-				LOGE_RET(ret, "ERROR: Failed verifing region 0x%08X-0x%08X", addr, addr + size);
+				ERR_RET(ret, "region 0x%08X-0x%08X", addr, addr + size);
 				goto err_enter;
 			}
 			md5_to_str(md5_str, md5);
@@ -1132,8 +1161,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 			uint32_t size = align_up(parts[i].reader->size, FLASH_ALIGN);
 			LOGI("Erasing region 0x%08X-0x%08X...", parts[i].addr, parts[i].addr + size);
 			if ((ret = cskburn_serial_erase(dev, options.target, parts[i].addr, size)) != 0) {
-				LOGE_RET(ret, "ERROR: Failed erasing region 0x%08X-0x%08X", parts[i].addr,
-						parts[i].addr + size);
+				ERR_RET(ret, "region 0x%08X-0x%08X", parts[i].addr, parts[i].addr + size);
 				goto err_write;
 			}
 		}
@@ -1144,7 +1172,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 				(float)parts[i].reader->size / 1024.0f);
 		if ((ret = cskburn_serial_write(dev, options.target, parts[i].addr, parts[i].reader,
 					 jump_addr, options.progress ? print_progress : NULL)) != 0) {
-			LOGE_RET(ret, "ERROR: Failed burning partition %d", i + 1);
+			ERR_RET(ret, "partition %d", i + 1);
 			goto err_write;
 		}
 
@@ -1153,21 +1181,21 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 			uint8_t flash_md5[MD5_SIZE] = {0};
 			char md5_str[MD5_SIZE * 2 + 1] = {0};
 			if (verify_finish(parts[i].reader, image_md5) != 0) {
-				LOGE("ERROR: Failed calculating MD5");
-				ret = -EIO;
+				ERR(CSKBURN_ERR_VERIFY_LOCAL_MD5_FAILED);
+				ret = -CSKBURN_ERR_VERIFY_LOCAL_MD5_FAILED;
 				goto err_write;
 			}
 			if ((ret = cskburn_serial_verify(dev, options.target, parts[i].addr,
 						 parts[i].reader->size, flash_md5)) != 0) {
-				LOGE_RET(ret, "ERROR: Failed verifing partition %d", i + 1);
+				ERR_RET(ret, "partition %d", i + 1);
 				goto err_write;
 			}
 			md5_to_str(md5_str, flash_md5);
 			LOGI("md5 (0x%08X-0x%08X): %s", parts[i].addr, parts[i].addr + parts[i].reader->size,
 					md5_str);
 			if (memcmp(image_md5, flash_md5, MD5_SIZE) != 0) {
-				LOGE("ERROR: MD5 mismatch");
-				ret = -EIO;
+				ERR_CTX(CSKBURN_ERR_VERIFY_MISMATCH, "partition %d", i + 1);
+				ret = -CSKBURN_ERR_VERIFY_MISMATCH;
 				goto err_write;
 			}
 		}

@@ -12,6 +12,7 @@ target_include_directories(
     ${PROJECT_SOURCE_DIR}/include
 )
 
+target_link_libraries(${PROJECT_NAME} errors)
 target_link_libraries(${PROJECT_NAME} log)
 target_link_libraries(${PROJECT_NAME} portable)
 target_link_libraries(${PROJECT_NAME} serial)

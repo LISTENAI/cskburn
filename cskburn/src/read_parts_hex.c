@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "cskburn_errors.h"
 #include "intelhex/intelhex.h"
 #include "log.h"
 #include "memio.h"
@@ -43,8 +44,9 @@ read_parts_hex(char **argv, int argc, cskburn_partition_t *parts, int *parts_cnt
 			hex_len = read_file(argv[i], hex_ptr, MAX_HEX_SIZE);
 			hex_parsed = 0;
 			if (hex_len == 0) {
-				ret = -errno;
-				LOGE_RET(ret, "ERROR: Failed reading %s", argv[i]);
+				LOGE("ERROR [E%04d]: %s: %s", CSKBURN_ERR_FILE_READ_FAILED,
+						cskburn_strerror(-CSKBURN_ERR_FILE_READ_FAILED), argv[i]);
+				ret = -CSKBURN_ERR_FILE_READ_FAILED;
 				goto exit;
 			} else {
 				LOGD("Parsing HEX file: %s, size: %" PRIu32, argv[i], hex_len);
@@ -89,8 +91,9 @@ read_parts_hex(char **argv, int argc, cskburn_partition_t *parts, int *parts_cnt
 					}
 					break;
 				} else {
-					LOGE("Failed parsing HEX file: %d", status);
-					ret = -EIO;
+					LOGE("ERROR [E%04d]: %s: %s (status %d)", CSKBURN_ERR_HEX_PARSE_FAILED,
+							cskburn_strerror(-CSKBURN_ERR_HEX_PARSE_FAILED), argv[i], status);
+					ret = -CSKBURN_ERR_HEX_PARSE_FAILED;
 					goto exit;
 				}
 			}

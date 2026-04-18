@@ -16,7 +16,6 @@
 
 #define BAUD_RATE_INIT 115200
 
-
 #define FLASH_BLOCK_TRIES 3
 
 extern uint8_t burner_serial_castor[];
@@ -53,6 +52,24 @@ cskburn_serial_init(int flags)
 	rts_active = (flags & FLAG_INVERT_RTS) ? SERIAL_HIGH : SERIAL_LOW;
 }
 
+static int
+map_serial_open_error(int ret)
+{
+	switch (-ret) {
+		case ENOENT:
+		case ENODEV:
+			return -CSKBURN_ERR_SERIAL_NOT_FOUND;
+		case EACCES:
+			return -CSKBURN_ERR_SERIAL_ACCESS_DENIED;
+		case EBUSY:
+			return -CSKBURN_ERR_SERIAL_BUSY;
+		case EIO:
+			return -CSKBURN_ERR_SERIAL_CONFIG_FAILED;
+		default:
+			return -CSKBURN_ERR_SERIAL_OPEN_FAILED;
+	}
+}
+
 int
 cskburn_serial_open(cskburn_serial_device_t **dev, const char *path, cskburn_serial_chip_t chip,
 		int32_t timeout)
@@ -62,16 +79,19 @@ cskburn_serial_open(cskburn_serial_device_t **dev, const char *path, cskburn_ser
 	serial_dev_t *serial = NULL;
 	ret = serial_open(path, &serial);
 	if (ret != 0) {
+		ret = map_serial_open_error(ret);
 		goto err_serial;
 	}
 
 	slip_dev_t *slip = slip_init(serial, MAX_REQ_SLIP_LEN, MAX_RES_SLIP_LEN);
 	if (slip == NULL) {
+		ret = -ENOMEM;
 		goto err_slip;
 	}
 
 	(*dev) = (cskburn_serial_device_t *)calloc(1, sizeof(cskburn_serial_device_t));
 	if (*dev == NULL) {
+		ret = -ENOMEM;
 		goto err_dev;
 	}
 
@@ -80,6 +100,7 @@ cskburn_serial_open(cskburn_serial_device_t **dev, const char *path, cskburn_ser
 	(*dev)->req_buf = (uint8_t *)calloc(1, MAX_REQ_RAW_LEN);
 	(*dev)->res_buf = (uint8_t *)calloc(1, MAX_RES_RAW_LEN);
 	if ((*dev)->req_buf == NULL || (*dev)->res_buf == NULL) {
+		ret = -ENOMEM;
 		goto err_buf;
 	}
 
@@ -100,7 +121,7 @@ err_dev:
 err_slip:
 	serial_close(&serial);
 err_serial:
-	return ret != 0 ? ret : -ENOMEM;
+	return ret;
 }
 
 void
@@ -143,6 +164,8 @@ try_sync(cskburn_serial_device_t *dev, int timeout)
 int
 cskburn_serial_connect(cskburn_serial_device_t *dev, uint32_t reset_delay, uint32_t probe_timeout)
 {
+	int ret;
+
 	if (reset_delay == 0) {
 		goto sync;
 	}
@@ -150,7 +173,7 @@ cskburn_serial_connect(cskburn_serial_device_t *dev, uint32_t reset_delay, uint3
 	if (dev->chip == CHIP_ARCS) {
 		// Hold RESET first, so holding BOOT won't harm the chip
 		if (serial_set_rts(dev->serial, SERIAL_LOW) != 0) {  // RESET=LOW
-			return -EIO;
+			return -CSKBURN_ERR_RESET_PIN_FAILED;
 		}
 		serial_set_dtr(dev->serial, SERIAL_HIGH);  // BOOT=HIGH
 		msleep(50);
@@ -165,7 +188,7 @@ cskburn_serial_connect(cskburn_serial_device_t *dev, uint32_t reset_delay, uint3
 		serial_set_dtr(dev->serial, SERIAL_HIGH);  // BOOT=HIGH
 	} else {
 		if (serial_set_rts(dev->serial, !rts_active) != 0) {  // UPDATE=HIGH
-			return -EIO;
+			return -CSKBURN_ERR_RESET_PIN_FAILED;
 		}
 		serial_set_dtr(dev->serial, SERIAL_HIGH);  // RESET=HIGH
 		msleep(10);
@@ -176,13 +199,16 @@ cskburn_serial_connect(cskburn_serial_device_t *dev, uint32_t reset_delay, uint3
 	}
 
 sync:
-	return try_sync(dev, probe_timeout);
+	ret = try_sync(dev, probe_timeout);
+	if (ret == -ETIMEDOUT) {
+		return -CSKBURN_ERR_PROBE_NO_SYNC;
+	}
+	return ret;
 }
 
 int
-cskburn_serial_enter(
-		cskburn_serial_device_t *dev, uint32_t baud_rate, uint8_t *burner, uint32_t len,
-		uint32_t load_addr)
+cskburn_serial_enter(cskburn_serial_device_t *dev, uint32_t baud_rate, uint8_t *burner,
+		uint32_t len, uint32_t load_addr)
 {
 	int ret;
 
@@ -209,13 +235,13 @@ cskburn_serial_enter(
 
 		if (load_speedup) {
 			if ((ret = cmd_change_baud(dev, baud_rate, BAUD_RATE_INIT)) != 0) {
-				LOGE_RET(ret, "ERROR: Failed changing baud rate");
-				return ret;
+				LOGD_RET(ret, "DEBUG: ROM baud change failed");
+				return -CSKBURN_ERR_ROM_BAUD_REJECTED;
 			}
 
 			if ((ret = try_sync(dev, 2000)) != 0) {
-				LOGE_RET(ret, "ERROR: Device not synced after baud rate change");
-				return ret;
+				LOGD_RET(ret, "DEBUG: ROM sync lost after baud change");
+				return -CSKBURN_ERR_ROM_SYNC_LOST;
 			}
 		}
 
@@ -223,7 +249,8 @@ cskburn_serial_enter(
 		uint32_t blocks = BLOCKS(len, RAM_BLOCK_SIZE);
 
 		if ((ret = cmd_mem_begin(dev, len, blocks, RAM_BLOCK_SIZE, load_addr)) != 0) {
-			return ret;
+			LOGD_RET(ret, "DEBUG: mem_begin failed while loading burner");
+			return -CSKBURN_ERR_BURNER_LOAD_FAILED;
 		}
 
 		for (uint32_t i = 0; i < blocks; i++) {
@@ -235,12 +262,14 @@ cskburn_serial_enter(
 			}
 
 			if ((ret = cmd_mem_block(dev, burner + offset, length, i)) != 0) {
-				return ret;
+				LOGD_RET(ret, "DEBUG: mem_block %u failed while loading burner", i);
+				return -CSKBURN_ERR_BURNER_LOAD_FAILED;
 			}
 		}
 
 		if ((ret = cmd_mem_finish(dev, OPTION_REBOOT, load_addr)) != 0) {
-			return ret;
+			LOGD_RET(ret, "DEBUG: mem_finish failed while loading burner");
+			return -CSKBURN_ERR_BURNER_LOAD_FAILED;
 		}
 
 		// RAM proxy is up with default baud rate
@@ -255,20 +284,20 @@ cskburn_serial_enter(
 	}
 
 	if ((ret = try_sync(dev, 2000)) != 0) {
-		LOGE_RET(ret, "ERROR: Device not recognized");
-		return ret;
+		LOGD_RET(ret, "DEBUG: Burner did not respond");
+		return -CSKBURN_ERR_BURNER_NO_RESPONSE;
 	}
 
 	if ((ret = cmd_change_baud(dev, baud_rate, BAUD_RATE_INIT)) != 0) {
-		LOGE_RET(ret, "ERROR: Failed changing baud rate");
-		return ret;
+		LOGD_RET(ret, "DEBUG: Burner baud change failed");
+		return -CSKBURN_ERR_BAUD_REJECTED;
 	}
 
 	msleep(200);
 
 	if ((ret = try_sync(dev, 2000)) != 0) {
-		LOGE_RET(ret, "ERROR: Device not synced after baud rate change");
-		return ret;
+		LOGD_RET(ret, "DEBUG: Burner sync lost after baud change");
+		return -CSKBURN_ERR_BAUD_SYNC_LOST;
 	}
 
 	return 0;
@@ -323,20 +352,26 @@ cskburn_serial_write(cskburn_serial_device_t *dev, cskburn_serial_target_t targe
 
 	uint64_t t1 = time_monotonic();
 
+	int err_code;
 	if (target == TARGET_FLASH) {
+		err_code = CSKBURN_ERR_FLASH_WRITE_FAILED;
 		if ((ret = cmd_flash_begin(dev, reader->size, blocks, FLASH_BLOCK_SIZE, addr)) != 0) {
-			return ret;
+			LOGD_RET(ret, "DEBUG: flash_begin failed");
+			return ret > 0 ? ret : -err_code;
 		}
 	} else if (target == TARGET_NAND) {
+		err_code = CSKBURN_ERR_NAND_WRITE_FAILED;
 		if ((ret = cmd_nand_begin(dev, reader->size, blocks, FLASH_BLOCK_SIZE, addr)) != 0) {
-			return ret;
+			LOGD_RET(ret, "DEBUG: nand_begin failed");
+			return ret > 0 ? ret : -err_code;
 		}
 	} else if (target == TARGET_RAM) {
+		err_code = CSKBURN_ERR_RAM_WRITE_FAILED;
 		if ((ret = cmd_mem_begin(dev, reader->size, blocks, FLASH_BLOCK_SIZE, addr) != 0)) {
-			return ret;
+			LOGD_RET(ret, "DEBUG: mem_begin failed");
+			return ret > 0 ? ret : -err_code;
 		}
 	} else {
-		LOGE("ERROR: Unsupported target: %d", target);
 		return -EINVAL;
 	}
 
@@ -352,20 +387,23 @@ cskburn_serial_write(cskburn_serial_device_t *dev, cskburn_serial_target_t targe
 		}
 
 		if (reader->read(reader, buffer, length) != length) {
-			return -EIO;
+			return -CSKBURN_ERR_FILE_READ_FAILED;
 		}
 
 		if (target == TARGET_FLASH) {
 			if ((ret = try_flash_block(dev, buffer, length, i)) != 0) {
-				return ret;
+				LOGD_RET(ret, "DEBUG: flash_block %u failed", i);
+				return ret > 0 ? ret : -err_code;
 			}
 		} else if (target == TARGET_NAND) {
 			if ((ret = try_nand_block(dev, buffer, length, i)) != 0) {
-				return ret;
+				LOGD_RET(ret, "DEBUG: nand_block %u failed", i);
+				return ret > 0 ? ret : -err_code;
 			}
 		} else if (target == TARGET_RAM) {
 			if ((ret = cmd_mem_block(dev, buffer, length, i)) != 0) {
-				return ret;
+				LOGD_RET(ret, "DEBUG: mem_block %u failed", i);
+				return ret > 0 ? ret : -err_code;
 			}
 		}
 
@@ -378,15 +416,18 @@ cskburn_serial_write(cskburn_serial_device_t *dev, cskburn_serial_target_t targe
 
 	if (target == TARGET_FLASH) {
 		if ((ret = cmd_flash_finish(dev)) != 0) {
-			return ret;
+			LOGD_RET(ret, "DEBUG: flash_finish failed");
+			return ret > 0 ? ret : -err_code;
 		}
 	} else if (target == TARGET_NAND) {
 		if ((ret = cmd_nand_finish(dev)) != 0) {
-			return ret;
+			LOGD_RET(ret, "DEBUG: nand_finish failed");
+			return ret > 0 ? ret : -err_code;
 		}
 	} else if (target == TARGET_RAM) {
 		if ((ret = cmd_mem_finish(dev, jump ? OPTION_JUMP : OPTION_RUN, jump)) != 0) {
-			return ret;
+			LOGD_RET(ret, "DEBUG: mem_finish failed");
+			return ret > 0 ? ret : -err_code;
 		}
 	}
 
@@ -409,15 +450,16 @@ cskburn_serial_read(cskburn_serial_device_t *dev, cskburn_serial_target_t target
 	uint32_t offset = 0, read_size;
 	while (offset < size) {
 		if ((ret = cmd_read_flash(dev, addr + offset, FLASH_READ_SIZE, buffer, &read_size)) != 0) {
-			return ret;
+			LOGD_RET(ret, "DEBUG: read_flash at 0x%08X failed", addr + offset);
+			return ret > 0 ? ret : -CSKBURN_ERR_FLASH_READ_FAILED;
 		}
 
 		if (read_size == 0) {
-			return -EIO;
+			return -CSKBURN_ERR_FLASH_READ_FAILED;
 		}
 
 		if (writer->write(writer, buffer, read_size) != read_size) {
-			return -EIO;
+			return -CSKBURN_ERR_FILE_WRITE_FAILED;
 		}
 
 		offset += read_size;
@@ -444,7 +486,8 @@ cskburn_serial_erase_all(
 
 		uint32_t flash_size_mb = (uint32_t)(flash_size >> 20);
 		if ((ret = cmd_flash_erase_chip(dev, flash_size_mb)) != 0) {
-			return ret;
+			LOGD_RET(ret, "DEBUG: flash_erase_chip failed");
+			return ret > 0 ? ret : -CSKBURN_ERR_FLASH_ERASE_FAILED;
 		}
 
 		uint64_t t2 = time_monotonic();
@@ -452,11 +495,9 @@ cskburn_serial_erase_all(
 
 		return 0;
 	} else if (target == TARGET_NAND) {
-		LOGE("ERROR: Erasing is not supported for NAND yet");
 		return -ENOTSUP;
 	}
 
-	LOGE("ERROR: Unsupported target: %d", target);
 	return -EINVAL;
 }
 
@@ -470,7 +511,8 @@ cskburn_serial_erase(
 		uint64_t t1 = time_monotonic();
 
 		if ((ret = cmd_flash_erase_region(dev, addr, size)) != 0) {
-			return ret;
+			LOGD_RET(ret, "DEBUG: flash_erase_region 0x%08X+%u failed", addr, size);
+			return ret > 0 ? ret : -CSKBURN_ERR_FLASH_ERASE_FAILED;
 		}
 
 		uint64_t t2 = time_monotonic();
@@ -478,11 +520,9 @@ cskburn_serial_erase(
 
 		return 0;
 	} else if (target == TARGET_NAND) {
-		LOGE("ERROR: Erasing is not supported for NAND yet");
 		return -ENOTSUP;
 	}
 
-	LOGE("ERROR: Unsupported target: %d", target);
 	return -EINVAL;
 }
 
@@ -496,7 +536,8 @@ cskburn_serial_verify(cskburn_serial_device_t *dev, cskburn_serial_target_t targ
 		uint64_t t1 = time_monotonic();
 
 		if ((ret = cmd_flash_md5sum(dev, addr, size, md5)) != 0) {
-			return ret;
+			LOGD_RET(ret, "DEBUG: flash_md5sum 0x%08X+%u failed", addr, size);
+			return ret > 0 ? ret : -CSKBURN_ERR_VERIFY_READ_FAILED;
 		}
 
 		uint64_t t2 = time_monotonic();
@@ -507,7 +548,8 @@ cskburn_serial_verify(cskburn_serial_device_t *dev, cskburn_serial_target_t targ
 		uint64_t t1 = time_monotonic();
 
 		if ((ret = cmd_nand_md5(dev, addr, size, md5)) != 0) {
-			return ret;
+			LOGD_RET(ret, "DEBUG: nand_md5 0x%08X+%u failed", addr, size);
+			return ret > 0 ? ret : -CSKBURN_ERR_VERIFY_READ_FAILED;
 		}
 
 		uint64_t t2 = time_monotonic();
@@ -516,14 +558,18 @@ cskburn_serial_verify(cskburn_serial_device_t *dev, cskburn_serial_target_t targ
 		return 0;
 	}
 
-	LOGE("ERROR: Unsupported target: %d", target);
 	return -EINVAL;
 }
 
 int
 cskburn_serial_read_chip_id(cskburn_serial_device_t *dev, uint8_t *chip_id)
 {
-	return cmd_read_chip_id(dev, chip_id);
+	int ret = cmd_read_chip_id(dev, chip_id);
+	if (ret != 0) {
+		LOGD_RET(ret, "DEBUG: read_chip_id failed");
+		return ret > 0 ? ret : -CSKBURN_ERR_CHIP_ID_READ_FAILED;
+	}
+	return 0;
 }
 
 int
@@ -533,17 +579,18 @@ cskburn_serial_get_flash_info(
 	int ret;
 
 	if ((ret = cmd_read_flash_id(dev, flash_id)) != 0) {
-		return ret;
+		LOGD_RET(ret, "DEBUG: read_flash_id failed");
+		return ret > 0 ? ret : -CSKBURN_ERR_FLASH_ID_READ_FAILED;
 	}
 
 	if ((*flash_id & 0xFFFFFF) == 0x000000 || (*flash_id & 0xFFFFFF) == 0xFFFFFF) {
 		// In case flash is not present
-		return -ENODEV;
+		return -CSKBURN_ERR_FLASH_NOT_DETECTED;
 	}
 
 	uint8_t capacity = (*flash_id >> 16) & 0xFF;
 	if (capacity == 0 || capacity > 31) {
-		return -ENODEV;
+		return -CSKBURN_ERR_FLASH_NOT_DETECTED;
 	}
 	*flash_size = 2 << (capacity - 1);
 	return 0;
@@ -552,7 +599,12 @@ cskburn_serial_get_flash_info(
 int
 cskburn_serial_init_nand(cskburn_serial_device_t *dev, nand_config_t *config, uint64_t *nand_size)
 {
-	return cmd_nand_init(dev, config, nand_size);
+	int ret = cmd_nand_init(dev, config, nand_size);
+	if (ret != 0) {
+		LOGD_RET(ret, "DEBUG: nand_init failed");
+		return ret > 0 ? ret : -CSKBURN_ERR_NAND_INIT_FAILED;
+	}
+	return 0;
 }
 
 int
@@ -560,7 +612,7 @@ cskburn_serial_reset(cskburn_serial_device_t *dev, uint32_t reset_delay)
 {
 	if (dev->chip == CHIP_ARCS) {
 		if (serial_set_rts(dev->serial, SERIAL_LOW) != 0) {  // RESET=LOW
-			return -EIO;
+			return -CSKBURN_ERR_RESET_PIN_FAILED;
 		}
 		serial_set_dtr(dev->serial, SERIAL_HIGH);  // UPDATE=HIGH
 		msleep(reset_delay);
@@ -568,7 +620,7 @@ cskburn_serial_reset(cskburn_serial_device_t *dev, uint32_t reset_delay)
 		serial_set_dtr(dev->serial, SERIAL_HIGH);  // UPDATE=HIGH, again to push RTS out
 	} else {
 		if (serial_set_rts(dev->serial, !rts_active) != 0) {  // UPDATE=HIGH
-			return -EIO;
+			return -CSKBURN_ERR_RESET_PIN_FAILED;
 		}
 		serial_set_dtr(dev->serial, SERIAL_LOW);  // RESET=LOW
 		msleep(reset_delay);

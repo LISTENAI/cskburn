@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "cskburn_errors.h"
 #include "fsio.h"
 #include "log.h"
 #include "read_parts.h"
@@ -26,8 +27,9 @@ read_parts_bin(
 
 		reader_t *reader = filereader_open(parts[cnt].path);
 		if (reader == NULL) {
-			LOGE_RET(-errno, "ERROR: Failed reading %s", parts[cnt].path);
-			return -errno;
+			LOGE("ERROR [E%04d]: %s: %s", CSKBURN_ERR_FILE_READ_FAILED,
+					cskburn_strerror(-CSKBURN_ERR_FILE_READ_FAILED), parts[cnt].path);
+			return -CSKBURN_ERR_FILE_READ_FAILED;
 		}
 
 		parts[cnt].reader = reader;

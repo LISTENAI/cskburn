@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "cskburn_errors.h"
 #include "io.h"
 
 #define FLAG_INVERT_RTS (1 << 0)
