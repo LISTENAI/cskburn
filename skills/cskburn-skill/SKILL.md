@@ -201,60 +201,54 @@ cskburn -C <chip> -s <port> -b <baud> --verify-all <addr1> <file1> [<addr2> <fil
 
 ## 故障排查
 
-### 串口连接失败
+cskburn 的错误输出统一形如 `ERROR [E####]: <说明>[: <上下文>]`，方括号里的编号（如 `E3001`）对应一种确定的根因。项目根目录的 `TROUBLESHOOTING.md` 有完整的编号速查表，下面只列最常见的几类。
 
-**症状**：`Failed to open serial port` 或类似错误
+### 串口连接失败（`E3xxx`）
 
-**排查步骤**：
+| 编号 | 含义 | 排查 |
+|---|---|---|
+| `E3001` | 串口不存在 | 检查设备是否已插；Linux `ls /dev/ttyUSB* /dev/ttyACM*`，macOS `ls /dev/cu.* \| grep -v Bluetooth`；确认驱动已装 |
+| `E3002` | 没权限访问 | Linux：`sudo usermod -aG dialout $USER` 后重新登录；临时用 `sudo chmod 666 /dev/ttyUSB0` |
+| `E3003` | 串口被占用 | `lsof /dev/ttyUSB0` 查占用进程；关掉串口终端/IDE 监视器/其他 cskburn 实例 |
+| `E3004` | 打开失败（其他原因） | 换 USB 口、换线、重插；确认用的是数据线而非充电线 |
 
-1. **设备是否存在**：Linux `ls /dev/ttyUSB* /dev/ttyACM* 2>/dev/null`；macOS `ls /dev/cu.* 2>/dev/null | grep -v Bluetooth`
-2. **权限问题**（Linux）：
-   - 检查权限：`ls -la /dev/ttyUSB0`
-   - 当前用户是否在 dialout 组：`groups`
-   - 临时方案：`sudo chmod 666 /dev/ttyUSB0`
-   - 永久方案：`sudo usermod -aG dialout $USER`（需重新登录）
-3. **串口被占用**：`lsof /dev/ttyUSB0` 或 `fuser /dev/ttyUSB0`
-4. **USB 线缆问题**：确认使用的是数据线而非仅充电线
-5. **设备未上电**：确认开发板已正确供电
+### 连不上芯片（`E4xxx`）
 
-### Probe 超时
+**症状**：`E4001` — Device did not respond after reset
 
-**症状**：`Probe timeout` 或长时间无响应
+按优先级排查：
 
-**排查步骤**：
+1. **DTR/RTS 接线**（最常见）：两根线都要接上，且引脚映射与芯片匹配——Venus 是 RTS→BOOT、DTR→RESET；ARCS 相反。
+2. **芯片系列选对**：`-C venus` vs `-C arcs`，选错会导致握手协议对不上。
+3. **TX/RX 接线**：是否交叉连接，GND 是否接好。
+4. **供电**：确认开发板供电充足，尤其是外接模组。
+5. **手动进下载模式**：按住 BOOT 再按一下复位。
+6. 少数板子需要加 `--update-high`（反相 RTS）。
 
-1. **检查 DTR/RTS 接线**（最常见原因）：
-   - 确认 DTR 和 RTS 线已连接
-   - 确认引脚映射与芯片匹配：Venus RTS→BOOT, DTR→RESET；ARCS 反过来
-   - DTR/RTS 未接或接反都会导致无法自动进入烧录模式
-2. **检查芯片系列是否正确**：`-C venus` vs `-C arcs`，芯片系列错误会导致握手协议不匹配
-3. **手动复位设备**后重试
-4. **检查串口接线**：TX/RX 是否交叉连接，GND 是否接好
+### 烧录中途失败、波特率问题（`E5xxx` / `E7xxx`）
 
-### 波特率问题
+**典型编号**：
 
-**症状**：
+- `E5001` / `E5005` — 切换波特率被设备拒绝
+- `E5002` / `E5006` — 切换波特率后连不上
+- `E7003` — 写 flash 中途失败
 
-- `ERROR: Device not synced after baud rate change` — 最典型的波特率过高表现。cskburn 先以 115200 与设备握手（能成功发现设备），然后切换到用户指定的波特率后重新 sync 失败
-- `ERROR: Failed changing baud rate` — 波特率切换命令本身失败
-- 传输过程中数据错误、校验失败、或传输异常中断
+**核心排查**：**降低波特率**。从当前值降到 `1500000`，还不行就 `921600`、`115200`。
 
-**排查步骤**：
+USB-串口芯片对最高波特率有限制：
 
-1. **降低波特率**：从当前值降到 `1500000` 或更低（如 `921600`、`115200`）
-2. **检查串口芯片型号**：不同 USB-串口芯片支持的最大波特率不同
-   - CP2102: 最高 1Mbps
-   - CH340: 最高 2Mbps
-   - FT232R: 最高 3Mbps
-   - CP2104/FT232H: 可支持更高
-3. **检查 USB 线缆质量和长度**：长线缆或劣质线缆在高波特率下更容易出错
+- CP2102: 最高 1Mbps
+- CH340: 最高 2Mbps
+- FT232R: 最高 3Mbps
+- CP2104/FT232H: 更高
 
-### 传输超时
+另外检查 USB 线质量和长度，避开 USB Hub 直连主板 USB 口。
 
-**症状**：烧录过程中超时中断
+### 校验失败（`E8003`）
 
-**排查步骤**：
+**症状**：`E8003` — Verification failed: MD5 does not match
 
-1. **降低波特率**：高波特率在不稳定连接上更容易超时
-2. **加 `-v` 查看详细日志**定位具体在哪个阶段超时
-3. **检查固件文件大小**：较大文件需要更长传输时间
+加了 `--verify-all` 时，烧完后设备端 MD5 与源文件不一致，说明写入过程有数据错误：
+
+1. 先重新烧一次，看是否偶发。
+2. 稳定复现时多半是 flash 坏块或电源不稳，需硬件层面排查。
