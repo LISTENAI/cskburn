@@ -17,6 +17,7 @@ endif()
 
 add_subdirectory(third/mbedtls)
 
+add_subdirectory(liberrors)
 add_subdirectory(libio)
 add_subdirectory(liblog)
 add_subdirectory(libportable)
