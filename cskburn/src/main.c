@@ -1005,8 +1005,13 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 			goto err_enter;
 		}
 
-		LOGI("chip-id: %02X%02X%02X%02X%02X%02X%02X%02X", id[0], id[1], id[2], id[3], id[4], id[5],
-				id[6], id[7]);
+		if (options.chip->serial == CHIP_ARCS) {
+			LOGI("chip-id: %02x%02x%02x%02x%02x%02x%02x%02x", id[0], id[1], id[2], id[3], id[4],
+					id[5], id[6], id[7]);
+		} else {
+			LOGI("chip-id: %02X%02X%02X%02X%02X%02X%02X%02X", id[0], id[1], id[2], id[3], id[4],
+					id[5], id[6], id[7]);
+		}
 	}
 
 	uint64_t flash_size = 0;
