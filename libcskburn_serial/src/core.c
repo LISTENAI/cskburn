@@ -27,10 +27,6 @@ extern uint32_t burner_serial_venus_len;
 extern uint8_t burner_serial_arcs[];
 extern uint32_t burner_serial_arcs_len;
 
-static int init_flags = 0;
-static bool rts_active = SERIAL_LOW;
-static bool cross_coupled = false;
-
 static void
 print_time_spent(const char *usage, uint64_t t1, uint64_t t2)
 {
@@ -46,12 +42,76 @@ print_time_spent_with_speed(const char *usage, uint64_t t1, uint64_t t2, uint32_
 	LOGD("%s took %.2fs, speed %.2f KB/s", usage, spent, speed);
 }
 
-void
-cskburn_serial_init(int flags)
+static int
+do_reset(cskburn_serial_device_t *dev, cskburn_reset_strategy_t strategy, bool enter_bootloader,
+		uint32_t reset_delay)
 {
-	init_flags = flags;
-	rts_active = (flags & FLAG_INVERT_RTS) ? SERIAL_HIGH : SERIAL_LOW;
-	cross_coupled = (flags & FLAG_CROSS_COUPLED) != 0;
+	switch (strategy) {
+		case CSKBURN_RESET_DTR_BOOT:
+			// DTR -> BOOT (active low), RTS -> RESET (active low)
+			// Hold RESET first, so toggling BOOT won't harm the chip
+			if (serial_set_rts(dev->serial, SERIAL_LOW) != 0) {  // RESET=LOW
+				return -CSKBURN_ERR_RESET_PIN_FAILED;
+			}
+			serial_set_dtr(dev->serial, SERIAL_HIGH);  // BOOT released
+			if (enter_bootloader) {
+				msleep(50);
+				serial_set_rts(dev->serial, SERIAL_LOW);  // RESET still low
+				serial_set_dtr(dev->serial, SERIAL_LOW);  // BOOT asserted
+			}
+			msleep(reset_delay);
+			serial_set_rts(dev->serial, SERIAL_HIGH);  // RESET released
+			if (enter_bootloader) {
+				serial_set_dtr(dev->serial, SERIAL_LOW);  // BOOT still asserted, push RTS out
+				msleep(50);
+			}
+			serial_set_rts(dev->serial, SERIAL_HIGH);
+			serial_set_dtr(dev->serial, SERIAL_HIGH);  // BOOT released
+			break;
+
+		case CSKBURN_RESET_RTS_BOOT:
+		case CSKBURN_RESET_RTS_BOOT_INV: {
+			// DTR -> RESET (active low), RTS -> BOOT
+			bool boot_active = (strategy == CSKBURN_RESET_RTS_BOOT_INV) ? SERIAL_HIGH : SERIAL_LOW;
+			if (serial_set_rts(dev->serial, !boot_active) != 0) {  // BOOT released
+				return -CSKBURN_ERR_RESET_PIN_FAILED;
+			}
+			if (enter_bootloader) {
+				serial_set_dtr(dev->serial, SERIAL_HIGH);  // RESET released
+				msleep(10);
+				serial_set_rts(dev->serial, boot_active);  // BOOT asserted
+			}
+			serial_set_dtr(dev->serial, SERIAL_LOW);  // RESET asserted
+			msleep(reset_delay);
+			serial_set_dtr(dev->serial, SERIAL_HIGH);  // RESET released
+			break;
+		}
+
+		case CSKBURN_RESET_DUAL_NPN:
+			// Cross-wired NPN pair (Q1/Q2 S8050)
+			// DTR>RTS -> Q1 on -> PRST=LOW; RTS>DTR -> Q2 on -> RXD=LOW
+			// ① Assert PRST: DTR=HIGH, RTS=LOW
+			if (serial_set_dtr(dev->serial, SERIAL_HIGH) != 0) {
+				return -CSKBURN_ERR_RESET_PIN_FAILED;
+			}
+			serial_set_rts(dev->serial, SERIAL_LOW);
+			msleep(reset_delay);
+			if (enter_bootloader) {
+				// ② Release PRST + pull RXD low: DTR=LOW, RTS=HIGH
+				serial_set_dtr(dev->serial, SERIAL_LOW);
+				serial_set_rts(dev->serial, SERIAL_HIGH);
+				msleep(50);
+			}
+			// ③ Release both: DTR=LOW, RTS=LOW
+			serial_set_dtr(dev->serial, SERIAL_LOW);
+			serial_set_rts(dev->serial, SERIAL_LOW);
+			break;
+
+		default:
+			return -EINVAL;
+	}
+
+	return 0;
 }
 
 static int
@@ -164,60 +224,17 @@ try_sync(cskburn_serial_device_t *dev, int timeout)
 }
 
 int
-cskburn_serial_connect(cskburn_serial_device_t *dev, uint32_t reset_delay, uint32_t probe_timeout)
+cskburn_serial_connect(cskburn_serial_device_t *dev, uint32_t reset_delay, uint32_t probe_timeout,
+		cskburn_reset_strategy_t strategy)
 {
 	int ret;
 
-	if (reset_delay == 0) {
-		goto sync;
+	if (reset_delay != 0) {
+		if ((ret = do_reset(dev, strategy, true, reset_delay)) != 0) {
+			return ret;
+		}
 	}
 
-	if (cross_coupled) {
-		// Cross-coupled NPN circuit (Q1/Q2 S8050)
-		// ① Hold RESET: DTR=HIGH, RTS=LOW → Q1 on, PRST=LOW
-		if (serial_set_dtr(dev->serial, SERIAL_HIGH) != 0) {
-			return -EIO;
-		}
-		serial_set_rts(dev->serial, SERIAL_LOW);
-		msleep(reset_delay);
-
-		// ② Release RESET + pull RXD low: DTR=LOW, RTS=HIGH → Q2 on, RXD=LOW
-		serial_set_dtr(dev->serial, SERIAL_LOW);
-		serial_set_rts(dev->serial, SERIAL_HIGH);
-		msleep(50);
-
-		// ③ Release RXD: DTR=LOW, RTS=LOW → both off, UART free
-		serial_set_dtr(dev->serial, SERIAL_LOW);
-		serial_set_rts(dev->serial, SERIAL_LOW);
-	} else if (dev->chip == CHIP_ARCS) {
-		// Hold RESET first, so holding BOOT won't harm the chip
-		if (serial_set_rts(dev->serial, SERIAL_LOW) != 0) {  // RESET=LOW
-			return -CSKBURN_ERR_RESET_PIN_FAILED;
-		}
-		serial_set_dtr(dev->serial, SERIAL_HIGH);  // BOOT=HIGH
-		msleep(50);
-		serial_set_rts(dev->serial, SERIAL_LOW);  // RESET=LOW
-		serial_set_dtr(dev->serial, SERIAL_LOW);  // BOOT=LOW
-		msleep(reset_delay);
-		serial_set_rts(dev->serial, SERIAL_HIGH);  // RESET=HIGH
-		serial_set_dtr(dev->serial, SERIAL_LOW);  // BOOT=LOW, again to push RTS out
-		msleep(50);
-		// Make sure to release BOOT so TX frees up
-		serial_set_rts(dev->serial, SERIAL_HIGH);  // RESET=HIGH
-		serial_set_dtr(dev->serial, SERIAL_HIGH);  // BOOT=HIGH
-	} else {
-		if (serial_set_rts(dev->serial, !rts_active) != 0) {  // UPDATE=HIGH
-			return -CSKBURN_ERR_RESET_PIN_FAILED;
-		}
-		serial_set_dtr(dev->serial, SERIAL_HIGH);  // RESET=HIGH
-		msleep(10);
-		serial_set_rts(dev->serial, rts_active);  // UPDATE=LOW
-		serial_set_dtr(dev->serial, SERIAL_LOW);  // RESET=LOW
-		msleep(reset_delay);
-		serial_set_dtr(dev->serial, SERIAL_HIGH);  // RESET=HIGH
-	}
-
-sync:
 	ret = try_sync(dev, probe_timeout);
 	if (ret == -ETIMEDOUT) {
 		return -CSKBURN_ERR_PROBE_NO_SYNC;
@@ -627,38 +644,10 @@ cskburn_serial_init_nand(cskburn_serial_device_t *dev, nand_config_t *config, ui
 }
 
 int
-cskburn_serial_reset(cskburn_serial_device_t *dev, uint32_t reset_delay)
+cskburn_serial_reset(
+		cskburn_serial_device_t *dev, uint32_t reset_delay, cskburn_reset_strategy_t strategy)
 {
-	if (cross_coupled) {
-		// Cross-coupled NPN circuit: pulse PRST only
-		// DTR=HIGH, RTS=LOW → Q1 on, PRST=LOW
-		if (serial_set_dtr(dev->serial, SERIAL_HIGH) != 0) {
-			return -EIO;
-		}
-		serial_set_rts(dev->serial, SERIAL_LOW);
-		msleep(reset_delay);
-
-		// Release: DTR=LOW, RTS=LOW → both off
-		serial_set_dtr(dev->serial, SERIAL_LOW);
-		serial_set_rts(dev->serial, SERIAL_LOW);
-	} else if (dev->chip == CHIP_ARCS) {
-		if (serial_set_rts(dev->serial, SERIAL_LOW) != 0) {  // RESET=LOW
-			return -CSKBURN_ERR_RESET_PIN_FAILED;
-		}
-		serial_set_dtr(dev->serial, SERIAL_HIGH);  // UPDATE=HIGH
-		msleep(reset_delay);
-		serial_set_rts(dev->serial, SERIAL_HIGH);  // RESET=HIGH
-		serial_set_dtr(dev->serial, SERIAL_HIGH);  // UPDATE=HIGH, again to push RTS out
-	} else {
-		if (serial_set_rts(dev->serial, !rts_active) != 0) {  // UPDATE=HIGH
-			return -CSKBURN_ERR_RESET_PIN_FAILED;
-		}
-		serial_set_dtr(dev->serial, SERIAL_LOW);  // RESET=LOW
-		msleep(reset_delay);
-		serial_set_dtr(dev->serial, SERIAL_HIGH);  // RESET=HIGH
-	}
-
-	return 0;
+	return do_reset(dev, strategy, false, reset_delay);
 }
 
 void

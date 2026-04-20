@@ -247,8 +247,9 @@ static struct {
 	char *burner;
 	uint8_t *burner_buf;
 	uint32_t burner_len;
-	bool update_high;
-	char *reset_strategy;
+	bool reset_strategy_auto;
+	cskburn_reset_strategy_t reset_strategy_fixed;
+	bool reset_strategy_user_set;
 	uint32_t jump_address;
 	bool no_reset;
 	uint32_t read_logs_baud;
@@ -278,8 +279,8 @@ static struct {
 		.timeout = 0,
 		.burner = NULL,
 		.burner_len = 0,
-		.update_high = false,
-		.reset_strategy = NULL,
+		.reset_strategy_auto = true,
+		.reset_strategy_user_set = false,
 		.jump_address = 0,
 		.no_reset = false,
 		.read_logs_baud = 0,
@@ -366,10 +367,18 @@ print_help(const char *progname)
 	LOGI("       n: timeout after n milliseconds (n > 0)");
 	LOGI("    this option does not affect the timeout of probing device, use "
 		 "--probe-timeout if needed");
-	LOGI("  --reset-strategy <strategy>");
-	LOGI("    reset strategy for entering burn mode (default: direct), acceptable values:");
-	LOGI("      direct: default pin-driven reset (DTR/RTS directly mapped)");
-	LOGI("      cross-coupled: cross-coupled NPN transistor circuit (Q1/Q2 S8050)");
+	LOGI("  --reset-strategy <name>");
+	LOGI("    reset strategy for entering burn mode (default: auto), acceptable values:");
+	LOGI("      auto:         auto-select by chip; for LS26 alternates dtr-boot and");
+	LOGI("                    dual-npn across retries");
+	LOGI("      dtr-boot:     DTR -> BOOT, RTS -> RESET (BOOT active low)");
+	LOGI("                    typical: LS26 ARCS-MINI board");
+	LOGI("      rts-boot:     RTS -> BOOT, DTR -> RESET (BOOT active low)");
+	LOGI("                    typical: CSK4 / CSK6 default");
+	LOGI("      rts-boot-inv: same as rts-boot but BOOT is active high");
+	LOGI("                    (equivalent to --update-high)");
+	LOGI("      dual-npn:     two NPN transistors (S8050) with crossed base/emitter");
+	LOGI("                    typical: LS26 ARCS-EVB board");
 	LOGI("");
 
 	LOGI("Advanced operations (serial only):");
@@ -567,17 +576,42 @@ main(int argc, char **argv)
 					options.burner = optarg;
 					break;
 				} else if (strcmp(name, "update-high") == 0) {
-					options.update_high = true;
+					if (options.reset_strategy_user_set) {
+						LOGE("ERROR: --update-high conflicts with --reset-strategy");
+						return EINVAL;
+					}
+					options.reset_strategy_auto = false;
+					options.reset_strategy_fixed = CSKBURN_RESET_RTS_BOOT_INV;
+					options.reset_strategy_user_set = true;
 					break;
 				} else if (strcmp(name, "reset-strategy") == 0) {
-					if (strcmp(optarg, "direct") != 0 &&
-							strcmp(optarg, "cross-coupled") != 0) {
+					if (options.reset_strategy_user_set) {
+						LOGE("ERROR: --reset-strategy conflicts with --update-high "
+							 "or a previous --reset-strategy");
+						return EINVAL;
+					}
+					if (strcmp(optarg, "auto") == 0) {
+						options.reset_strategy_auto = true;
+					} else if (strcmp(optarg, "dtr-boot") == 0) {
+						options.reset_strategy_auto = false;
+						options.reset_strategy_fixed = CSKBURN_RESET_DTR_BOOT;
+					} else if (strcmp(optarg, "rts-boot") == 0) {
+						options.reset_strategy_auto = false;
+						options.reset_strategy_fixed = CSKBURN_RESET_RTS_BOOT;
+					} else if (strcmp(optarg, "rts-boot-inv") == 0) {
+						options.reset_strategy_auto = false;
+						options.reset_strategy_fixed = CSKBURN_RESET_RTS_BOOT_INV;
+					} else if (strcmp(optarg, "dual-npn") == 0) {
+						options.reset_strategy_auto = false;
+						options.reset_strategy_fixed = CSKBURN_RESET_DUAL_NPN;
+					} else {
 						LOGE("ERROR: Invalid value for --reset-strategy: %s, "
-							 "acceptable values: direct, cross-coupled",
+							 "acceptable values: auto, dtr-boot, rts-boot, rts-boot-inv, "
+							 "dual-npn",
 								optarg);
 						return EINVAL;
 					}
-					options.reset_strategy = optarg;
+					options.reset_strategy_user_set = true;
 					break;
 				} else if (strcmp(name, "reset-nanokit") == 0) {
 					LOGI("WARNING: --reset-nanokit is no longer needed");
@@ -943,14 +977,43 @@ err_init:
 #endif
 
 static int
-serial_connect(cskburn_serial_device_t *dev)
+serial_connect(cskburn_serial_device_t *dev, cskburn_reset_strategy_t *out_strategy)
 {
 	int ret;
 
+	cskburn_reset_strategy_t candidates[2];
+	uint32_t n_candidates;
+	if (options.reset_strategy_auto) {
+		if (options.chip->serial == CHIP_ARCS) {
+			candidates[0] = CSKBURN_RESET_DTR_BOOT;
+			candidates[1] = CSKBURN_RESET_DUAL_NPN;
+			n_candidates = 2;
+		} else {
+			candidates[0] = CSKBURN_RESET_RTS_BOOT;
+			n_candidates = 1;
+		}
+	} else {
+		candidates[0] = options.reset_strategy_fixed;
+		n_candidates = 1;
+	}
+
+	cskburn_reset_strategy_t effective = candidates[0];
+
 	for (uint32_t i = 0; options.wait || i < options.reset_attempts + 1; i++) {
 		uint32_t reset_delay = i == 0 ? 0 : options.reset_delay;
-		uint32_t probe_timeout = i == 0 ? 100 : options.probe_timeout;
-		if ((ret = cskburn_serial_connect(dev, reset_delay, probe_timeout)) != 0) {
+		uint32_t probe_timeout;
+		if (i == 0) {
+			probe_timeout = 100;
+		} else if (n_candidates > 1 && i <= n_candidates) {
+			// Give each candidate a quick first try so a wrong strategy fails
+			// fast; full probe_timeout kicks in only once every candidate has
+			// had its short chance.
+			probe_timeout = options.probe_timeout < 2000 ? options.probe_timeout : 2000;
+		} else {
+			probe_timeout = options.probe_timeout;
+		}
+		effective = candidates[(i == 0 ? 0 : (i - 1)) % n_candidates];
+		if ((ret = cskburn_serial_connect(dev, reset_delay, probe_timeout, effective)) != 0) {
 			if (i == 0) {
 				LOGI("Waiting for device...");
 			}
@@ -975,6 +1038,9 @@ serial_connect(cskburn_serial_device_t *dev)
 		break;
 	}
 
+	if (out_strategy != NULL) {
+		*out_strategy = effective;
+	}
 	return ret;
 }
 
@@ -983,12 +1049,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 {
 	int ret;
 
-	int flags = 0;
-	if (options.update_high) flags |= FLAG_INVERT_RTS;
-	if (options.reset_strategy != NULL && strcmp(options.reset_strategy, "cross-coupled") == 0) {
-		flags |= FLAG_CROSS_COUPLED;
-	}
-	cskburn_serial_init(flags);
+	cskburn_reset_strategy_t effective_strategy = CSKBURN_RESET_RTS_BOOT;
 
 	if (options.target == TARGET_NAND) {
 		LOGD("Using NAND flash");
@@ -1014,7 +1075,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		goto err_open;
 	}
 
-	if ((ret = serial_connect(dev)) != 0) {
+	if ((ret = serial_connect(dev, &effective_strategy)) != 0) {
 		goto err_enter;
 	}
 
@@ -1230,7 +1291,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		LOGI("Jumping to 0x%08X...", jump_addr);
 	} else if (!options.no_reset) {
 		LOGI("Resetting...");
-		cskburn_serial_reset(dev, options.reset_delay);
+		cskburn_serial_reset(dev, options.reset_delay, effective_strategy);
 	}
 
 	if (options.read_logs_baud) {
@@ -1244,7 +1305,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 err_write:
 err_enter:
 	if (ret != 0) {
-		cskburn_serial_reset(dev, options.reset_delay);
+		cskburn_serial_reset(dev, options.reset_delay, effective_strategy);
 	}
 	cskburn_serial_close(&dev);
 err_open:

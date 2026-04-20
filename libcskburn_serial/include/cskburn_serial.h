@@ -7,12 +7,7 @@
 #include "cskburn_errors.h"
 #include "io.h"
 
-#define FLAG_INVERT_RTS    (1 << 0)
-#define FLAG_CROSS_COUPLED (1 << 1)
-
 #define CHIP_ID_LEN 8
-
-void cskburn_serial_init(int flags);
 
 struct _cskburn_serial_device_t;
 typedef struct _cskburn_serial_device_t cskburn_serial_device_t;
@@ -22,6 +17,13 @@ typedef enum {
 	CHIP_VENUS,
 	CHIP_ARCS,
 } cskburn_serial_chip_t;
+
+typedef enum {
+	CSKBURN_RESET_DTR_BOOT,  // DTR -> BOOT, RTS -> RESET (BOOT active low)
+	CSKBURN_RESET_RTS_BOOT,  // RTS -> BOOT, DTR -> RESET (BOOT active low)
+	CSKBURN_RESET_RTS_BOOT_INV,  // RTS -> BOOT, DTR -> RESET (BOOT active high)
+	CSKBURN_RESET_DUAL_NPN,  // Cross-wired NPN pair (Q1/Q2 S8050)
+} cskburn_reset_strategy_t;
 
 #pragma pack(1)
 typedef struct {
@@ -76,13 +78,14 @@ void cskburn_serial_close(cskburn_serial_device_t **dev);
  * @param dev Device handle
  * @param reset_delay Delay in milliseconds that the reset line is held low
  * @param probe_timeout Timeout in milliseconds for probing the device
+ * @param strategy Reset strategy describing how DTR/RTS map to BOOT/RESET
  *
  * @retval 0 if successful
  * @retval -ETIMEDOUT if timeout
  * @retval -errno on other errors from serial device
  */
-int cskburn_serial_connect(
-		cskburn_serial_device_t *dev, uint32_t reset_delay, uint32_t probe_timeout);
+int cskburn_serial_connect(cskburn_serial_device_t *dev, uint32_t reset_delay,
+		uint32_t probe_timeout, cskburn_reset_strategy_t strategy);
 
 /**
  * @brief Enter CSK burn mode
@@ -124,7 +127,8 @@ int cskburn_serial_get_flash_info(
 int cskburn_serial_init_nand(
 		cskburn_serial_device_t *dev, nand_config_t *config, uint64_t *nand_size);
 
-int cskburn_serial_reset(cskburn_serial_device_t *dev, uint32_t reset_delay);
+int cskburn_serial_reset(
+		cskburn_serial_device_t *dev, uint32_t reset_delay, cskburn_reset_strategy_t strategy);
 
 void cskburn_serial_read_logs(cskburn_serial_device_t *dev, uint32_t baud);
 
