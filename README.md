@@ -51,6 +51,7 @@ Serial burning options:
     chip family (default: castor), acceptable values:
       castor: Castor (CSK3/CSK4)
       venus: Venus (CSK6)
+      arcs: Arcs (LS26)
   --chip-id
     read unique chip ID
   --verify-all
@@ -63,6 +64,13 @@ Serial burning options:
     number of attempts to reset device during probing (default: 4)
   --reset-delay <ms>
     delay in milliseconds the reset line is held low (default: 500 ms)
+  --reset-strategy <name>
+    reset strategy for entering burn mode (default: auto), acceptable values:
+      auto: auto-select by chip; for LS26 alternates dtr-boot and dual-npn
+      dtr-boot: DTR -> BOOT, RTS -> RESET (LS26 ARCS-MINI)
+      rts-boot: RTS -> BOOT, DTR -> RESET (CSK4/CSK6 default)
+      rts-boot-inv: rts-boot with BOOT active high (equivalent to --update-high)
+      dual-npn: cross-wired NPN pair S8050 (LS26 ARCS-EVB)
   --timeout <ms>
     override timeout for each operation (default: 0), acceptable values:
       -1: no timeout
