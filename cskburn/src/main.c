@@ -402,8 +402,8 @@ print_version(void)
 }
 
 #ifndef WITHOUT_USB
-static bool usb_check(void);
-static bool usb_burn(cskburn_partition_t *parts, int parts_cnt);
+static int usb_check(void);
+static int usb_burn(cskburn_partition_t *parts, int parts_cnt);
 #endif
 
 static int
@@ -730,17 +730,14 @@ main(int argc, char **argv)
 
 	if (options.serial != NULL && strlen(options.serial) > 0) {
 		options.protocol = PROTO_SERIAL;
-	} else {
-#ifdef WITHOUT_USB
-		ERR_CTX(CSKBURN_ERR_ARG_NO_SERIAL, "use -s (e.g. -s %s)", example_serial_dev);
-		return CSKBURN_ERR_ARG_NO_SERIAL;
-#else
+#ifndef WITHOUT_USB
+	} else if (options.usb != NULL) {
 		if (!options.chip->usb) {
 			ERR_CTX(CSKBURN_ERR_ARG_UNSUPPORTED_OP, "USB is not supported by %s",
 					options.chip->name);
 			return CSKBURN_ERR_ARG_UNSUPPORTED_OP;
 		}
-		if (options.usb != NULL && strcmp(options.usb, "-") != 0) {
+		if (strcmp(options.usb, "-") != 0) {
 			if (sscanf(options.usb, "%hu:%hu\n", &options.usb_bus, &options.usb_addr) != 2) {
 				ERR_CTX(CSKBURN_ERR_ARG_INVALID, "--usb must be <bus>:<device> (e.g. 020:004)");
 				return CSKBURN_ERR_ARG_INVALID;
@@ -748,6 +745,14 @@ main(int argc, char **argv)
 		}
 		options.protocol = PROTO_USB;
 #endif
+	} else {
+#ifndef WITHOUT_USB
+		ERR_CTX(CSKBURN_ERR_ARG_NO_PORT, "use -s <port> (e.g. -s %s) or -u <bus>:<dev>",
+				example_serial_dev);
+#else
+		ERR_CTX(CSKBURN_ERR_ARG_NO_PORT, "use -s (e.g. -s %s)", example_serial_dev);
+#endif
+		return CSKBURN_ERR_ARG_NO_PORT;
 	}
 
 	if (options.target == TARGET_NAND) {
@@ -790,11 +795,7 @@ main(int argc, char **argv)
 	if (options.action == ACTION_CHECK) {
 #ifndef WITHOUT_USB
 		if (options.protocol == PROTO_USB) {
-			if (usb_check()) {
-				return 0;
-			} else {
-				return ENOENT;
-			}
+			return -usb_check();
 		}
 #endif
 	}
@@ -839,8 +840,7 @@ main(int argc, char **argv)
 				msleep(2000);
 			}
 		} else {
-			if (!usb_burn(parts, parts_cnt)) {
-				ret = -EIO;
+			if ((ret = usb_burn(parts, parts_cnt)) != 0) {
 				goto exit;
 			}
 		}
@@ -881,35 +881,36 @@ print_progress(int32_t wrote_bytes, uint32_t total_bytes)
 }
 
 #ifndef WITHOUT_USB
-static bool
+static int
 usb_check(void)
 {
-	bool ret = false;
+	int ret;
 
 	if (!cskburn_usb_init()) {
-		LOGE("ERROR: USB initialize failed");
-		goto exit;
+		ERR(CSKBURN_ERR_USB_INIT_FAILED);
+		return -CSKBURN_ERR_USB_INIT_FAILED;
 	}
 
+	ret = -CSKBURN_ERR_USB_DEVICE_NOT_FOUND;
 	do {
 		if (cskburn_usb_wait(options.usb_bus, options.usb_addr, 10)) {
-			ret = true;
-			goto exit;
+			ret = 0;
+			break;
 		}
 	} while (options.wait);
 
-exit:
 	cskburn_usb_exit();
 	return ret;
 }
 
-static bool
+static int
 usb_burn(cskburn_partition_t *parts, int parts_cnt)
 {
-	bool ret = false;
+	int ret;
 
 	if (!cskburn_usb_init()) {
-		LOGE("ERROR: USB initialize failed");
+		ERR(CSKBURN_ERR_USB_INIT_FAILED);
+		ret = -CSKBURN_ERR_USB_INIT_FAILED;
 		goto err_init;
 	}
 
@@ -926,11 +927,12 @@ usb_burn(cskburn_partition_t *parts, int parts_cnt)
 	}
 
 	LOGI("Entering update mode...");
-	cskburn_usb_device_t *dev;
+	cskburn_usb_device_t *dev = NULL;
 	for (int i = 0; i < ENTER_TRIES; i++) {
 		if ((dev = cskburn_usb_open(options.usb_bus, options.usb_addr)) == NULL) {
 			if (i == ENTER_TRIES - 1) {
-				LOGE("ERROR: Failed opening device");
+				ERR(CSKBURN_ERR_USB_DEVICE_NOT_FOUND);
+				ret = -CSKBURN_ERR_USB_DEVICE_NOT_FOUND;
 				goto err_open;
 			} else {
 				msleep(2000);
@@ -940,7 +942,8 @@ usb_burn(cskburn_partition_t *parts, int parts_cnt)
 		msleep(500);
 		if (!cskburn_usb_enter(dev, options.burner_buf, options.burner_len)) {
 			if (i == ENTER_TRIES - 1) {
-				LOGE("ERROR: Failed entering update mode");
+				ERR(CSKBURN_ERR_USB_ENTER_FAILED);
+				ret = -CSKBURN_ERR_USB_ENTER_FAILED;
 				goto err_enter;
 			} else {
 				cskburn_usb_close(&dev);
@@ -956,7 +959,8 @@ usb_burn(cskburn_partition_t *parts, int parts_cnt)
 				(float)parts[i].reader->size / 1024.0f);
 		if (!cskburn_usb_write(dev, parts[i].addr, parts[i].reader,
 					options.progress ? print_progress : NULL)) {
-			LOGE("ERROR: Failed burning partition %d", i + 1);
+			ERR_CTX(CSKBURN_ERR_USB_WRITE_FAILED, "partition %d", i + 1);
+			ret = -CSKBURN_ERR_USB_WRITE_FAILED;
 			goto err_write;
 		}
 	}
@@ -964,14 +968,14 @@ usb_burn(cskburn_partition_t *parts, int parts_cnt)
 	cskburn_usb_show_done(dev);
 
 	LOGI("Finished");
-	ret = true;
+	ret = 0;
 
 err_write:
 err_enter:
 	cskburn_usb_close(&dev);
 err_open:
-err_init:
 	cskburn_usb_exit();
+err_init:
 	return ret;
 }
 #endif

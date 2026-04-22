@@ -16,8 +16,8 @@ cskburn_strerror(int err)
 		/* 1xxx — argument */
 		case CSKBURN_ERR_ARG_INVALID:
 			return "Invalid argument";
-		case CSKBURN_ERR_ARG_NO_SERIAL:
-			return "No serial port specified";
+		case CSKBURN_ERR_ARG_NO_PORT:
+			return "No serial port or USB device specified";
 		case CSKBURN_ERR_ARG_UNSUPPORTED_OP:
 			return "Operation not supported in this mode";
 		case CSKBURN_ERR_ARG_TOO_MANY_PARTS:
@@ -96,6 +96,16 @@ cskburn_strerror(int err)
 			return "Failed to compute MD5 on local file";
 		case CSKBURN_ERR_VERIFY_MISMATCH:
 			return "Verification failed: MD5 does not match";
+
+		/* 9xxx — USB backend */
+		case CSKBURN_ERR_USB_INIT_FAILED:
+			return "Failed to initialize USB backend";
+		case CSKBURN_ERR_USB_DEVICE_NOT_FOUND:
+			return "USB device not found";
+		case CSKBURN_ERR_USB_ENTER_FAILED:
+			return "Failed to enter USB update mode";
+		case CSKBURN_ERR_USB_WRITE_FAILED:
+			return "Failed to write data over USB";
 
 		/* Passthrough errno values — rare, usually out-of-memory */
 		case ENOMEM:
