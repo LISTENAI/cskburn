@@ -37,6 +37,22 @@ configure_port(HANDLE handle, DWORD baud_rate, bool rts, bool dtr)
 	return 0;
 }
 
+static int
+map_create_file_error(DWORD err)
+{
+	switch (err) {
+		case ERROR_FILE_NOT_FOUND:
+		case ERROR_PATH_NOT_FOUND:
+			return -ENOENT;
+		// COM 口被占用时 Windows 返回 ACCESS_DENIED 而非 EACCES，统一归到 EBUSY。
+		case ERROR_ACCESS_DENIED:
+		case ERROR_SHARING_VIOLATION:
+			return -EBUSY;
+		default:
+			return -ENXIO;
+	}
+}
+
 int
 serial_open(const char *path, serial_dev_t **dev)
 {
@@ -58,7 +74,7 @@ serial_open(const char *path, serial_dev_t **dev)
 			NULL);  // Null for Comm Devices
 
 	if (handle == INVALID_HANDLE_VALUE) {
-		return -ENODEV;
+		return map_create_file_error(GetLastError());
 	}
 
 	ret = configure_port(handle, CBR_115200, false, false);
@@ -82,10 +98,23 @@ serial_open(const char *path, serial_dev_t **dev)
 		return -EIO;
 	}
 
+	HANDLE read_event = CreateEventA(NULL, TRUE, FALSE, NULL);
+	if (read_event == NULL) {
+		CloseHandle(handle);
+		return -EIO;
+	}
+
+	HANDLE write_event = CreateEventA(NULL, FALSE, FALSE, NULL);
+	if (write_event == NULL) {
+		CloseHandle(read_event);
+		CloseHandle(handle);
+		return -EIO;
+	}
+
 	(*dev) = (serial_dev_t *)calloc(1, sizeof(serial_dev_t));
 	(*dev)->handle = handle;
-	(*dev)->overlapped_read.hEvent = CreateEventA(NULL, TRUE, FALSE, NULL);
-	(*dev)->overlapped_write.hEvent = CreateEventA(NULL, FALSE, FALSE, NULL);
+	(*dev)->overlapped_read.hEvent = read_event;
+	(*dev)->overlapped_write.hEvent = write_event;
 
 	return 0;
 }
