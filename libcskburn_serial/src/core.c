@@ -235,6 +235,8 @@ cskburn_serial_connect(cskburn_serial_device_t *dev, uint32_t reset_delay, uint3
 		}
 	}
 
+	serial_set_speed(dev->serial, BAUD_RATE_INIT);
+
 	ret = try_sync(dev, probe_timeout);
 	if (ret == -ETIMEDOUT) {
 		return -CSKBURN_ERR_PROBE_NO_SYNC;
