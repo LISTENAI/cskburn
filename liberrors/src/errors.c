@@ -46,6 +46,8 @@ cskburn_strerror(int err)
 			return "Failed to open serial port";
 		case CSKBURN_ERR_SERIAL_CONFIG_FAILED:
 			return "Failed to configure serial port";
+		case CSKBURN_ERR_SERIAL_BAUD_UNSUPPORTED:
+			return "Serial driver does not support the requested baud rate";
 
 		/* 4xxx — probe / reset */
 		case CSKBURN_ERR_PROBE_NO_SYNC:

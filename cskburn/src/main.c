@@ -1031,7 +1031,10 @@ serial_connect(cskburn_serial_device_t *dev, cskburn_reset_strategy_t *out_strat
 		LOGI("Entering update mode...");
 		if ((ret = cskburn_serial_enter(dev, options.serial_baud, options.burner_buf,
 					 options.burner_len, options.chip->burner_load_addr)) != 0) {
-			if (!options.wait && i >= options.reset_attempts) {
+			// host 驱动不支持当前波特率是确定性失败，再怎么复位重试也没
+			// 用，直接把错误码冒泡出去。
+			if (ret == -CSKBURN_ERR_SERIAL_BAUD_UNSUPPORTED
+					|| (!options.wait && i >= options.reset_attempts)) {
 				ERR_RET_NO_CTX(ret);
 				return ret;
 			} else {

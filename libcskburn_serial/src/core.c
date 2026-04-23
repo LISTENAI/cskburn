@@ -272,6 +272,9 @@ cskburn_serial_enter(cskburn_serial_device_t *dev, uint32_t baud_rate, uint8_t *
 		if (load_speedup) {
 			if ((ret = cmd_change_baud(dev, baud_rate, BAUD_RATE_INIT)) != 0) {
 				LOGD_RET(ret, "DEBUG: ROM baud change failed");
+				if (ret == -EINVAL) {
+					return -CSKBURN_ERR_SERIAL_BAUD_UNSUPPORTED;
+				}
 				return -CSKBURN_ERR_ROM_BAUD_REJECTED;
 			}
 
@@ -326,6 +329,9 @@ cskburn_serial_enter(cskburn_serial_device_t *dev, uint32_t baud_rate, uint8_t *
 
 	if ((ret = cmd_change_baud(dev, baud_rate, BAUD_RATE_INIT)) != 0) {
 		LOGD_RET(ret, "DEBUG: Burner baud change failed");
+		if (ret == -EINVAL) {
+			return -CSKBURN_ERR_SERIAL_BAUD_UNSUPPORTED;
+		}
 		return -CSKBURN_ERR_BAUD_REJECTED;
 	}
 

@@ -636,8 +636,8 @@ cmd_change_baud(cskburn_serial_device_t *dev, uint32_t baud, uint32_t old_baud)
 	cmd->baud = baud;
 	cmd->old_baud = old_baud;
 
-	ret = command(dev, CMD_CHANGE_BAUDRATE, sizeof(cmd_change_baud_t), CHECKSUM_NONE, NULL, NULL,
-			NULL, 0, 1000);
+	ret = check_command(
+			dev, CMD_CHANGE_BAUDRATE, sizeof(cmd_change_baud_t), CHECKSUM_NONE, NULL, 1000);
 	if (ret != 0) {
 		return ret;
 	}
