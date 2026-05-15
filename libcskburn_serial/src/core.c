@@ -27,6 +27,9 @@ extern const uint32_t burner_serial_venus_len;
 extern const uint8_t burner_serial_arcs[];
 extern const uint32_t burner_serial_arcs_len;
 
+extern const uint8_t burner_serial_venusa[];
+extern const uint32_t burner_serial_venusa_len;
+
 static const struct {
 	const uint8_t *burner;
 	const uint32_t *len_ptr;
@@ -49,6 +52,16 @@ static const struct {
 						.burner = burner_serial_arcs,
 						.len_ptr = &burner_serial_arcs_len,
 						.info = {.load_addr = 0x20040000},
+				},
+		[CHIP_VENUSA] =
+				{
+						.burner = burner_serial_venusa,
+						.len_ptr = &burner_serial_venusa_len,
+						.info =
+								{
+										.load_addr = 0x20050000,
+										.supports_read_flash_stream = true,
+								},
 				},
 };
 
@@ -508,9 +521,9 @@ cskburn_serial_write(cskburn_serial_device_t *dev, cskburn_serial_target_t targe
 	return 0;
 }
 
-int
-cskburn_serial_read(cskburn_serial_device_t *dev, cskburn_serial_target_t target, uint32_t addr,
-		uint32_t size, writer_t *writer, uint8_t *md5,
+static int
+cskburn_serial_read_legacy(cskburn_serial_device_t *dev, cskburn_serial_target_t target,
+		uint32_t addr, uint32_t size, writer_t *writer, uint8_t *md5,
 		void (*on_progress)(int32_t read_bytes, uint32_t total_bytes))
 {
 	int ret;
@@ -556,6 +569,39 @@ cskburn_serial_read(cskburn_serial_device_t *dev, cskburn_serial_target_t target
 	}
 
 	return 0;
+}
+
+static int
+cskburn_serial_read_stream(cskburn_serial_device_t *dev, cskburn_serial_target_t target,
+		uint32_t addr, uint32_t size, writer_t *writer, uint8_t *md5,
+		void (*on_progress)(int32_t read_bytes, uint32_t total_bytes))
+{
+	int ret;
+
+	uint64_t t1 = time_monotonic();
+
+	ret = cmd_read_flash_stream(dev, addr, size, writer, md5, on_progress);
+	if (ret != 0) {
+		LOGD_RET(ret, "DEBUG: read_flash_stream at 0x%08X (%u bytes) failed", addr, size);
+		return ret > 0 ? ret : -CSKBURN_ERR_FLASH_READ_FAILED;
+	}
+
+	uint64_t t2 = time_monotonic();
+	print_time_spent_with_speed("Reading", t1, t2, size);
+
+	return 0;
+}
+
+int
+cskburn_serial_read(cskburn_serial_device_t *dev, cskburn_serial_target_t target, uint32_t addr,
+		uint32_t size, writer_t *writer, uint8_t *md5,
+		void (*on_progress)(int32_t read_bytes, uint32_t total_bytes))
+{
+	if (dev->burner_info->supports_read_flash_stream) {
+		return cskburn_serial_read_stream(dev, target, addr, size, writer, md5, on_progress);
+	} else {
+		return cskburn_serial_read_legacy(dev, target, addr, size, writer, md5, on_progress);
+	}
 }
 
 int

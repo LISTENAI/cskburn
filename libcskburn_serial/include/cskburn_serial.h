@@ -16,6 +16,7 @@ typedef enum {
 	CHIP_CASTOR,
 	CHIP_VENUS,
 	CHIP_ARCS,
+	CHIP_VENUSA,
 } cskburn_serial_chip_t;
 
 typedef enum {

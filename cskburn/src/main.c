@@ -150,6 +150,7 @@ typedef enum {
 	CASTOR,
 	VENUS,
 	ARCS,
+	VENUSA,
 	CHIP_COUNT,
 } cskburn_chip_t;
 
@@ -195,6 +196,17 @@ static const chip_features_t chip_features[] = {
 						.serial = CHIP_ARCS,
 						.nand = false,
 						.base_addr = 0x30000000,
+						.default_baud = DEFAULT_BAUD,
+						.flash_auto_erase = false,
+				},
+		[VENUSA] =
+				{
+						.code = "venusa",
+						.name = "VenusA (CSK7)",
+						.usb = false,
+						.serial = CHIP_VENUSA,
+						.nand = false,
+						.base_addr = 0x3000000,
 						.default_baud = DEFAULT_BAUD,
 						.flash_auto_erase = false,
 				},
@@ -466,6 +478,9 @@ main(int argc, char **argv)
 					options.chip = &chip_features[VENUS];
 				} else if (strcmp(optarg, "arcs") == 0 || strcmp(optarg, "ARCS") == 0) {
 					options.chip = &chip_features[ARCS];
+				} else if (strcmp(optarg, "venusa") == 0 || strcmp(optarg, "VENUSA") == 0 ||
+						   strstr(optarg, "csk7") == optarg || strstr(optarg, "CSK7") == optarg) {
+					options.chip = &chip_features[VENUSA];
 				} else {
 					ERR_CTX(CSKBURN_ERR_ARG_INVALID, "--chip: %s", optarg);
 					return CSKBURN_ERR_ARG_INVALID;

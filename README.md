@@ -52,6 +52,7 @@ Serial burning options:
       castor: Castor (CSK3/CSK4)
       venus: Venus (CSK6)
       arcs: Arcs (LS26)
+      venusa: VenusA (CSK7)
   --chip-id
     read unique chip ID
   --verify-all
