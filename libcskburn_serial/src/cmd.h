@@ -28,6 +28,8 @@ typedef enum {
 #define RAM_BLOCK_SIZE (2 * 1024)
 #define FLASH_BLOCK_SIZE (4 * 1024)
 #define FLASH_READ_SIZE (64)
+#define FLASH_READ_STREAM_BLOCK (4 * 1024)
+#define FLASH_READ_STREAM_WINDOW (64)
 
 #define STATUS_BYTES_LEN 2
 
@@ -37,7 +39,8 @@ typedef enum {
 #define MAX_REQ_SLIP_LEN (MAX_REQ_RAW_LEN * 2)
 
 #define MAX_RES_COMMAND_LEN (sizeof(csk_response_t) + STATUS_BYTES_LEN)
-#define MAX_RES_PAYLOAD_LEN (FLASH_READ_SIZE)
+#define MAX_RES_PAYLOAD_LEN \
+	(FLASH_READ_STREAM_BLOCK > FLASH_READ_SIZE ? FLASH_READ_STREAM_BLOCK : FLASH_READ_SIZE)
 #define MAX_RES_RAW_LEN (MAX_RES_COMMAND_LEN + MAX_RES_PAYLOAD_LEN)
 #define MAX_RES_SLIP_LEN (MAX_RES_RAW_LEN * 2)
 
@@ -76,6 +79,10 @@ int cmd_flash_md5sum(cskburn_serial_device_t *dev, uint32_t address, uint32_t si
 
 int cmd_read_flash(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uint8_t *data,
 		uint32_t *data_len);
+
+int cmd_read_flash_stream(cskburn_serial_device_t *dev, uint32_t address, uint32_t size,
+		writer_t *writer, uint8_t *md5,
+		void (*on_progress)(int32_t read_bytes, uint32_t total_bytes));
 
 int cmd_change_baud(cskburn_serial_device_t *dev, uint32_t baud, uint32_t old_baud);
 

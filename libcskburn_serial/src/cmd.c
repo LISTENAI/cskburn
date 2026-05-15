@@ -37,6 +37,7 @@
 #define CMD_NAND_MD5 0x24
 #define CMD_FLASH_ERASE_CHIP 0xD0
 #define CMD_FLASH_ERASE_REGION 0xD1
+#define CMD_READ_FLASH_STREAM 0xD2
 #define CMD_READ_FLASH_ID 0xF3
 #define CMD_READ_CHIP_ID 0xF4
 
@@ -115,6 +116,13 @@ typedef struct {
 	uint32_t address;
 	uint32_t size;
 } cmd_read_flash_t;
+
+typedef struct {
+	uint32_t address;
+	uint32_t size;
+	uint32_t block_size;
+	uint32_t max_in_flight;
+} cmd_read_flash_stream_t;
 
 static ssize_t
 command_send(cskburn_serial_device_t *dev, uint8_t op, uint8_t *req_buf, uint32_t req_len,
@@ -622,6 +630,123 @@ cmd_read_flash(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, ui
 
 	*data_len = ret_len - STATUS_BYTES_LEN;
 	memcpy(data, ret_buf + STATUS_BYTES_LEN, *data_len);
+
+	return 0;
+}
+
+int
+cmd_read_flash_stream(cskburn_serial_device_t *dev, uint32_t address, uint32_t size,
+		writer_t *writer, uint8_t *md5,
+		void (*on_progress)(int32_t read_bytes, uint32_t total_bytes))
+{
+	int ret;
+
+	serial_discard_input(dev->serial);
+	serial_discard_output(dev->serial);
+
+	// Phase 1: send request
+	csk_command_t *req = (csk_command_t *)dev->req_hdr;
+	req->direction = DIR_REQ;
+	req->command = CMD_READ_FLASH_STREAM;
+	req->size = sizeof(cmd_read_flash_stream_t);
+	req->checksum = CHECKSUM_NONE;
+
+	cmd_read_flash_stream_t *payload = (cmd_read_flash_stream_t *)dev->req_cmd;
+	payload->address = address;
+	payload->size = size;
+	payload->block_size = FLASH_READ_STREAM_BLOCK;
+	payload->max_in_flight = FLASH_READ_STREAM_WINDOW;
+
+	uint32_t req_len = sizeof(csk_command_t) + sizeof(cmd_read_flash_stream_t);
+
+	LOG_TRACE("> req op=%02X len=%zu", CMD_READ_FLASH_STREAM, sizeof(cmd_read_flash_stream_t));
+
+	if ((ret = slip_write(dev->slip, dev->req_buf, req_len, TIMEOUT_DEFAULT)) < 0) {
+		LOGD_RET(ret, "DEBUG: Failed to write read_flash_stream request");
+		return ret;
+	}
+
+	// Phase 1 cont'd: receive ACK frame (csk_response_t + error byte + status byte)
+	bool got_ack = false;
+	uint8_t status_code = 0;
+	uint64_t start = time_monotonic();
+	do {
+		ssize_t r = slip_read(dev->slip, dev->res_buf, MAX_RES_SLIP_LEN, TIMEOUT_DEFAULT);
+		if (r == -ETIMEDOUT) {
+			break;
+		} else if (r < 0) {
+			return r;
+		}
+		if ((size_t)r < sizeof(csk_response_t) + STATUS_BYTES_LEN) {
+			continue;
+		}
+		csk_response_t *res = (csk_response_t *)dev->res_buf;
+		if (res->direction != DIR_RES || res->command != CMD_READ_FLASH_STREAM) {
+			continue;
+		}
+		uint8_t *status = dev->res_buf + sizeof(csk_response_t);
+		LOG_TRACE("< ack op=%02X err=%02X code=%02X", res->command, status[0], status[1]);
+		if (status[0] != 0) {
+			status_code = status[1];
+			break;
+		}
+		got_ack = true;
+		break;
+	} while (TIME_SINCE_MS(start) < TIMEOUT_DEFAULT);
+
+	if (!got_ack) {
+		if (status_code != 0) {
+			LOGD("DEBUG: read_flash_stream rejected: 0x%02X", status_code);
+			return status_code;
+		}
+		return -ETIMEDOUT;
+	}
+
+	// Phase 2: stream data with rolling ACK
+	uint32_t received = 0;
+	while (received < size) {
+		ssize_t r = slip_read(dev->slip, dev->res_buf, MAX_RES_SLIP_LEN, TIMEOUT_FLASH_DATA);
+		if (r < 0) {
+			return r;
+		}
+		if (r == 0) {
+			continue;
+		}
+		if (received + (uint32_t)r > size) {
+			LOGD("DEBUG: read_flash_stream overflow: have %u, want %u, got %zd", received, size, r);
+			return -EIO;
+		}
+
+		if (writer->write(writer, dev->res_buf, (uint32_t)r) != (uint32_t)r) {
+			return -CSKBURN_ERR_FILE_WRITE_FAILED;
+		}
+		received += (uint32_t)r;
+
+		// Cumulative ACK: 4-byte LE byte count, raw SLIP (no csk_command header)
+		uint32_t ack = received;
+		if ((ret = slip_write(dev->slip, (uint8_t *)&ack, sizeof(ack), TIMEOUT_DEFAULT)) < 0) {
+			return ret;
+		}
+
+		if (on_progress != NULL) {
+			on_progress(received, size);
+		}
+	}
+
+	// Phase 3: final MD5 frame (16 bytes, raw SLIP)
+	uint8_t remote_md5[MD5_LEN];
+	ssize_t r = slip_read(dev->slip, remote_md5, sizeof(remote_md5), TIMEOUT_FLASH_DATA);
+	if (r < 0) {
+		return r;
+	}
+	if (r != MD5_LEN) {
+		LOGD("DEBUG: read_flash_stream md5 frame size %zd", r);
+		return -EIO;
+	}
+
+	if (md5 != NULL) {
+		memcpy(md5, remote_md5, MD5_LEN);
+	}
 
 	return 0;
 }
