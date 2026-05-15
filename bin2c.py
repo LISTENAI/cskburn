@@ -10,7 +10,7 @@ def main():
 
     with open(output_path, "w", newline="\n") as out:
         out.write("#include <stdint.h>\n\n")
-        out.write(f"uint8_t {name}[] = {{\n")
+        out.write(f"const uint8_t {name}[] = {{\n")
 
         with open(input_path, "rb") as f:
             while True:
@@ -21,7 +21,7 @@ def main():
                 out.write(f"\t{line},\n")
 
         out.write("};\n\n")
-        out.write(f"uint32_t {name}_len = sizeof({name});\n")
+        out.write(f"const uint32_t {name}_len = sizeof({name});\n")
 
 
 if __name__ == "__main__":

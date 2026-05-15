@@ -6,6 +6,10 @@
 #include "serial.h"
 #include "slip.h"
 
+struct cskburn_serial_burner_info {
+	uint32_t load_addr;
+};
+
 struct _cskburn_serial_device_t {
 	serial_dev_t *serial;
 	slip_dev_t *slip;
@@ -14,6 +18,9 @@ struct _cskburn_serial_device_t {
 	uint8_t *req_buf;
 	uint8_t *res_buf;
 	cskburn_serial_chip_t chip;
+	const uint8_t *burner_img;
+	uint32_t burner_len;
+	const struct cskburn_serial_burner_info *burner_info;
 	int32_t timeout;
 };
 

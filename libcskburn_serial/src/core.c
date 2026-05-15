@@ -18,14 +18,41 @@
 
 #define FLASH_BLOCK_TRIES 3
 
-extern uint8_t burner_serial_castor[];
-extern uint32_t burner_serial_castor_len;
+extern const uint8_t burner_serial_castor[];
+extern const uint32_t burner_serial_castor_len;
 
-extern uint8_t burner_serial_venus[];
-extern uint32_t burner_serial_venus_len;
+extern const uint8_t burner_serial_venus[];
+extern const uint32_t burner_serial_venus_len;
 
-extern uint8_t burner_serial_arcs[];
-extern uint32_t burner_serial_arcs_len;
+extern const uint8_t burner_serial_arcs[];
+extern const uint32_t burner_serial_arcs_len;
+
+static const struct {
+	const uint8_t *burner;
+	const uint32_t *len_ptr;
+	struct cskburn_serial_burner_info info;
+} burners[] = {
+		[CHIP_CASTOR] =
+				{
+						.burner = burner_serial_castor,
+						.len_ptr = &burner_serial_castor_len,
+						.info = {.load_addr = 0x0},
+				},
+		[CHIP_VENUS] =
+				{
+						.burner = burner_serial_venus,
+						.len_ptr = &burner_serial_venus_len,
+						.info = {.load_addr = 0x0},
+				},
+		[CHIP_ARCS] =
+				{
+						.burner = burner_serial_arcs,
+						.len_ptr = &burner_serial_arcs_len,
+						.info = {.load_addr = 0x20040000},
+				},
+};
+
+#define BURNERS_COUNT (sizeof(burners) / sizeof(burners[0]))
 
 static void
 print_time_spent(const char *usage, uint64_t t1, uint64_t t2)
@@ -169,6 +196,13 @@ cskburn_serial_open(cskburn_serial_device_t **dev, const char *path, cskburn_ser
 	(*dev)->req_hdr = (*dev)->req_buf;
 	(*dev)->req_cmd = (*dev)->req_buf + sizeof(csk_command_t);
 	(*dev)->chip = chip;
+
+	if (chip < BURNERS_COUNT) {
+		(*dev)->burner_img = burners[chip].burner;
+		(*dev)->burner_len = *burners[chip].len_ptr;
+		(*dev)->burner_info = &burners[chip].info;
+	}
+
 	(*dev)->timeout = timeout;
 
 	return 0;
@@ -245,22 +279,14 @@ cskburn_serial_connect(cskburn_serial_device_t *dev, uint32_t reset_delay, uint3
 }
 
 int
-cskburn_serial_enter(cskburn_serial_device_t *dev, uint32_t baud_rate, uint8_t *burner,
-		uint32_t len, uint32_t load_addr)
+cskburn_serial_enter(
+		cskburn_serial_device_t *dev, uint32_t baud_rate, uint8_t *burner, uint32_t len)
 {
 	int ret;
 
-	if (burner == NULL || len == 0) {
-		if (dev->chip == CHIP_CASTOR) {
-			burner = burner_serial_castor;
-			len = burner_serial_castor_len;
-		} else if (dev->chip == CHIP_VENUS) {
-			burner = burner_serial_venus;
-			len = burner_serial_venus_len;
-		} else if (dev->chip == CHIP_ARCS) {
-			burner = burner_serial_arcs;
-			len = burner_serial_arcs_len;
-		}
+	if ((burner == NULL || len == 0) && dev->burner_img != NULL && dev->burner_len > 0) {
+		burner = (uint8_t *)dev->burner_img;
+		len = dev->burner_len;
 	}
 
 	if (burner != NULL && len > 0) {
@@ -289,7 +315,8 @@ cskburn_serial_enter(cskburn_serial_device_t *dev, uint32_t baud_rate, uint8_t *
 		uint32_t offset, length;
 		uint32_t blocks = BLOCKS(len, RAM_BLOCK_SIZE);
 
-		if ((ret = cmd_mem_begin(dev, len, blocks, RAM_BLOCK_SIZE, load_addr)) != 0) {
+		if ((ret = cmd_mem_begin(dev, len, blocks, RAM_BLOCK_SIZE, dev->burner_info->load_addr)) !=
+				0) {
 			LOGD_RET(ret, "DEBUG: mem_begin failed while loading burner");
 			return -CSKBURN_ERR_BURNER_LOAD_FAILED;
 		}
@@ -308,7 +335,7 @@ cskburn_serial_enter(cskburn_serial_device_t *dev, uint32_t baud_rate, uint8_t *
 			}
 		}
 
-		if ((ret = cmd_mem_finish(dev, OPTION_REBOOT, load_addr)) != 0) {
+		if ((ret = cmd_mem_finish(dev, OPTION_REBOOT, dev->burner_info->load_addr)) != 0) {
 			LOGD_RET(ret, "DEBUG: mem_finish failed while loading burner");
 			return -CSKBURN_ERR_BURNER_LOAD_FAILED;
 		}

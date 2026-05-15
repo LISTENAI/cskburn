@@ -56,8 +56,6 @@ int _isatty(int);
 	} while (0)
 
 #define DEFAULT_BAUD 3000000
-#define BURNER_LOAD_ADDR_DEFAULT 0
-#define BURNER_LOAD_ADDR_ARCS 0x20040000
 
 #define DEFAULT_PROBE_TIMEOUT 10 * 1000
 #define DEFAULT_RESET_ATTEMPTS 4
@@ -162,7 +160,6 @@ typedef struct {
 	cskburn_serial_chip_t serial;
 	bool nand;
 	uint32_t base_addr;
-	uint32_t burner_load_addr;
 	uint32_t default_baud;
 	bool flash_auto_erase;
 } chip_features_t;
@@ -176,7 +173,6 @@ static const chip_features_t chip_features[] = {
 						.serial = CHIP_CASTOR,
 						.nand = false,
 						.base_addr = 0x80000000,
-						.burner_load_addr = BURNER_LOAD_ADDR_DEFAULT,
 						.default_baud = DEFAULT_BAUD,
 						.flash_auto_erase = true,
 				},
@@ -188,7 +184,6 @@ static const chip_features_t chip_features[] = {
 						.serial = CHIP_VENUS,
 						.nand = true,
 						.base_addr = 0x18000000,
-						.burner_load_addr = BURNER_LOAD_ADDR_DEFAULT,
 						.default_baud = DEFAULT_BAUD,
 						.flash_auto_erase = true,
 				},
@@ -200,7 +195,6 @@ static const chip_features_t chip_features[] = {
 						.serial = CHIP_ARCS,
 						.nand = false,
 						.base_addr = 0x30000000,
-						.burner_load_addr = BURNER_LOAD_ADDR_ARCS,
 						.default_baud = DEFAULT_BAUD,
 						.flash_auto_erase = false,
 				},
@@ -1029,12 +1023,12 @@ serial_connect(cskburn_serial_device_t *dev, cskburn_reset_strategy_t *out_strat
 			}
 		}
 		LOGI("Entering update mode...");
-		if ((ret = cskburn_serial_enter(dev, options.serial_baud, options.burner_buf,
-					 options.burner_len, options.chip->burner_load_addr)) != 0) {
+		if ((ret = cskburn_serial_enter(
+					 dev, options.serial_baud, options.burner_buf, options.burner_len)) != 0) {
 			// host 驱动不支持当前波特率是确定性失败，再怎么复位重试也没
 			// 用，直接把错误码冒泡出去。
-			if (ret == -CSKBURN_ERR_SERIAL_BAUD_UNSUPPORTED
-					|| (!options.wait && i >= options.reset_attempts)) {
+			if (ret == -CSKBURN_ERR_SERIAL_BAUD_UNSUPPORTED ||
+					(!options.wait && i >= options.reset_attempts)) {
 				ERR_RET_NO_CTX(ret);
 				return ret;
 			} else {
