@@ -12,7 +12,7 @@ verify_hook(const uint8_t *buf, uint32_t size, void *ctx)
 }
 
 void
-verify_install(reader_t *reader)
+verify_install_reader(reader_t *reader)
 {
 	mbedtls_md5_context *ctx = malloc(sizeof(mbedtls_md5_context));
 	mbedtls_md5_init(ctx);
@@ -21,9 +21,28 @@ verify_install(reader_t *reader)
 }
 
 int
-verify_finish(reader_t *reader, uint8_t md5[16])
+verify_finish_reader(reader_t *reader, uint8_t md5[16])
 {
 	mbedtls_md5_context *ctx = (mbedtls_md5_context *)reader_hook_ctx(reader);
+	int ret = mbedtls_md5_finish(ctx, md5);
+	mbedtls_md5_free(ctx);
+	free(ctx);
+	return ret;
+}
+
+void
+verify_install_writer(writer_t *writer)
+{
+	mbedtls_md5_context *ctx = malloc(sizeof(mbedtls_md5_context));
+	mbedtls_md5_init(ctx);
+	mbedtls_md5_starts(ctx);
+	writer_install(writer, verify_hook, (void *)ctx);
+}
+
+int
+verify_finish_writer(writer_t *writer, uint8_t md5[16])
+{
+	mbedtls_md5_context *ctx = (mbedtls_md5_context *)writer_hook_ctx(writer);
 	int ret = mbedtls_md5_finish(ctx, md5);
 	mbedtls_md5_free(ctx);
 	free(ctx);

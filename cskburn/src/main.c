@@ -1183,7 +1183,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		}
 
 		if (options.verify_all) {
-			verify_install(parts[i].reader);
+			verify_install_reader(parts[i].reader);
 		}
 	}
 
@@ -1267,7 +1267,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 			uint8_t image_md5[MD5_SIZE] = {0};
 			uint8_t flash_md5[MD5_SIZE] = {0};
 			char md5_str[MD5_SIZE * 2 + 1] = {0};
-			if (verify_finish(parts[i].reader, image_md5) != 0) {
+			if (verify_finish_reader(parts[i].reader, image_md5) != 0) {
 				ERR(CSKBURN_ERR_VERIFY_LOCAL_MD5_FAILED);
 				ret = -CSKBURN_ERR_VERIFY_LOCAL_MD5_FAILED;
 				goto err_write;
