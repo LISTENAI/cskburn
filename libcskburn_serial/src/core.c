@@ -510,7 +510,7 @@ cskburn_serial_write(cskburn_serial_device_t *dev, cskburn_serial_target_t targe
 
 int
 cskburn_serial_read(cskburn_serial_device_t *dev, cskburn_serial_target_t target, uint32_t addr,
-		uint32_t size, writer_t *writer,
+		uint32_t size, writer_t *writer, uint8_t *md5,
 		void (*on_progress)(int32_t read_bytes, uint32_t total_bytes))
 {
 	int ret;
@@ -542,6 +542,18 @@ cskburn_serial_read(cskburn_serial_device_t *dev, cskburn_serial_target_t target
 
 	uint64_t t2 = time_monotonic();
 	print_time_spent_with_speed("Reading", t1, t2, size);
+
+	if (md5 != NULL) {
+		uint64_t t1 = time_monotonic();
+
+		if ((ret = cmd_flash_md5sum(dev, addr, size, md5)) != 0) {
+			LOGD_RET(ret, "DEBUG: flash_md5sum 0x%08X+%u failed", addr, size);
+			return ret > 0 ? ret : -CSKBURN_ERR_VERIFY_READ_FAILED;
+		}
+
+		uint64_t t2 = time_monotonic();
+		print_time_spent_with_speed("Verifying", t1, t2, size);
+	}
 
 	return 0;
 }

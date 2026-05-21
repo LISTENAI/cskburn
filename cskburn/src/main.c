@@ -1198,11 +1198,34 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 			goto err_enter;
 		}
 
+		uint8_t flash_md5[MD5_SIZE] = {0};
+		if (options.verify_all) {
+			verify_install_writer(writer);
+		}
+
 		LOGI("Reading region 0x%08X-0x%08X...", addr, addr + size);
 		if ((ret = cskburn_serial_read(dev, options.target, addr, size, writer,
+					 options.verify_all ? flash_md5 : NULL,
 					 options.progress ? print_progress : NULL)) != 0) {
 			ERR_RET(ret, "region 0x%08X-0x%08X", addr, addr + size);
 			goto err_enter;
+		}
+
+		if (options.verify_all) {
+			uint8_t local_md5[MD5_SIZE] = {0};
+			char md5_str[MD5_SIZE * 2 + 1] = {0};
+			if (verify_finish_writer(writer, local_md5) != 0) {
+				ERR(CSKBURN_ERR_VERIFY_LOCAL_MD5_FAILED);
+				ret = -CSKBURN_ERR_VERIFY_LOCAL_MD5_FAILED;
+				goto err_enter;
+			}
+			md5_to_str(md5_str, flash_md5);
+			LOGI("md5 (0x%08X-0x%08X): %s", addr, addr + size, md5_str);
+			if (memcmp(local_md5, flash_md5, MD5_SIZE) != 0) {
+				ERR_CTX(CSKBURN_ERR_VERIFY_MISMATCH, "region 0x%08X-0x%08X", addr, addr + size);
+				ret = -CSKBURN_ERR_VERIFY_MISMATCH;
+				goto err_enter;
+			}
 		}
 
 		writer->close(&writer);
