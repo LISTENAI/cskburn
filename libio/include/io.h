@@ -22,8 +22,15 @@ void *reader_hook_ctx(reader_t *reader);
 struct _writer_t;
 typedef struct _writer_t writer_t;
 
+typedef void (*writer_hook_t)(const uint8_t *buf, uint32_t size, void *ctx);
+
 struct _writer_t {
 	uint32_t (*write)(writer_t *writer, const uint8_t *buf, uint32_t size);
 	void (*close)(writer_t **writer);
 	void *ctx;
+	writer_hook_t hook;
+	void *hook_ctx;
 };
+
+void writer_install(writer_t *writer, writer_hook_t hook, void *ctx);
+void *writer_hook_ctx(writer_t *writer);

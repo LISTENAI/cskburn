@@ -86,6 +86,9 @@ filewriter_write(writer_t *writer, const uint8_t *buf, uint32_t size)
 {
 	filewriter_ctx_t *ctx = (filewriter_ctx_t *)writer->ctx;
 	uint32_t bytes = fwrite(buf, 1, size, ctx->fp);
+	if (writer->hook) {
+		writer->hook((const uint8_t *)buf, bytes, writer->hook_ctx);
+	}
 	return bytes;
 }
 
