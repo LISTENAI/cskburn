@@ -160,10 +160,19 @@ typedef struct {
 	bool usb;
 	cskburn_serial_chip_t serial;
 	bool nand;
-	uint32_t base_addr;
+	const cskburn_chip_mem_region_t *mem_regions;
+	size_t mem_region_count;
 	uint32_t default_baud;
 	bool flash_auto_erase;
 } chip_features_t;
+
+#define MEM_REGIONS(...)                                                           \
+	.mem_regions = (const cskburn_chip_mem_region_t[]){__VA_ARGS__},               \
+	.mem_region_count = sizeof((const cskburn_chip_mem_region_t[]){__VA_ARGS__}) / \
+						sizeof(cskburn_chip_mem_region_t)
+
+#define MEM_SIZE_K(x) ((x) * 1024U)
+#define MEM_SIZE_M(x) (MEM_SIZE_K(x) * 1024U)
 
 static const chip_features_t chip_features[] = {
 		[CASTOR] =
@@ -173,9 +182,11 @@ static const chip_features_t chip_features[] = {
 						.usb = true,
 						.serial = CHIP_CASTOR,
 						.nand = false,
-						.base_addr = 0x80000000,
 						.default_baud = DEFAULT_BAUD,
 						.flash_auto_erase = true,
+						MEM_REGIONS({.base = 0x00000000, .size = MEM_SIZE_M(8)},  // raw offset
+								{.base = 0x80000000, .size = MEM_SIZE_M(8)},  // Flash XIP
+								),
 				},
 		[VENUS] =
 				{
@@ -184,9 +195,14 @@ static const chip_features_t chip_features[] = {
 						.usb = true,
 						.serial = CHIP_VENUS,
 						.nand = true,
-						.base_addr = 0x18000000,
 						.default_baud = DEFAULT_BAUD,
 						.flash_auto_erase = true,
+						MEM_REGIONS({.base = 0x00000000, .size = MEM_SIZE_M(128)},  // raw offset
+								{.base = 0x18000000, .size = MEM_SIZE_M(128)},  // Flash XIP (AP)
+								{.base = 0x30000000, .size = MEM_SIZE_M(8)},  // PSRAM (AP)
+								{.base = 0x60000000, .size = MEM_SIZE_M(8)},  // PSRAM (CP)
+								{.base = 0x68000000, .size = MEM_SIZE_M(128)},  // Flash XIP (CP)
+								),
 				},
 		[ARCS] =
 				{
@@ -195,9 +211,12 @@ static const chip_features_t chip_features[] = {
 						.usb = false,
 						.serial = CHIP_ARCS,
 						.nand = false,
-						.base_addr = 0x30000000,
 						.default_baud = DEFAULT_BAUD,
 						.flash_auto_erase = false,
+						MEM_REGIONS({.base = 0x00000000, .size = MEM_SIZE_M(16)},  // raw offset
+								{.base = 0x28000000, .size = MEM_SIZE_M(16)},  // PSRAM
+								{.base = 0x30000000, .size = MEM_SIZE_M(128)},  // Flash XIP
+								),
 				},
 		[VENUSA] =
 				{
@@ -206,9 +225,12 @@ static const chip_features_t chip_features[] = {
 						.usb = false,
 						.serial = CHIP_VENUSA,
 						.nand = false,
-						.base_addr = 0x30000000,
 						.default_baud = DEFAULT_BAUD,
 						.flash_auto_erase = false,
+						MEM_REGIONS({.base = 0x00000000, .size = MEM_SIZE_M(128)},  // raw offset
+								{.base = 0x30000000, .size = MEM_SIZE_M(128)},  // Flash XIP
+								{.base = 0x38000000, .size = MEM_SIZE_M(16)},  // PSRAM
+								),
 				},
 };
 
@@ -822,7 +844,8 @@ main(int argc, char **argv)
 		goto exit;
 	}
 	if ((ret = read_parts_hex(parts_argv, parts_argc, parts + parts_cnt, &parts_cnt, MAX_IMAGE_SIZE,
-				 MAX_FLASH_PARTS - parts_cnt, options.chip->base_addr)) != 0) {
+				 MAX_FLASH_PARTS - parts_cnt, options.chip->mem_regions,
+				 options.chip->mem_region_count)) != 0) {
 		goto exit;
 	}
 

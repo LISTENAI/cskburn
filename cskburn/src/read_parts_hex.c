@@ -16,9 +16,24 @@
 static int append_part(cskburn_partition_t *parts, int *part_idx, uint32_t part_size_limit,
 		int parts_cnt_limit, const char *path, uint8_t *buf, uint32_t addr, uint32_t size);
 
+static bool
+translate_hex_addr(
+		const cskburn_chip_mem_region_t *regions, size_t region_count, uint32_t *bin_addr)
+{
+	for (size_t i = 0; i < region_count; i++) {
+		const cskburn_chip_mem_region_t *r = &regions[i];
+		if (*bin_addr >= r->base && *bin_addr < r->base + r->size) {
+			*bin_addr -= r->base;
+			return true;
+		}
+	}
+	return false;
+}
+
 int
 read_parts_hex(char **argv, int argc, cskburn_partition_t *parts, int *parts_cnt,
-		uint32_t part_size_limit, int parts_cnt_limit, uint32_t base_addr)
+		uint32_t part_size_limit, int parts_cnt_limit, const cskburn_chip_mem_region_t *regions,
+		size_t region_count)
 {
 	int ret = 0;
 
@@ -60,8 +75,12 @@ read_parts_hex(char **argv, int argc, cskburn_partition_t *parts, int *parts_cnt
 			while (1) {
 				status = parse_hex_blob(hex_ptr, hex_len, &hex_parsed, bin_buf, part_size_limit,
 						&bin_addr, &bin_size);
-				if (bin_addr >= base_addr) {
-					bin_addr -= base_addr;
+				if (bin_size > 0 && !translate_hex_addr(regions, region_count, &bin_addr)) {
+					LOGE("ERROR [E%04d]: %s: 0x%08X-0x%08X", CSKBURN_ERR_HEX_ADDR_UNMAPPED,
+							cskburn_strerror(-CSKBURN_ERR_HEX_ADDR_UNMAPPED), bin_addr,
+							bin_addr + bin_size - 1);
+					ret = -CSKBURN_ERR_HEX_ADDR_UNMAPPED;
+					goto exit;
 				}
 				if (status == HEX_PARSE_OK) {
 					if (bin_size > 0) {

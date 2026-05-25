@@ -34,6 +34,8 @@ cskburn_strerror(int err)
 			return "Failed to write output file";
 		case CSKBURN_ERR_HEX_PARSE_FAILED:
 			return "Failed to parse HEX file";
+		case CSKBURN_ERR_HEX_ADDR_UNMAPPED:
+			return "HEX address does not fall in any known memory region";
 
 		/* 3xxx — serial port */
 		case CSKBURN_ERR_SERIAL_NOT_FOUND:
