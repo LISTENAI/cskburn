@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #if defined(_WIN32) || defined(_WIN64)
 int _isatty(int);
 #define isatty _isatty
@@ -489,19 +490,17 @@ main(int argc, char **argv)
 				options.action = ACTION_CHECK;
 				break;
 			case 'C':
-				if (strcmp(optarg, "castor") == 0 || strcmp(optarg, "CASTOR") == 0 ||
-						strstr(optarg, "csk3") == optarg || strstr(optarg, "CSK3") == optarg ||
-						strstr(optarg, "csk4") == optarg || strstr(optarg, "CSK4") == optarg ||
-						strcmp(optarg, "3") == 0 || strcmp(optarg, "4") == 0) {
+				if (strcasecmp(optarg, "castor") == 0 || strncasecmp(optarg, "csk3", 4) == 0 ||
+						strncasecmp(optarg, "csk4", 4) == 0 || strcmp(optarg, "3") == 0 ||
+						strcmp(optarg, "4") == 0) {
 					options.chip = &chip_features[CASTOR];
-				} else if (strcmp(optarg, "venus") == 0 || strcmp(optarg, "VENUS") == 0 ||
-						   strstr(optarg, "csk6") == optarg || strstr(optarg, "CSK6") == optarg ||
-						   strcmp(optarg, "6") == 0) {
+				} else if (strcasecmp(optarg, "venus") == 0 ||
+						   strncasecmp(optarg, "csk6", 4) == 0 || strcmp(optarg, "6") == 0) {
 					options.chip = &chip_features[VENUS];
-				} else if (strcmp(optarg, "arcs") == 0 || strcmp(optarg, "ARCS") == 0) {
+				} else if (strcasecmp(optarg, "arcs") == 0) {
 					options.chip = &chip_features[ARCS];
-				} else if (strcmp(optarg, "venusa") == 0 || strcmp(optarg, "VENUSA") == 0 ||
-						   strstr(optarg, "csk7") == optarg || strstr(optarg, "CSK7") == optarg) {
+				} else if (strcasecmp(optarg, "venusa") == 0 ||
+						   strncasecmp(optarg, "csk7", 4) == 0) {
 					options.chip = &chip_features[VENUSA];
 				} else {
 					ERR_CTX(CSKBURN_ERR_ARG_INVALID, "--chip: %s", optarg);
