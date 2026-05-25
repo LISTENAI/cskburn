@@ -206,7 +206,7 @@ static const chip_features_t chip_features[] = {
 						.usb = false,
 						.serial = CHIP_VENUSA,
 						.nand = false,
-						.base_addr = 0x3000000,
+						.base_addr = 0x30000000,
 						.default_baud = DEFAULT_BAUD,
 						.flash_auto_erase = false,
 				},
