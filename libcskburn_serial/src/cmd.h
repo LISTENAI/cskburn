@@ -50,6 +50,8 @@ typedef enum {
 
 int cmd_sync(cskburn_serial_device_t *dev, uint16_t timeout);
 
+int cmd_read_reg(cskburn_serial_device_t *dev, uint32_t address, uint32_t *value);
+
 int cmd_read_flash_id(cskburn_serial_device_t *dev, uint32_t *id);
 int cmd_read_chip_id(cskburn_serial_device_t *dev, uint8_t *id);
 

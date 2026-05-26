@@ -27,6 +27,7 @@
 #define CMD_MEM_END 0x06
 #define CMD_MEM_DATA 0x07
 #define CMD_SYNC 0x08
+#define CMD_READ_REG 0x0a
 #define CMD_READ_FLASH 0x0e
 #define CMD_CHANGE_BAUDRATE 0x0f
 #define CMD_SPI_FLASH_MD5 0x13
@@ -283,6 +284,15 @@ cmd_sync(cskburn_serial_device_t *dev, uint16_t timeout)
 	cmd[3] = 0x20;
 	memset(cmd + 4, 0x55, 32);
 	return command(dev, CMD_SYNC, 4 + 32, CHECKSUM_NONE, NULL, NULL, NULL, 0, timeout);
+}
+
+int
+cmd_read_reg(cskburn_serial_device_t *dev, uint32_t address, uint32_t *value)
+{
+	uint32_t *cmd = (uint32_t *)dev->req_cmd;
+	cmd[0] = address;
+
+	return check_command(dev, CMD_READ_REG, sizeof(address), CHECKSUM_NONE, value, TIMEOUT_DEFAULT);
 }
 
 int
