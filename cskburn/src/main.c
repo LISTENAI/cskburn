@@ -163,7 +163,6 @@ typedef struct {
 	bool nand;
 	const cskburn_chip_mem_region_t *mem_regions;
 	size_t mem_region_count;
-	uint32_t default_baud;
 	bool flash_auto_erase;
 } chip_features_t;
 
@@ -183,7 +182,6 @@ static const chip_features_t chip_features[] = {
 						.usb = true,
 						.serial = CHIP_CASTOR,
 						.nand = false,
-						.default_baud = DEFAULT_BAUD,
 						.flash_auto_erase = true,
 						MEM_REGIONS({.base = 0x00000000, .size = MEM_SIZE_M(8)},  // raw offset
 								{.base = 0x80000000, .size = MEM_SIZE_M(8)},  // Flash XIP
@@ -196,7 +194,6 @@ static const chip_features_t chip_features[] = {
 						.usb = true,
 						.serial = CHIP_VENUS,
 						.nand = true,
-						.default_baud = DEFAULT_BAUD,
 						.flash_auto_erase = true,
 						MEM_REGIONS({.base = 0x00000000, .size = MEM_SIZE_M(128)},  // raw offset
 								{.base = 0x18000000, .size = MEM_SIZE_M(128)},  // Flash XIP (AP)
@@ -212,7 +209,6 @@ static const chip_features_t chip_features[] = {
 						.usb = false,
 						.serial = CHIP_ARCS,
 						.nand = false,
-						.default_baud = DEFAULT_BAUD,
 						.flash_auto_erase = false,
 						MEM_REGIONS({.base = 0x00000000, .size = MEM_SIZE_M(16)},  // raw offset
 								{.base = 0x28000000, .size = MEM_SIZE_M(16)},  // PSRAM
@@ -226,7 +222,6 @@ static const chip_features_t chip_features[] = {
 						.usb = false,
 						.serial = CHIP_VENUSA,
 						.nand = false,
-						.default_baud = DEFAULT_BAUD,
 						.flash_auto_erase = false,
 						MEM_REGIONS({.base = 0x00000000, .size = MEM_SIZE_M(128)},  // raw offset
 								{.base = 0x30000000, .size = MEM_SIZE_M(128)},  // Flash XIP
@@ -294,7 +289,7 @@ static struct {
 		.usb_addr = -1,
 #endif
 		.serial = NULL,
-		.serial_baud = 0,
+		.serial_baud = DEFAULT_BAUD,
 		.target = TARGET_FLASH,
 		.read_chip_id = false,
 		.read_count = 0,
@@ -366,8 +361,7 @@ print_help(const char *progname)
 
 	LOGI("Serial burning options:");
 	LOGI("  -b, --baud <rate>");
-	LOGI("    baud rate used for serial burning (default: %d)",
-			chip_features[DEFAULT_CHIP].default_baud);
+	LOGI("    baud rate used for serial burning (default: %d)", DEFAULT_BAUD);
 #ifndef WITHOUT_USB
 	LOGI("  -C, --chip <family>");
 	LOGI("    chip family (default: %s), acceptable values:", chip_features[DEFAULT_CHIP].code);
@@ -743,10 +737,6 @@ main(int argc, char **argv)
 				print_help(argv[0]);
 				return 0;
 		}
-	}
-
-	if (options.serial_baud == 0) {
-		options.serial_baud = options.chip->default_baud;
 	}
 
 	if (options.burner != NULL) {
