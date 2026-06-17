@@ -5,6 +5,18 @@ cskburn
 
 聆思 CSK 系列芯片烧录工具，[串口 OTA 协议](https://docs.listenai.com/AIsolution/dsp/firmware_development/OTA_service#5-ota%E5%8D%8F%E8%AE%AE)的一个跨平台参考实现。
 
+## 安装
+
+### Homebrew（macOS）
+
+```sh
+brew install listenai/tap/cskburn
+```
+
+### 其他平台
+
+前往 [Releases](https://github.com/LISTENAI/cskburn/releases) 下载对应平台的预编译包，解压后将 `cskburn` 放入 `PATH`。
+
 ## 使用
 
 ### AI Skill
