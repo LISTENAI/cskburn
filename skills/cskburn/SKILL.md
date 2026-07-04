@@ -204,7 +204,9 @@ cskburn -C <chip> -s <port> -b <baud> --verify-all <addr1> <file1> [<addr2> <fil
 
 ## 故障排查
 
-cskburn 的错误输出统一形如 `ERROR [E####]: <说明>[: <上下文>]`，方括号里的编号（如 `E3001`）对应一种确定的根因。项目根目录的 `TROUBLESHOOTING.md` 有完整的编号速查表，下面只列最常见的几类。
+cskburn 的错误输出统一形如 `ERROR [E####]: <说明>[: <上下文>]`，方括号里的编号（如 `E3001`）对应一种确定的根因。下面只列高频出现的几类；遇到未列出的编号时，抓取完整的编号速查表：
+
+https://github.com/LISTENAI/cskburn/raw/refs/heads/master/TROUBLESHOOTING.md
 
 ### 串口连接失败（`E3xxx`）
 
