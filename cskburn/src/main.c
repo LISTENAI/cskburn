@@ -870,7 +870,9 @@ main(int argc, char **argv)
 
 exit:
 	for (int i = 0; i < parts_cnt; i++) {
-		parts[i].reader->close(&parts[i].reader);
+		if (parts[i].reader != NULL) {
+			parts[i].reader->close(&parts[i].reader);
+		}
 	}
 	free(options.burner_buf);
 	return -ret;

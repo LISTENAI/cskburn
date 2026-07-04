@@ -86,8 +86,13 @@ read_parts_hex(char **argv, int argc, cskburn_partition_t *parts, int *parts_cnt
 					if (bin_size > 0) {
 						LOG_TRACE("Parsed HEX, addr: 0x%08X, size: %" PRIu32 " (OK)", bin_addr,
 								bin_size);
-						cnt += append_part(parts, &idx, part_size_limit, parts_cnt_limit, argv[i],
+						int r = append_part(parts, &idx, part_size_limit, parts_cnt_limit, argv[i],
 								bin_buf, bin_addr, bin_size);
+						if (r < 0) {
+							ret = r;
+							goto exit;
+						}
+						cnt += r;
 						idx++;
 					}
 					break;
@@ -95,8 +100,13 @@ read_parts_hex(char **argv, int argc, cskburn_partition_t *parts, int *parts_cnt
 					if (bin_size > 0) {
 						LOG_TRACE("Parsed HEX, addr: 0x%08X, size: %" PRIu32 " (UNALIGNED)",
 								bin_addr, bin_size);
-						cnt += append_part(parts, &idx, part_size_limit, parts_cnt_limit, argv[i],
+						int r = append_part(parts, &idx, part_size_limit, parts_cnt_limit, argv[i],
 								bin_buf, bin_addr, bin_size);
+						if (r < 0) {
+							ret = r;
+							goto exit;
+						}
+						cnt += r;
 					}
 					hex_len -= hex_parsed;
 					hex_ptr += hex_parsed;
@@ -104,8 +114,13 @@ read_parts_hex(char **argv, int argc, cskburn_partition_t *parts, int *parts_cnt
 					if (bin_size > 0) {
 						LOG_TRACE("Parsed HEX, addr: 0x%08X, size: %" PRIu32 " (EOF)", bin_addr,
 								bin_size);
-						cnt += append_part(parts, &idx, part_size_limit, parts_cnt_limit, argv[i],
+						int r = append_part(parts, &idx, part_size_limit, parts_cnt_limit, argv[i],
 								bin_buf, bin_addr, bin_size);
+						if (r < 0) {
+							ret = r;
+							goto exit;
+						}
+						cnt += r;
 						idx++;
 					}
 					break;
@@ -153,8 +168,9 @@ append_part(cskburn_partition_t *parts, int *part_idx, uint32_t part_size_limit,
 			LOG_TRACE("Address changed from 0x%08X to 0x%08X, moving to next partition %d",
 					part->addr + part->reader->size, addr, idx);
 			if (idx >= parts_cnt_limit) {
-				LOG_TRACE("Index %d reached part count limit %d, ignored", idx, parts_cnt_limit);
-				return 0;
+				LOGE("ERROR [E%04d]: %s（最多 %d 个）", CSKBURN_ERR_ARG_TOO_MANY_PARTS,
+						cskburn_strerror(-CSKBURN_ERR_ARG_TOO_MANY_PARTS), parts_cnt_limit);
+				return -CSKBURN_ERR_ARG_TOO_MANY_PARTS;
 			}
 			part = &parts[idx];
 			*part_idx = idx;
