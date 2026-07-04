@@ -90,6 +90,7 @@ serial_open(const char *path, serial_dev_t **dev)
 
 	ret = set_interface_attribs(fd, 115200);
 	if (ret != 0) {
+		close(fd);
 		return ret;
 	}
 
