@@ -3,6 +3,12 @@ cmake_minimum_required(VERSION 3.10)
 project(CSKBurnKit)
 enable_testing()
 
+# 未显式指定时默认 Release：Ninja 等单配置生成器下 --config 无效，
+# 否则发布产物会是无优化、带 assert 的默认构建
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
 set(CMAKE_C_STANDARD 11)
 if(NOT MSVC)
     add_compile_options(-Wall -Wextra -Wno-unused-parameter)
