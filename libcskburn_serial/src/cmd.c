@@ -155,8 +155,11 @@ command_recv(cskburn_serial_device_t *dev, uint8_t op, uint8_t **res_buf, uint32
 			return r;
 		}
 
+		// 短于响应头的残帧无法可靠解析；借助 && 短路避免读取缓冲区里
+		// 上一条响应残留的陈旧头部，从而被误判为本次命令的合法应答
 		csk_response_t *res = (csk_response_t *)dev->res_buf;
-		if (res->direction == DIR_RES && res->command == op) {
+		if (r >= (ssize_t)sizeof(csk_response_t) && res->direction == DIR_RES &&
+				res->command == op) {
 			*res_buf = dev->res_buf;
 			return r;
 		}
@@ -215,6 +218,12 @@ command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_c
 
 	if (out_buf != NULL && out_len != NULL) {
 		uint16_t res_size = res->size;
+		// 设备声明的 size 不得超过本帧实际收到的载荷长度（帧长减去响应头），
+		// 否则会把缓冲区里的陈旧字节当作应答数据拷出（如 MD5 与旧数据比对）
+		uint32_t payload = (uint32_t)ret - (uint32_t)sizeof(csk_response_t);
+		if (res_size > payload) {
+			res_size = payload;
+		}
 		if (res_size > out_limit) {
 			res_size = out_limit;
 		}
