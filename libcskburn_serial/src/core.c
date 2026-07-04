@@ -451,7 +451,7 @@ cskburn_serial_write(cskburn_serial_device_t *dev, cskburn_serial_target_t targe
 		}
 	} else if (target == TARGET_RAM) {
 		err_code = CSKBURN_ERR_RAM_WRITE_FAILED;
-		if ((ret = cmd_mem_begin(dev, reader->size, blocks, FLASH_BLOCK_SIZE, addr) != 0)) {
+		if ((ret = cmd_mem_begin(dev, reader->size, blocks, FLASH_BLOCK_SIZE, addr)) != 0) {
 			LOGD_RET(ret, "DEBUG: mem_begin failed");
 			return ret > 0 ? ret : -err_code;
 		}
@@ -721,7 +721,7 @@ cskburn_serial_get_flash_info(
 	if (capacity == 0 || capacity > 31) {
 		return -CSKBURN_ERR_FLASH_NOT_DETECTED;
 	}
-	*flash_size = 2 << (capacity - 1);
+	*flash_size = 2ULL << (capacity - 1);
 	return 0;
 }
 
