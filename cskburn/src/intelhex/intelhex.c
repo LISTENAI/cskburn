@@ -166,8 +166,18 @@ parse_hex_blob(const uint8_t *hex_blob, const uint32_t hex_blob_size, uint32_t *
 			// decoding lines
 			default:
 				if (low_nibble) {
-					line.buf[idx] |= ctoh((uint8_t)(*hex_blob)) & 0xf;
-					if (++idx >= (line.byte_count + 5)) {  // all data in
+					if (idx < sizeof(hex_line_t)) {
+						line.buf[idx] |= ctoh((uint8_t)(*hex_blob)) & 0xf;
+					}
+					idx++;
+					// byte_count（记录首字节，来自文件）决定后续校验与拷贝的长度，
+					// 但 line 的 data 字段仅 sizeof(line.data) 字节；超长记录无法容纳，
+					// 判定为损坏，避免 validate_checksum / memcpy 越界访问
+					if (line.byte_count > sizeof(line.data)) {
+						status = HEX_PARSE_LINE_OVERRUN;
+						goto hex_parser_exit;
+					}
+					if (idx >= (line.byte_count + 5)) {  // all data in
 						if (0 == validate_checksum(&line)) {
 							status = HEX_PARSE_CKSUM_FAIL;
 							goto hex_parser_exit;
