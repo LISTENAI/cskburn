@@ -533,7 +533,13 @@ cskburn_serial_read_legacy(cskburn_serial_device_t *dev, cskburn_serial_target_t
 	uint8_t buffer[FLASH_READ_SIZE];
 	uint32_t offset = 0, read_size;
 	while (offset < size) {
-		if ((ret = cmd_read_flash(dev, addr + offset, FLASH_READ_SIZE, buffer, &read_size)) != 0) {
+		// 最后一块可能不足 FLASH_READ_SIZE，只请求剩余字节，避免越过请求范围多读多写
+		uint32_t want = size - offset;
+		if (want > FLASH_READ_SIZE) {
+			want = FLASH_READ_SIZE;
+		}
+
+		if ((ret = cmd_read_flash(dev, addr + offset, want, buffer, &read_size)) != 0) {
 			LOGD_RET(ret, "DEBUG: read_flash at 0x%08X failed", addr + offset);
 			return ret > 0 ? ret : -CSKBURN_ERR_FLASH_READ_FAILED;
 		}
@@ -542,11 +548,12 @@ cskburn_serial_read_legacy(cskburn_serial_device_t *dev, cskburn_serial_target_t
 			return -CSKBURN_ERR_FLASH_READ_FAILED;
 		}
 
-		if (writer->write(writer, buffer, read_size) != read_size) {
+		uint32_t to_write = read_size < want ? read_size : want;
+		if (writer->write(writer, buffer, to_write) != to_write) {
 			return -CSKBURN_ERR_FILE_WRITE_FAILED;
 		}
 
-		offset += read_size;
+		offset += to_write;
 
 		if (on_progress != NULL) {
 			on_progress(offset, size);
