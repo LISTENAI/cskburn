@@ -1,11 +1,11 @@
 ---
 name: cskburn
 description: >
-  Use cskburn CLI to flash firmware onto LISTENAI CSK series chips (Venus/CSK6, ARCS/LS26) via serial port.
+  Use cskburn CLI to flash firmware onto LISTENAI CSK series chips (Castor/CSK4, Venus/CSK6, ARCS/LS26, VenusA/CSK7) via serial port.
   Trigger this skill whenever the user mentions cskburn, flashing firmware to CSK chips, burning images to
   LISTENAI devices, serial flashing, or troubleshooting burn/flash failures on CSK hardware.
   Also trigger when the user says "烧录", "刷固件", "烧 flash", "flash 固件", or references cskburn errors
-  or flash-related issues on LISTENAI/CSK/Venus/ARCS/LS26 devices — even if they don't mention cskburn by name.
+  or flash-related issues on LISTENAI/CSK/Venus/VenusA/ARCS/LS26 devices — even if they don't mention cskburn by name.
 ---
 
 # cskburn — CSK 芯片烧录工具
@@ -16,9 +16,12 @@ description: >
 
 | `--chip` 值 | 芯片型号 | 芯片系列 |
 |---|---|---|
+| `castor` | CSK3 / CSK4 | Castor |
 | `venus` | CSK6 | Venus |
 | `arcs` | LS26 | ARCS |
+| `venusa` | CSK7 | VenusA |
 
+`-C` 也接受型号别名（如 `csk4`、`csk6`、`csk7`），但建议使用上表的规范值。
 如果从项目上下文无法推断芯片系列，必须询问用户。
 
 ## 命令格式
@@ -58,13 +61,13 @@ cskburn -C <chip> -s <serial_port> --chip-id
 
 | 芯片系列 / 板型 | RTS 接 | DTR 接 |
 |---|---|---|
-| Venus (CSK6) | BOOT | RESET |
+| Castor / Venus / VenusA (CSK3/4/6/7) | BOOT | RESET |
 | ARCS / LS26 ARCS-MINI（直连）| RESET | BOOT |
 | ARCS / LS26 ARCS-EVB（差分）| — | — |
 
 ARCS-EVB 用交叉耦合的 NPN 三极管对（S8050），DTR/RTS 差分驱动 PRST 和 RXD，不是直接连到复位/BOOT 引脚。cskburn 默认的 `--reset-strategy auto` 会在 LS26 上自动在 ARCS-MINI 和 ARCS-EVB 两种电路之间切换重试，一般不需要手动指定。
 
-> **这是 probe 超时最常见的原因。** 遇到 probe 超时时，首先检查 DTR/RTS 是否正确连接，以及引脚映射是否与芯片系列匹配。
+> **这是 probe 超时最常见的原因。** 遇到 probe 超时时，首先检查 DTR/RTS 是否正确连接，以及引脚映射是否与芯片系列匹配。接线确认无误后，可用 `--probe-timeout <ms>` 延长探测超时（默认 10000 ms）。
 
 ## 关键参数
 
@@ -99,7 +102,7 @@ ls /dev/cu.* 2>/dev/null | grep -v Bluetooth
 
 从项目上下文推断芯片系列的线索：
 
-- 项目 README 或文档中提到的芯片型号（CSK6xxx → venus，LS26xxx → arcs）
+- 项目 README 或文档中提到的芯片型号（CSK3xxx / CSK4xxx → castor，CSK6xxx → venus，LS26xxx → arcs，CSK7xxx → venusa）
 - 链接脚本 (`.ld`) 中的内存布局
 - SDK 或工具链名称（如包含 venus、arcs 等关键字）
 - 构建系统配置文件
@@ -152,29 +155,24 @@ case "${OS}-${ARCH}" in
   Linux-armv7l)   ASSET="cskburn-linux-arm.tar.xz" ;;
   Darwin-x86_64)  ASSET="cskburn-darwin-x64.tar.xz" ;;
   Darwin-arm64)   ASSET="cskburn-darwin-arm64.tar.xz" ;;
+  MINGW*|MSYS*)   ASSET="cskburn-win32-x64.zip" ;;
   *)              echo "Unsupported platform: ${OS}-${ARCH}"; exit 1 ;;
 esac
 
-curl -fSL "https://github.com/LISTENAI/cskburn/releases/latest/download/${ASSET}" -o /tmp/cskburn.tar.xz
+# Alpine 等 musl 发行版：arm / arm64 需改用带 -musl 后缀的资产
+# （如 cskburn-linux-arm64-musl.tar.xz；x64 没有 musl 构建）
+
+curl -fSL "https://github.com/LISTENAI/cskburn/releases/latest/download/${ASSET}" -o "/tmp/${ASSET}"
 mkdir -p /tmp/cskburn-bin
-tar xf /tmp/cskburn.tar.xz -C /tmp/cskburn-bin
-chmod +x /tmp/cskburn-bin/cskburn
+case "${ASSET}" in
+  *.zip) unzip -o "/tmp/${ASSET}" -d /tmp/cskburn-bin ;;  # Windows 包内为 cskburn.exe
+  *)     tar xf "/tmp/${ASSET}" -C /tmp/cskburn-bin ;;
+esac
+chmod +x /tmp/cskburn-bin/cskburn*
 # 使用 /tmp/cskburn-bin/cskburn 作为 cskburn 路径，或移到 PATH 中
 ```
 
-> Windows 下的 asset 名为 `cskburn-win32-x64.zip`，需用 `unzip` 解压。
-
-**探测串口设备：**
-
-```bash
-# Linux
-ls /dev/ttyUSB* /dev/ttyACM* 2>/dev/null
-
-# macOS — 串口设备前缀因 USB-串口芯片而异（cu.usbserial、cu.usbmodem、cu.wchusbserial 等）
-ls /dev/cu.* 2>/dev/null | grep -v Bluetooth
-```
-
-macOS 上不要假设串口前缀，直接列出所有 `/dev/cu.*` 设备（排除 Bluetooth）让用户选择。
+**探测串口设备**：用「关键参数 → 串口」一节的命令列出设备。macOS 上不要假设串口前缀，直接列出所有 `/dev/cu.*` 设备（排除 Bluetooth）。
 
 ### 2. 收集烧录参数
 
@@ -224,11 +222,11 @@ https://github.com/LISTENAI/cskburn/raw/refs/heads/master/TROUBLESHOOTING.md
 按优先级排查：
 
 1. **DTR/RTS 接线**（最常见）：两根线都要接上，且引脚映射与芯片匹配——Venus 是 RTS→BOOT、DTR→RESET；ARCS 直连板相反。
-2. **芯片系列选对**：`-C venus` vs `-C arcs`，选错会导致握手协议对不上。
+2. **芯片系列选对**：`-C` 值与实际芯片匹配（castor / venus / arcs / venusa），选错会导致握手协议对不上。
 3. **TX/RX 接线**：是否交叉连接，GND 是否接好。
 4. **供电**：确认开发板供电充足，尤其是外接模组。
 5. **手动进下载模式**：按住 BOOT 再按一下复位。
-6. **特殊复位电路**：auto 模式会覆盖 ARCS-MINI 和 ARCS-EVB 两种；如果仍失败可用 `--reset-strategy <name>` 显式指定：`dtr-boot`（ARCS-MINI）、`dual-npn`（ARCS-EVB）、`rts-boot-inv`（反相 BOOT，等同旧的 `--update-high`）。
+6. **特殊复位电路**：auto 模式在 LS26 上会交替尝试 ARCS-MINI 和 ARCS-EVB 两种电路，其余芯片用 rts-boot；如果仍失败可用 `--reset-strategy <name>` 显式指定：`rts-boot`（Castor/Venus/VenusA 默认）、`dtr-boot`（ARCS-MINI）、`dual-npn`（ARCS-EVB）、`rts-boot-inv`（反相 BOOT，等同旧的 `--update-high`）。
 
 ### 烧录中途失败、波特率问题（`E5xxx` / `E7xxx`）
 
