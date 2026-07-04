@@ -143,7 +143,7 @@ command_recv(cskburn_serial_device_t *dev, uint8_t op, uint8_t **res_buf, uint32
 
 	uint64_t start = time_monotonic();
 	do {
-		ssize_t r = slip_read(dev->slip, dev->res_buf, MAX_RES_SLIP_LEN, timeout);
+		ssize_t r = slip_read(dev->slip, dev->res_buf, MAX_RES_RAW_LEN, timeout);
 		if (r == 0) {
 			continue;
 		} else if (r == -ETIMEDOUT) {
@@ -681,7 +681,7 @@ cmd_read_flash_stream(cskburn_serial_device_t *dev, uint32_t address, uint32_t s
 	uint8_t status_code = 0;
 	uint64_t start = time_monotonic();
 	do {
-		ssize_t r = slip_read(dev->slip, dev->res_buf, MAX_RES_SLIP_LEN, TIMEOUT_DEFAULT);
+		ssize_t r = slip_read(dev->slip, dev->res_buf, MAX_RES_RAW_LEN, TIMEOUT_DEFAULT);
 		if (r == -ETIMEDOUT) {
 			break;
 		} else if (r < 0) {
@@ -715,7 +715,7 @@ cmd_read_flash_stream(cskburn_serial_device_t *dev, uint32_t address, uint32_t s
 	// Phase 2: stream data with rolling ACK
 	uint32_t received = 0;
 	while (received < size) {
-		ssize_t r = slip_read(dev->slip, dev->res_buf, MAX_RES_SLIP_LEN, TIMEOUT_FLASH_DATA);
+		ssize_t r = slip_read(dev->slip, dev->res_buf, MAX_RES_RAW_LEN, TIMEOUT_FLASH_DATA);
 		if (r < 0) {
 			return r;
 		}
