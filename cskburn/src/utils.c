@@ -1,6 +1,9 @@
 #include "utils.h"
 
+#include <errno.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 uint32_t
@@ -19,15 +22,20 @@ read_file(const char *path, uint8_t *buf, uint32_t limit)
 bool
 scan_int(const char *str, uint32_t *out)
 {
-	if (sscanf(str, "0x%x", out) == 1) {
-		return true;
+	if (str == NULL || str[0] == '\0' || str[0] == '-') {
+		return false;
 	}
 
-	if (sscanf(str, "%d", out) == 1) {
-		return true;
+	// base 0 自动识别 0x/0X 十六进制前缀，其余按十进制解析
+	char *end = NULL;
+	errno = 0;
+	unsigned long val = strtoul(str, &end, 0);
+	if (errno != 0 || end == str || *end != '\0' || val > UINT32_MAX) {
+		return false;
 	}
 
-	return false;
+	*out = (uint32_t)val;
+	return true;
 }
 
 bool
