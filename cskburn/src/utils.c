@@ -38,42 +38,60 @@ scan_int(const char *str, uint32_t *out)
 	return true;
 }
 
+static bool
+scan_int_field(const char *str, size_t len, uint32_t *out)
+{
+	char field[32];
+
+	if (len == 0 || len >= sizeof(field)) {
+		return false;
+	}
+	memcpy(field, str, len);
+	field[len] = '\0';
+	return scan_int(field, out);
+}
+
 bool
 scan_addr_size(const char *str, uint32_t *addr, uint32_t *size)
 {
-	char *split = strstr(str, ":");
-	if (split == NULL) {
+	if (str == NULL || addr == NULL || size == NULL) {
 		return false;
 	}
 
-	const char *str_addr = str;
-	const char *str_size = split + 1;
+	const char *split = strchr(str, ':');
+	if (split == NULL || strchr(split + 1, ':') != NULL) {
+		return false;
+	}
 
-	return scan_int(str_addr, addr) && scan_int(str_size, size);
+	const char *str_size = split + 1;
+	return scan_int_field(str, (size_t)(split - str), addr) && scan_int(str_size, size);
 }
 
 bool
 scan_addr_size_name(const char *str, uint32_t *addr, uint32_t *size, const char **name)
 {
-	char *split;
-
-	if (name == NULL) {
+	if (str == NULL || addr == NULL || size == NULL || name == NULL) {
 		return false;
 	}
 
-	if ((split = strstr(str, ":")) == NULL) {
+	const char *addr_end = strchr(str, ':');
+	if (addr_end == NULL) {
 		return false;
 	}
 
-	const char *str_addr = str;
-	const char *str_size = split + 1;
-
-	if ((split = strstr(str_size, ":")) == NULL) {
+	const char *str_size = addr_end + 1;
+	const char *size_end = strchr(str_size, ':');
+	if (size_end == NULL || size_end[1] == '\0') {
 		return false;
 	}
 
-	*name = split + 1;
-	return scan_int(str_addr, addr) && scan_int(str_size, size);
+	if (!scan_int_field(str, (size_t)(addr_end - str), addr) ||
+			!scan_int_field(str_size, (size_t)(size_end - str_size), size)) {
+		return false;
+	}
+
+	*name = size_end + 1;
+	return true;
 }
 
 void

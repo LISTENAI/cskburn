@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 
 project(CSKBurnKit)
-enable_testing()
+include(CTest)
 
 # 未显式指定时默认 Release：Ninja 等单配置生成器下 --config 无效，
 # 否则发布产物会是无优化、带 assert 的默认构建

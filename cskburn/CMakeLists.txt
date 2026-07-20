@@ -48,3 +48,10 @@ target_compile_options(
 )
 
 install(TARGETS ${PROJECT_NAME} DESTINATION bin)
+
+if(BUILD_TESTING)
+    add_executable(test_utils tests/test_utils.c src/utils.c)
+    target_include_directories(test_utils PRIVATE src)
+    target_link_libraries(test_utils portable)
+    add_test(NAME cskburn_utils COMMAND test_utils)
+endif()
