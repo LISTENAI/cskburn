@@ -8,7 +8,8 @@
 
 struct cskburn_serial_burner_info {
 	uint32_t load_addr;
-	bool supports_read_flash_stream;
+	uint32_t capabilities;
+	uint8_t flash_count;
 };
 
 struct _cskburn_serial_device_t {

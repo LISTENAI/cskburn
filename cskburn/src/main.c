@@ -89,12 +89,16 @@ static struct option long_options[] = {
 		{"nand-dat1", required_argument, NULL, 0},
 		{"nand-dat2", required_argument, NULL, 0},
 		{"nand-dat3", required_argument, NULL, 0},
+		{"emmc", no_argument, NULL, 0},
 		{"ram", no_argument, NULL, 'r'},
 		{"jump", required_argument, NULL, 0},
 		{"chip-id", no_argument, NULL, 0},
 		{"read", required_argument, NULL, 0},
+		{"flash-index", required_argument, NULL, 0},
 		{"erase", required_argument, NULL, 0},
 		{"erase-all", no_argument, NULL, 0},
+		{"lock", no_argument, NULL, 0},
+		{"unlock", no_argument, NULL, 0},
 		{"verify", required_argument, NULL, 0},
 		{"verify-all", no_argument, NULL, 0},
 		{"probe-timeout", required_argument, NULL, 0},
@@ -151,6 +155,7 @@ typedef enum {
 	CASTOR,
 	VENUS,
 	ARCS,
+	ARCS_DUAL,
 	VENUSA,
 	CHIP_COUNT,
 } cskburn_chip_t;
@@ -215,6 +220,19 @@ static const chip_features_t chip_features[] = {
 								{.base = 0x30000000, .size = MEM_SIZE_M(128)},  // Flash XIP
 								),
 				},
+		[ARCS_DUAL] =
+				{
+						.code = "arcs_dual",
+						.name = "Arcs Dual Flash (LS26)",
+						.usb = false,
+						.serial = CHIP_ARCS_DUAL,
+						.nand = false,
+						.flash_auto_erase = false,
+						MEM_REGIONS({.base = 0x00000000, .size = MEM_SIZE_M(16)},  // raw offset
+								{.base = 0x28000000, .size = MEM_SIZE_M(16)},  // PSRAM
+								{.base = 0x30000000, .size = MEM_SIZE_M(128)},  // Flash XIP
+								),
+				},
 		[VENUSA] =
 				{
 						.code = "venusa",
@@ -245,6 +263,11 @@ static struct {
 	char *serial;
 	uint32_t serial_baud;
 	cskburn_serial_target_t target;
+	bool target_set;
+	uint32_t flash_index;
+	bool flash_index_set;
+	bool lock;
+	bool unlock;
 	bool read_chip_id;
 	uint16_t read_count;
 	struct {
@@ -291,6 +314,11 @@ static struct {
 		.serial = NULL,
 		.serial_baud = DEFAULT_BAUD,
 		.target = TARGET_FLASH,
+		.target_set = false,
+		.flash_index = 0,
+		.flash_index_set = false,
+		.lock = false,
+		.unlock = false,
 		.read_chip_id = false,
 		.read_count = 0,
 		.erase_count = 0,
@@ -375,6 +403,8 @@ print_help(const char *progname)
 	LOGI("    verify all partitions after burning");
 	LOGI("  -n, --nand");
 	LOGI("    burn to NAND flash (CSK6 only)");
+	LOGI("  --emmc");
+	LOGI("    burn to eMMC (ARCS only)");
 	LOGI("  --probe-timeout <ms>");
 	LOGI("    timeout for probing device (default: %d ms)", DEFAULT_PROBE_TIMEOUT);
 	LOGI("  --reset-attempts <n>");
@@ -405,10 +435,16 @@ print_help(const char *progname)
 	LOGI("");
 
 	LOGI("Advanced operations (serial only):");
+	LOGI("  --flash-index <index>");
+	LOGI("    select flash 0 or 1 (arcs_dual only; default: 0)");
 	LOGI("  --erase <addr:size>");
 	LOGI("    erase specified flash region");
 	LOGI("  --erase-all");
 	LOGI("    erase the entire flash");
+	LOGI("  --lock");
+	LOGI("    lock the selected flash after successful operations");
+	LOGI("  --unlock");
+	LOGI("    unlock the selected flash before operations");
 	LOGI("  --verify <addr:size>");
 	LOGI("    verify specified flash region");
 	LOGI("");
@@ -443,6 +479,29 @@ validate_flash_bounds(uint32_t addr, uint32_t size, uint64_t flash_size, const c
 		return -CSKBURN_ERR_ARG_ADDR_OUT_OF_BOUNDS;
 	}
 	return 0;
+}
+
+static int
+validate_emmc_protocol_bounds(uint32_t addr, uint32_t size, const char *op)
+{
+	if ((uint64_t)addr + size > (uint64_t)UINT32_MAX + 1U) {
+		ERR_CTX(CSKBURN_ERR_ARG_ADDR_OUT_OF_BOUNDS,
+				"%s exceeds the 32-bit eMMC protocol address range", op);
+		return -CSKBURN_ERR_ARG_ADDR_OUT_OF_BOUNDS;
+	}
+	return 0;
+}
+
+static bool
+set_target(cskburn_serial_target_t target, const char *name)
+{
+	if (options.target_set && options.target != target) {
+		ERR_CTX(CSKBURN_ERR_ARG_INVALID, "%s conflicts with another target option", name);
+		return false;
+	}
+	options.target = target;
+	options.target_set = true;
+	return true;
 }
 
 static int serial_burn(cskburn_partition_t *parts, int parts_cnt);
@@ -493,6 +552,8 @@ main(int argc, char **argv)
 					options.chip = &chip_features[VENUS];
 				} else if (strcasecmp(optarg, "arcs") == 0) {
 					options.chip = &chip_features[ARCS];
+				} else if (strcasecmp(optarg, "arcs_dual") == 0) {
+					options.chip = &chip_features[ARCS_DUAL];
 				} else if (strcasecmp(optarg, "venusa") == 0 ||
 						   strncasecmp(optarg, "csk7", 4) == 0) {
 					options.chip = &chip_features[VENUSA];
@@ -502,10 +563,10 @@ main(int argc, char **argv)
 				}
 				break;
 			case 'n':
-				options.target = TARGET_NAND;
+				if (!set_target(TARGET_NAND, "--nand")) return CSKBURN_ERR_ARG_INVALID;
 				break;
 			case 'r':
-				options.target = TARGET_RAM;
+				if (!set_target(TARGET_RAM, "--ram")) return CSKBURN_ERR_ARG_INVALID;
 				break;
 			case 0: { /* long-only options */
 				const char *name = long_options[long_index].name;
@@ -550,6 +611,22 @@ main(int argc, char **argv)
 					break;
 				} else if (strcmp(name, "erase-all") == 0) {
 					options.erase_all = true;
+					break;
+				} else if (strcmp(name, "emmc") == 0) {
+					if (!set_target(TARGET_EMMC, "--emmc")) return CSKBURN_ERR_ARG_INVALID;
+					break;
+				} else if (strcmp(name, "flash-index") == 0) {
+					if (!scan_int(optarg, &options.flash_index)) {
+						ERR_CTX(CSKBURN_ERR_ARG_INVALID, "--flash-index: %s", optarg);
+						return CSKBURN_ERR_ARG_INVALID;
+					}
+					options.flash_index_set = true;
+					break;
+				} else if (strcmp(name, "lock") == 0) {
+					options.lock = true;
+					break;
+				} else if (strcmp(name, "unlock") == 0) {
+					options.unlock = true;
 					break;
 				} else if (strcmp(name, "verify") == 0) {
 					if (options.verify_count >= MAX_VERIFY_PARTS) {
@@ -810,6 +887,45 @@ main(int argc, char **argv)
 			ERR_CTX(CSKBURN_ERR_ARG_UNSUPPORTED_OP, "verifying is not supported on RAM");
 			return CSKBURN_ERR_ARG_UNSUPPORTED_OP;
 		}
+	} else if (options.target == TARGET_EMMC) {
+#ifndef WITHOUT_USB
+		if (options.protocol != PROTO_SERIAL) {
+			ERR_CTX(CSKBURN_ERR_ARG_UNSUPPORTED_OP, "eMMC requires serial burning (-s)");
+			return CSKBURN_ERR_ARG_UNSUPPORTED_OP;
+		}
+#endif
+		if ((cskburn_serial_get_capabilities(options.chip->serial) & CSKBURN_CAP_EMMC) == 0) {
+			ERR_CTX(CSKBURN_ERR_ARG_UNSUPPORTED_OP, "eMMC is not supported by %s",
+					options.chip->name);
+			return CSKBURN_ERR_ARG_UNSUPPORTED_OP;
+		}
+	}
+
+	uint32_t capabilities = cskburn_serial_get_capabilities(options.chip->serial);
+	uint8_t flash_count = cskburn_serial_get_flash_count(options.chip->serial);
+	if (options.flash_index_set) {
+		if (options.target != TARGET_FLASH || (capabilities & CSKBURN_CAP_FLASH_INDEX) == 0) {
+			ERR_CTX(CSKBURN_ERR_ARG_UNSUPPORTED_OP,
+					"--flash-index requires -C arcs_dual with the flash target");
+			return CSKBURN_ERR_ARG_UNSUPPORTED_OP;
+		}
+		if (options.flash_index >= flash_count) {
+			ERR_CTX(CSKBURN_ERR_ARG_INVALID, "--flash-index must be in range 0-%u",
+					flash_count - 1);
+			return CSKBURN_ERR_ARG_INVALID;
+		}
+	}
+	if (options.lock || options.unlock) {
+		if (options.target != TARGET_FLASH ||
+				(capabilities & CSKBURN_CAP_FLASH_PROTECTION) == 0) {
+			ERR_CTX(CSKBURN_ERR_ARG_UNSUPPORTED_OP,
+					"--lock/--unlock require an ARCS flash loader with protection support");
+			return CSKBURN_ERR_ARG_UNSUPPORTED_OP;
+		}
+		if (options.lock && options.unlock) {
+			ERR_CTX(CSKBURN_ERR_ARG_INVALID, "--lock conflicts with --unlock");
+			return CSKBURN_ERR_ARG_INVALID;
+		}
 	}
 
 	if (options.action == ACTION_CHECK) {
@@ -1011,7 +1127,7 @@ serial_connect(cskburn_serial_device_t *dev, cskburn_reset_strategy_t *out_strat
 	cskburn_reset_strategy_t candidates[2];
 	uint32_t n_candidates;
 	if (options.reset_strategy_auto) {
-		if (options.chip->serial == CHIP_ARCS) {
+		if (options.chip->serial == CHIP_ARCS || options.chip->serial == CHIP_ARCS_DUAL) {
 			candidates[0] = CSKBURN_RESET_DTR_BOOT;
 			candidates[1] = CSKBURN_RESET_DUAL_NPN;
 			n_candidates = 2;
@@ -1077,7 +1193,8 @@ serial_connect(cskburn_serial_device_t *dev, cskburn_reset_strategy_t *out_strat
 static int
 serial_burn(cskburn_partition_t *parts, int parts_cnt)
 {
-	int ret;
+	int ret = 0;
+	bool flash_index_selected = false;
 
 	cskburn_reset_strategy_t effective_strategy = CSKBURN_RESET_RTS_BOOT;
 
@@ -1102,11 +1219,20 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	if ((ret = cskburn_serial_open(&dev, options.serial, options.chip->serial, options.timeout)) !=
 			0) {
 		ERR_RET(ret, "%s", options.serial);
-		goto err_open;
+		return ret;
 	}
 
 	if ((ret = serial_connect(dev, &effective_strategy)) != 0) {
 		goto err_enter;
+	}
+
+	if ((cskburn_serial_get_capabilities(options.chip->serial) & CSKBURN_CAP_FLASH_INDEX) != 0 &&
+			options.target == TARGET_FLASH) {
+		if ((ret = cskburn_serial_set_flash_index(dev, options.flash_index)) != 0) {
+			ERR_RET(ret, "flash index %u", options.flash_index);
+			goto err_enter;
+		}
+		flash_index_selected = true;
 	}
 
 	if (options.read_chip_id) {
@@ -1116,7 +1242,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 			goto err_enter;
 		}
 
-		if (options.chip->serial == CHIP_ARCS) {
+		if (options.chip->serial == CHIP_ARCS || options.chip->serial == CHIP_ARCS_DUAL) {
 			LOGI("chip-id: %02x%02x%02x%02x%02x%02x%02x%02x", id[0], id[1], id[2], id[3], id[4],
 					id[5], id[6], id[7]);
 		} else {
@@ -1126,6 +1252,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	}
 
 	uint64_t flash_size = 0;
+	cskburn_emmc_info_t emmc_info = {0};
 
 	if (options.target == TARGET_FLASH) {
 		uint32_t flash_id = 0;
@@ -1145,6 +1272,23 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		}
 
 		LOGI("Detected NAND size: %" PRIu64 " MB", flash_size >> 20);
+	} else if (options.target == TARGET_EMMC) {
+		if ((ret = cskburn_serial_get_emmc_info(dev, &emmc_info)) != 0) {
+			ERR_RET_NO_CTX(ret);
+			goto err_enter;
+		}
+		flash_size = (uint64_t)emmc_info.sector_count * emmc_info.sector_size;
+		LOGD("eMMC: sectors=%u sector-size=%u erase-size=%u card-type=%u",
+				emmc_info.sector_count, emmc_info.sector_size, emmc_info.erase_size,
+				emmc_info.card_type);
+		LOGI("Detected eMMC size: %" PRIu64 " MB", flash_size >> 20);
+	}
+
+	if (options.unlock) {
+		if ((ret = cskburn_serial_unlock(dev, options.target)) != 0) {
+			ERR_RET_NO_CTX(ret);
+			goto err_enter;
+		}
 	}
 
 	for (int i = 0; i < options.read_count; i++) {
@@ -1152,15 +1296,26 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 					 flash_size, "read")) != 0) {
 			goto err_enter;
 		}
+		if (options.target == TARGET_EMMC &&
+				(ret = validate_emmc_protocol_bounds(options.read_parts[i].addr,
+						 options.read_parts[i].size, "read")) != 0) goto err_enter;
 	}
 
 	for (int i = 0; i < options.erase_count; i++) {
-		if (!is_aligned(options.erase_parts[i].addr, FLASH_ALIGN)) {
+		if (options.erase_parts[i].size == 0) {
+			ERR_CTX(CSKBURN_ERR_ARG_INVALID,
+					"--erase region size must be greater than zero; use --erase-all instead");
+			ret = -CSKBURN_ERR_ARG_INVALID;
+			goto err_enter;
+		}
+		if (options.target != TARGET_EMMC &&
+				!is_aligned(options.erase_parts[i].addr, FLASH_ALIGN)) {
 			ERR_CTX(CSKBURN_ERR_ARG_ADDR_UNALIGNED, "erase addr 0x%08X is not 4K-aligned",
 					options.erase_parts[i].addr);
 			ret = -CSKBURN_ERR_ARG_ADDR_UNALIGNED;
 			goto err_enter;
-		} else if (!is_aligned(options.erase_parts[i].size, FLASH_ALIGN)) {
+		} else if (options.target != TARGET_EMMC &&
+				!is_aligned(options.erase_parts[i].size, FLASH_ALIGN)) {
 			ERR_CTX(CSKBURN_ERR_ARG_ADDR_UNALIGNED, "erase size 0x%08X is not 4K-aligned",
 					options.erase_parts[i].size);
 			ret = -CSKBURN_ERR_ARG_ADDR_UNALIGNED;
@@ -1169,6 +1324,9 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 							options.erase_parts[i].size, flash_size, "erase")) != 0) {
 			goto err_enter;
 		}
+		if (options.target == TARGET_EMMC &&
+				(ret = validate_emmc_protocol_bounds(options.erase_parts[i].addr,
+						 options.erase_parts[i].size, "erase")) != 0) goto err_enter;
 	}
 
 	for (int i = 0; i < options.verify_count; i++) {
@@ -1176,6 +1334,9 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 					 flash_size, "verify")) != 0) {
 			goto err_enter;
 		}
+		if (options.target == TARGET_EMMC &&
+				(ret = validate_emmc_protocol_bounds(options.verify_parts[i].addr,
+						 options.verify_parts[i].size, "verify")) != 0) goto err_enter;
 	}
 
 	for (int i = 0; i < parts_cnt; i++) {
@@ -1195,20 +1356,17 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 			}
 		}
 
-		if (options.target == TARGET_FLASH || options.target == TARGET_NAND) {
-			if (parts[i].addr >= flash_size) {
-				ERR_CTX(CSKBURN_ERR_ARG_ADDR_OUT_OF_BOUNDS,
-						"partition %d start 0x%08X beyond target capacity %" PRIu64 " MB", i + 1,
-						parts[i].addr, flash_size >> 20);
-				ret = -CSKBURN_ERR_ARG_ADDR_OUT_OF_BOUNDS;
-				goto err_enter;
-			} else if (parts[i].addr + parts[i].reader->size > flash_size) {
-				ERR_CTX(CSKBURN_ERR_ARG_ADDR_OUT_OF_BOUNDS,
-						"partition %d end 0x%08X beyond target capacity %" PRIu64 " MB", i + 1,
-						parts[i].addr + parts[i].reader->size, flash_size >> 20);
-				ret = -CSKBURN_ERR_ARG_ADDR_OUT_OF_BOUNDS;
+		if (options.target == TARGET_FLASH || options.target == TARGET_NAND ||
+				options.target == TARGET_EMMC) {
+			char operation[32];
+			snprintf(operation, sizeof(operation), "partition %d", i + 1);
+			if ((ret = validate_flash_bounds(
+					 parts[i].addr, parts[i].reader->size, flash_size, operation)) != 0) {
 				goto err_enter;
 			}
+			if (options.target == TARGET_EMMC &&
+					(ret = validate_emmc_protocol_bounds(
+						 parts[i].addr, parts[i].reader->size, operation)) != 0) goto err_enter;
 		}
 
 		if (options.verify_all) {
@@ -1261,8 +1419,13 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	}
 
 	if (options.erase_all) {
-		LOGI("Erasing entire flash...");
-		if ((ret = cskburn_serial_erase_all(dev, options.target, flash_size)) != 0) {
+		LOGI("Erasing entire target...");
+		if (options.target == TARGET_EMMC) {
+			ret = cskburn_serial_erase(dev, options.target, 0, 0);
+		} else {
+			ret = cskburn_serial_erase_all(dev, options.target, flash_size);
+		}
+		if (ret != 0) {
 			ERR_RET_NO_CTX(ret);
 			goto err_enter;
 		}
@@ -1340,6 +1503,21 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		}
 	}
 
+	if (options.lock) {
+		if ((ret = cskburn_serial_lock(dev, options.target)) != 0) {
+			ERR_RET_NO_CTX(ret);
+			goto err_write;
+		}
+	}
+
+	if (flash_index_selected) {
+		if ((ret = cskburn_serial_set_flash_index(dev, 0xFF)) != 0) {
+			ERR_RET(ret, "restore mapped flash view");
+			goto err_write;
+		}
+		flash_index_selected = false;
+	}
+
 	if (jump_addr) {
 		LOGI("Jumping to 0x%08X...", jump_addr);
 	} else if (!options.no_reset) {
@@ -1354,13 +1532,20 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	} else {
 		LOGI("Finished");
 	}
+	ret = 0;
 
 err_write:
 err_enter:
+	if (flash_index_selected) {
+		int restore_ret = cskburn_serial_set_flash_index(dev, 0xFF);
+		if (restore_ret != 0) {
+			ERR_RET(restore_ret, "restore mapped flash view");
+			if (ret == 0) ret = restore_ret;
+		}
+	}
 	if (ret != 0) {
 		cskburn_serial_reset(dev, options.reset_delay, effective_strategy);
 	}
 	cskburn_serial_close(&dev);
-err_open:
 	return ret;
 }

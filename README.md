@@ -64,6 +64,7 @@ Serial burning options:
       castor: Castor (CSK3/CSK4)
       venus: Venus (CSK6)
       arcs: Arcs (LS26)
+      arcs_dual: Arcs Dual Flash (LS26)
       venusa: VenusA (CSK7)
   --chip-id
     read unique chip ID
@@ -71,6 +72,8 @@ Serial burning options:
     verify all partitions after burning
   -n, --nand
     burn to NAND flash (CSK6 only)
+  --emmc
+    burn to eMMC (ARCS only)
   --probe-timeout <ms>
     timeout for probing device (default: 10000 ms)
   --reset-attempts <n>
@@ -92,16 +95,48 @@ Serial burning options:
     this option does not affect the timeout of probing device, use --probe-timeout if needed
 
 Advanced operations (serial only):
+  --flash-index <index>
+    select flash 0 or 1 (arcs_dual only; default: 0)
   --erase <addr:size>
     erase specified flash region
   --erase-all
     erase the entire flash
+  --lock
+    lock the selected flash after successful operations
+  --unlock
+    unlock the selected flash before operations
   --verify <addr:size>
     verify specified flash region
 
 Example:
     cskburn -C venus -s /dev/cu.usbserial-0001 -b 1500000 --verify-all 0x0 app.bin 0x100000 res.bin
 ```
+
+### ARCS 双 Flash 与 eMMC
+
+`arcs` 使用单 Flash loader，`arcs_dual` 使用双 Flash loader。双 Flash
+loader 将两个 16 MB Flash 作为独立器件操作，地址相对于当前选择的器件：
+
+```sh
+cskburn -C arcs_dual -s /dev/ttyACM0 --flash-index 0 0x0 flash0.bin
+cskburn -C arcs_dual -s /dev/ttyACM0 --flash-index 1 0x0 flash1.bin
+```
+
+选择在擦除、写入、读取、MD5 校验和锁解锁期间保持不变。操作结束或失败时，
+host 会恢复 loader 的 32 MB 映射视图。`--lock` 只在全部操作和校验成功后执行，
+`--unlock` 在其他 Flash 操作前执行。
+
+ARCS eMMC 使用 `--emmc` 选择，读写、区域擦除和 MD5 校验复用相同的地址参数：
+
+```sh
+cskburn -C arcs -s /dev/ttyACM0 --emmc --verify-all 0x0 image.bin
+```
+
+当前 eMMC wire protocol 使用 32 位地址和长度，因此 host 拒绝跨越 4 GiB
+可寻址边界的单次操作；设备容量检测仍使用 64 位计算。
+
+这些功能由所选嵌入 loader 的 capability 控制；不支持的芯片组合会在打开串口前
+返回结构化 `E1003` 错误。
 
 ## 编译
 

@@ -27,6 +27,9 @@ extern const uint32_t burner_serial_venus_len;
 extern const uint8_t burner_serial_arcs[];
 extern const uint32_t burner_serial_arcs_len;
 
+extern const uint8_t burner_serial_arcs_dual[];
+extern const uint32_t burner_serial_arcs_dual_len;
+
 extern const uint8_t burner_serial_venusa[];
 extern const uint32_t burner_serial_venusa_len;
 
@@ -39,19 +42,38 @@ static const struct {
 				{
 						.burner = burner_serial_castor,
 						.len_ptr = &burner_serial_castor_len,
-						.info = {.load_addr = 0x0},
+						.info = {.load_addr = 0x0, .flash_count = 1},
 				},
 		[CHIP_VENUS] =
 				{
 						.burner = burner_serial_venus,
 						.len_ptr = &burner_serial_venus_len,
-						.info = {.load_addr = 0x0},
+						.info = {.load_addr = 0x0, .flash_count = 1},
 				},
 		[CHIP_ARCS] =
 				{
 						.burner = burner_serial_arcs,
 						.len_ptr = &burner_serial_arcs_len,
-						.info = {.load_addr = 0x20040000},
+						.info =
+								{
+										.load_addr = 0x20040000,
+										.capabilities = CSKBURN_CAP_EMMC |
+												CSKBURN_CAP_FLASH_PROTECTION,
+										.flash_count = 1,
+								},
+				},
+		[CHIP_ARCS_DUAL] =
+				{
+						.burner = burner_serial_arcs_dual,
+						.len_ptr = &burner_serial_arcs_dual_len,
+						.info =
+								{
+										.load_addr = 0x20040000,
+										.capabilities = CSKBURN_CAP_EMMC |
+												CSKBURN_CAP_FLASH_PROTECTION |
+												CSKBURN_CAP_FLASH_INDEX,
+										.flash_count = 2,
+								},
 				},
 		[CHIP_VENUSA] =
 				{
@@ -60,12 +82,32 @@ static const struct {
 						.info =
 								{
 										.load_addr = 0x20050000,
-										.supports_read_flash_stream = true,
+										.capabilities = CSKBURN_CAP_READ_FLASH_STREAM |
+												CSKBURN_CAP_VENUSA_LOADER_PACING,
+										.flash_count = 1,
 								},
 				},
 };
 
 #define BURNERS_COUNT (sizeof(burners) / sizeof(burners[0]))
+
+uint32_t
+cskburn_serial_get_capabilities(cskburn_serial_chip_t chip)
+{
+	return chip < BURNERS_COUNT ? burners[chip].info.capabilities : 0;
+}
+
+uint8_t
+cskburn_serial_get_flash_count(cskburn_serial_chip_t chip)
+{
+	return chip < BURNERS_COUNT ? burners[chip].info.flash_count : 0;
+}
+
+static bool
+has_capability(cskburn_serial_device_t *dev, cskburn_serial_capability_t capability)
+{
+	return dev->burner_info != NULL && (dev->burner_info->capabilities & capability) != 0;
+}
 
 static void
 print_time_spent(const char *usage, uint64_t t1, uint64_t t2)
@@ -210,7 +252,7 @@ cskburn_serial_open(cskburn_serial_device_t **dev, const char *path, cskburn_ser
 	(*dev)->req_cmd = (*dev)->req_buf + sizeof(csk_command_t);
 	(*dev)->chip = chip;
 
-	if (chip < BURNERS_COUNT) {
+	if (chip < BURNERS_COUNT && burners[chip].burner != NULL) {
 		(*dev)->burner_img = burners[chip].burner;
 		(*dev)->burner_len = *burners[chip].len_ptr;
 		(*dev)->burner_info = &burners[chip].info;
@@ -307,8 +349,9 @@ cskburn_serial_enter(
 
 		// For CSK6 and ARCS CMD_CHANGE_BAUD is supported by the ROM, so take advantage
 		// of it to speed up the process.
-		bool load_speedup =
-				(dev->chip == CHIP_VENUS || dev->chip == CHIP_ARCS) && baud_rate != BAUD_RATE_INIT;
+		bool load_speedup = (dev->chip == CHIP_VENUS || dev->chip == CHIP_ARCS ||
+								dev->chip == CHIP_ARCS_DUAL) &&
+				baud_rate != BAUD_RATE_INIT;
 
 		if (load_speedup) {
 			if ((ret = cmd_change_baud(dev, baud_rate, BAUD_RATE_INIT)) != 0) {
@@ -333,6 +376,9 @@ cskburn_serial_enter(
 			LOGD_RET(ret, "DEBUG: mem_begin failed while loading burner");
 			return -CSKBURN_ERR_BURNER_LOAD_FAILED;
 		}
+		if (has_capability(dev, CSKBURN_CAP_VENUSA_LOADER_PACING)) {
+			msleep(50);
+		}
 
 		for (uint32_t i = 0; i < blocks; i++) {
 			offset = RAM_BLOCK_SIZE * i;
@@ -345,6 +391,9 @@ cskburn_serial_enter(
 			if ((ret = cmd_mem_block(dev, burner + offset, length, i)) != 0) {
 				LOGD_RET(ret, "DEBUG: mem_block %u failed while loading burner", i);
 				return -CSKBURN_ERR_BURNER_LOAD_FAILED;
+			}
+			if (has_capability(dev, CSKBURN_CAP_VENUSA_LOADER_PACING)) {
+				msleep(5);
 			}
 		}
 
@@ -455,6 +504,15 @@ cskburn_serial_write(cskburn_serial_device_t *dev, cskburn_serial_target_t targe
 			LOGD_RET(ret, "DEBUG: mem_begin failed");
 			return ret > 0 ? ret : -err_code;
 		}
+	} else if (target == TARGET_EMMC) {
+		err_code = CSKBURN_ERR_EMMC_WRITE_FAILED;
+		if (!has_capability(dev, CSKBURN_CAP_EMMC)) {
+			return -CSKBURN_ERR_ARG_UNSUPPORTED_OP;
+		}
+		if ((ret = cmd_emmc_begin(dev, reader->size, blocks, FLASH_BLOCK_SIZE, addr)) != 0) {
+			LOGD_RET(ret, "DEBUG: emmc_begin failed");
+			return ret > 0 ? ret : -err_code;
+		}
 	} else {
 		return -EINVAL;
 	}
@@ -489,6 +547,11 @@ cskburn_serial_write(cskburn_serial_device_t *dev, cskburn_serial_target_t targe
 				LOGD_RET(ret, "DEBUG: mem_block %u failed", i);
 				return ret > 0 ? ret : -err_code;
 			}
+		} else if (target == TARGET_EMMC) {
+			if ((ret = cmd_emmc_block(dev, buffer, length, i)) != 0) {
+				LOGD_RET(ret, "DEBUG: emmc_block %u failed", i);
+				return ret > 0 ? ret : -err_code;
+			}
 		}
 
 		i++;
@@ -511,6 +574,11 @@ cskburn_serial_write(cskburn_serial_device_t *dev, cskburn_serial_target_t targe
 	} else if (target == TARGET_RAM) {
 		if ((ret = cmd_mem_finish(dev, jump ? OPTION_JUMP : OPTION_RUN, jump)) != 0) {
 			LOGD_RET(ret, "DEBUG: mem_finish failed");
+			return ret > 0 ? ret : -err_code;
+		}
+	} else if (target == TARGET_EMMC) {
+		if ((ret = cmd_emmc_finish(dev)) != 0) {
+			LOGD_RET(ret, "DEBUG: emmc_finish failed");
 			return ret > 0 ? ret : -err_code;
 		}
 	}
@@ -539,13 +607,23 @@ cskburn_serial_read_legacy(cskburn_serial_device_t *dev, cskburn_serial_target_t
 			want = FLASH_READ_SIZE;
 		}
 
-		if ((ret = cmd_read_flash(dev, addr + offset, want, buffer, &read_size)) != 0) {
-			LOGD_RET(ret, "DEBUG: read_flash at 0x%08X failed", addr + offset);
-			return ret > 0 ? ret : -CSKBURN_ERR_FLASH_READ_FAILED;
+		if (target == TARGET_FLASH) {
+			ret = cmd_read_flash(dev, addr + offset, want, buffer, &read_size);
+		} else if (target == TARGET_EMMC && has_capability(dev, CSKBURN_CAP_EMMC)) {
+			ret = cmd_read_emmc(dev, addr + offset, want, buffer, &read_size);
+		} else {
+			return -CSKBURN_ERR_ARG_UNSUPPORTED_OP;
+		}
+		if (ret != 0) {
+			LOGD_RET(ret, "DEBUG: read at 0x%08X failed", addr + offset);
+			int err = target == TARGET_EMMC ? CSKBURN_ERR_EMMC_READ_FAILED :
+													CSKBURN_ERR_FLASH_READ_FAILED;
+			return ret > 0 ? ret : -err;
 		}
 
 		if (read_size == 0) {
-			return -CSKBURN_ERR_FLASH_READ_FAILED;
+			return target == TARGET_EMMC ? -CSKBURN_ERR_EMMC_READ_FAILED :
+													-CSKBURN_ERR_FLASH_READ_FAILED;
 		}
 
 		uint32_t to_write = read_size < want ? read_size : want;
@@ -566,7 +644,12 @@ cskburn_serial_read_legacy(cskburn_serial_device_t *dev, cskburn_serial_target_t
 	if (md5 != NULL) {
 		uint64_t t1 = time_monotonic();
 
-		if ((ret = cmd_flash_md5sum(dev, addr, size, md5)) != 0) {
+		if (target == TARGET_EMMC) {
+			ret = cmd_emmc_md5(dev, addr, size, md5);
+		} else {
+			ret = cmd_flash_md5sum(dev, addr, size, md5);
+		}
+		if (ret != 0) {
 			LOGD_RET(ret, "DEBUG: flash_md5sum 0x%08X+%u failed", addr, size);
 			return ret > 0 ? ret : -CSKBURN_ERR_VERIFY_READ_FAILED;
 		}
@@ -604,7 +687,7 @@ cskburn_serial_read(cskburn_serial_device_t *dev, cskburn_serial_target_t target
 		uint32_t size, writer_t *writer, uint8_t *md5,
 		void (*on_progress)(int32_t read_bytes, uint32_t total_bytes))
 {
-	if (dev->burner_info->supports_read_flash_stream) {
+	if (target == TARGET_FLASH && has_capability(dev, CSKBURN_CAP_READ_FLASH_STREAM)) {
 		return cskburn_serial_read_stream(dev, target, addr, size, writer, md5, on_progress);
 	} else {
 		return cskburn_serial_read_legacy(dev, target, addr, size, writer, md5, on_progress);
@@ -632,6 +715,8 @@ cskburn_serial_erase_all(
 		return 0;
 	} else if (target == TARGET_NAND) {
 		return -ENOTSUP;
+	} else if (target == TARGET_EMMC) {
+		return -CSKBURN_ERR_ARG_UNSUPPORTED_OP;
 	}
 
 	return -EINVAL;
@@ -657,6 +742,16 @@ cskburn_serial_erase(
 		return 0;
 	} else if (target == TARGET_NAND) {
 		return -ENOTSUP;
+	} else if (target == TARGET_EMMC) {
+		if (!has_capability(dev, CSKBURN_CAP_EMMC)) {
+			return -CSKBURN_ERR_ARG_UNSUPPORTED_OP;
+		}
+		uint64_t t1 = time_monotonic();
+		if ((ret = cmd_emmc_erase_region(dev, addr, size)) != 0) {
+			return ret > 0 ? ret : -CSKBURN_ERR_EMMC_ERASE_FAILED;
+		}
+		print_time_spent_with_speed("Erasing", t1, time_monotonic(), size);
+		return 0;
 	}
 
 	return -EINVAL;
@@ -691,6 +786,16 @@ cskburn_serial_verify(cskburn_serial_device_t *dev, cskburn_serial_target_t targ
 		uint64_t t2 = time_monotonic();
 		print_time_spent_with_speed("Verifying", t1, t2, size);
 
+		return 0;
+	} else if (target == TARGET_EMMC) {
+		if (!has_capability(dev, CSKBURN_CAP_EMMC)) {
+			return -CSKBURN_ERR_ARG_UNSUPPORTED_OP;
+		}
+		uint64_t t1 = time_monotonic();
+		if ((ret = cmd_emmc_md5(dev, addr, size, md5)) != 0) {
+			return ret > 0 ? ret : -CSKBURN_ERR_VERIFY_READ_FAILED;
+		}
+		print_time_spent_with_speed("Verifying", t1, time_monotonic(), size);
 		return 0;
 	}
 
@@ -741,6 +846,52 @@ cskburn_serial_init_nand(cskburn_serial_device_t *dev, nand_config_t *config, ui
 		return ret > 0 ? ret : -CSKBURN_ERR_NAND_INIT_FAILED;
 	}
 	return 0;
+}
+
+int
+cskburn_serial_get_emmc_info(cskburn_serial_device_t *dev, cskburn_emmc_info_t *info)
+{
+	if (!has_capability(dev, CSKBURN_CAP_EMMC)) {
+		return -CSKBURN_ERR_ARG_UNSUPPORTED_OP;
+	}
+	int ret = cmd_emmc_get_info(dev, info);
+	if (ret != 0) {
+		return ret > 0 ? ret : -CSKBURN_ERR_EMMC_INFO_FAILED;
+	}
+	if (info->sector_count == 0 || info->sector_size == 0) {
+		return -CSKBURN_ERR_EMMC_NOT_DETECTED;
+	}
+	return 0;
+}
+
+int
+cskburn_serial_set_flash_index(cskburn_serial_device_t *dev, uint32_t index)
+{
+	if (!has_capability(dev, CSKBURN_CAP_FLASH_INDEX)) {
+		return -CSKBURN_ERR_ARG_UNSUPPORTED_OP;
+	}
+	int ret = cmd_set_flash_index(dev, index);
+	return ret == 0 || ret > 0 ? ret : -CSKBURN_ERR_FLASH_INDEX_FAILED;
+}
+
+int
+cskburn_serial_lock(cskburn_serial_device_t *dev, cskburn_serial_target_t target)
+{
+	if (target != TARGET_FLASH || !has_capability(dev, CSKBURN_CAP_FLASH_PROTECTION)) {
+		return -CSKBURN_ERR_ARG_UNSUPPORTED_OP;
+	}
+	int ret = cmd_flash_lock(dev);
+	return ret == 0 || ret > 0 ? ret : -CSKBURN_ERR_FLASH_LOCK_FAILED;
+}
+
+int
+cskburn_serial_unlock(cskburn_serial_device_t *dev, cskburn_serial_target_t target)
+{
+	if (target != TARGET_FLASH || !has_capability(dev, CSKBURN_CAP_FLASH_PROTECTION)) {
+		return -CSKBURN_ERR_ARG_UNSUPPORTED_OP;
+	}
+	int ret = cmd_flash_unlock(dev);
+	return ret == 0 || ret > 0 ? ret : -CSKBURN_ERR_FLASH_UNLOCK_FAILED;
 }
 
 int

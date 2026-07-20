@@ -16,8 +16,17 @@ typedef enum {
 	CHIP_CASTOR,
 	CHIP_VENUS,
 	CHIP_ARCS,
+	CHIP_ARCS_DUAL,
 	CHIP_VENUSA,
 } cskburn_serial_chip_t;
+
+typedef enum {
+	CSKBURN_CAP_READ_FLASH_STREAM = 1U << 0,
+	CSKBURN_CAP_EMMC = 1U << 1,
+	CSKBURN_CAP_FLASH_PROTECTION = 1U << 2,
+	CSKBURN_CAP_FLASH_INDEX = 1U << 3,
+	CSKBURN_CAP_VENUSA_LOADER_PACING = 1U << 4,
+} cskburn_serial_capability_t;
 
 typedef enum {
 	CSKBURN_RESET_DTR_BOOT,  // DTR -> BOOT, RTS -> RESET (BOOT active low)
@@ -51,7 +60,20 @@ typedef enum {
 	TARGET_FLASH = 0,
 	TARGET_NAND = 1,
 	TARGET_RAM = 2,
+	TARGET_EMMC = 3,
 } cskburn_serial_target_t;
+
+#pragma pack(1)
+typedef struct {
+	uint32_t sector_count;
+	uint32_t sector_size;
+	uint32_t erase_size;
+	uint32_t card_type;
+} cskburn_emmc_info_t;
+#pragma pack()
+
+uint32_t cskburn_serial_get_capabilities(cskburn_serial_chip_t chip);
+uint8_t cskburn_serial_get_flash_count(cskburn_serial_chip_t chip);
 
 /**
  * @brief Open CSK device
@@ -127,6 +149,13 @@ int cskburn_serial_get_flash_info(
 
 int cskburn_serial_init_nand(
 		cskburn_serial_device_t *dev, nand_config_t *config, uint64_t *nand_size);
+
+int cskburn_serial_get_emmc_info(cskburn_serial_device_t *dev, cskburn_emmc_info_t *info);
+
+int cskburn_serial_set_flash_index(cskburn_serial_device_t *dev, uint32_t index);
+
+int cskburn_serial_lock(cskburn_serial_device_t *dev, cskburn_serial_target_t target);
+int cskburn_serial_unlock(cskburn_serial_device_t *dev, cskburn_serial_target_t target);
 
 int cskburn_serial_reset(
 		cskburn_serial_device_t *dev, uint32_t reset_delay, cskburn_reset_strategy_t strategy);
