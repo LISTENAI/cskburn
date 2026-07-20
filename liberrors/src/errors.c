@@ -80,6 +80,8 @@ cskburn_strerror(int err)
 			return "No flash detected (ID reads as all zeros or all ones)";
 		case CSKBURN_ERR_NAND_INIT_FAILED:
 			return "Failed to initialize NAND (check --nand-* pin configuration)";
+		case CSKBURN_ERR_EMMC_INIT_FAILED:
+			return "Failed to initialize eMMC";
 
 		/* 7xxx — flash / NAND / RAM ops */
 		case CSKBURN_ERR_FLASH_READ_FAILED:
@@ -92,6 +94,16 @@ cskburn_strerror(int err)
 			return "Failed to write NAND";
 		case CSKBURN_ERR_RAM_WRITE_FAILED:
 			return "Failed to write RAM";
+		case CSKBURN_ERR_EMMC_READ_FAILED:
+			return "Failed to read eMMC";
+		case CSKBURN_ERR_EMMC_ERASE_FAILED:
+			return "Failed to erase eMMC";
+		case CSKBURN_ERR_EMMC_WRITE_FAILED:
+			return "Failed to write eMMC";
+		case CSKBURN_ERR_FLASH_LOCK_FAILED:
+			return "Failed to lock flash";
+		case CSKBURN_ERR_FLASH_UNLOCK_FAILED:
+			return "Failed to unlock flash";
 
 		/* 8xxx — verification */
 		case CSKBURN_ERR_VERIFY_READ_FAILED:

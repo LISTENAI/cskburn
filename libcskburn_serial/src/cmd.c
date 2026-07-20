@@ -36,11 +36,22 @@
 #define CMD_NAND_DATA 0x22
 #define CMD_NAND_END 0x23
 #define CMD_NAND_MD5 0x24
+#define CMD_SET_SYS_CLK 0x31
+#define CMD_EMMC_READ_CARD_INFO 0x41
+#define CMD_EMMC_BEGIN 0x42
+#define CMD_EMMC_DATA 0x43
+#define CMD_EMMC_END 0x44
+#define CMD_EMMC_MD5 0x45
+#define CMD_EMMC_READ_DATA 0x46
+#define CMD_EMMC_ERASE_DATA 0x47
 #define CMD_FLASH_ERASE_CHIP 0xD0
 #define CMD_FLASH_ERASE_REGION 0xD1
 #define CMD_READ_FLASH_STREAM 0xD2
+#define CMD_FLASH_LOCK 0xD4
+#define CMD_FLASH_UNLOCK 0xD5
 #define CMD_READ_FLASH_ID 0xF3
 #define CMD_READ_CHIP_ID 0xF4
+#define CMD_SET_FLASH_INDEX 0xF5
 
 #define CHECKSUM_MAGIC 0xef
 #define CHECKSUM_NONE 0
@@ -117,6 +128,10 @@ typedef struct {
 	uint32_t address;
 	uint32_t size;
 } cmd_read_flash_t;
+
+typedef struct {
+	uint32_t index;
+} cmd_set_flash_index_t;
 
 typedef struct {
 	uint32_t address;
@@ -196,7 +211,7 @@ command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_c
 		goto exit;
 	}
 
-	uint8_t *res_ptr;
+	uint8_t *res_ptr = NULL;
 	if ((ret = command_recv(dev, op, &res_ptr, timeout)) < 0) {
 		if (ret != -ETIMEDOUT) {
 			LOGD_RET(ret, "DEBUG: Failed to read command %02X", op);
@@ -591,6 +606,18 @@ cmd_flash_erase_region(cskburn_serial_device_t *dev, uint32_t address, uint32_t 
 }
 
 int
+cmd_flash_lock(cskburn_serial_device_t *dev)
+{
+	return check_command(dev, CMD_FLASH_LOCK, 0, CHECKSUM_NONE, NULL, TIMEOUT_FLASH_DATA);
+}
+
+int
+cmd_flash_unlock(cskburn_serial_device_t *dev)
+{
+	return check_command(dev, CMD_FLASH_UNLOCK, 0, CHECKSUM_NONE, NULL, TIMEOUT_FLASH_DATA);
+}
+
+int
 cmd_flash_md5sum(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uint8_t *md5)
 {
 	uint8_t ret_buf[STATUS_BYTES_LEN + 16];
@@ -654,6 +681,154 @@ cmd_read_flash(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, ui
 	memcpy(data, ret_buf + STATUS_BYTES_LEN, *data_len);
 
 	return 0;
+}
+
+int
+cmd_emmc_get_info(cskburn_serial_device_t *dev, emmc_info_t *info)
+{
+	uint8_t ret_buf[STATUS_BYTES_LEN + sizeof(emmc_info_t)];
+	uint16_t ret_len = 0;
+
+	int ret = command(dev, CMD_EMMC_READ_CARD_INFO, 0, CHECKSUM_NONE, NULL, ret_buf, &ret_len,
+			sizeof(ret_buf), TIMEOUT_DEFAULT);
+	if (ret != 0) {
+		return ret;
+	}
+	if (ret_len < sizeof(ret_buf)) {
+		LOGD("DEBUG: Interrupted eMMC info response");
+		return -EIO;
+	}
+	if (ret_buf[0] != 0) {
+		return ret_buf[1];
+	}
+
+	memcpy(info, ret_buf + STATUS_BYTES_LEN, sizeof(*info));
+	return 0;
+}
+
+int
+cmd_emmc_begin(cskburn_serial_device_t *dev, uint32_t size, uint32_t blocks, uint32_t block_size,
+		uint32_t offset)
+{
+	cmd_flash_begin_t *cmd = (cmd_flash_begin_t *)dev->req_cmd;
+	memset(cmd, 0, sizeof(*cmd));
+	cmd->size = size;
+	cmd->blocks = blocks;
+	cmd->block_size = block_size;
+	cmd->offset = offset;
+
+	return check_command(
+			dev, CMD_EMMC_BEGIN, sizeof(*cmd), CHECKSUM_NONE, NULL, TIMEOUT_DEFAULT);
+}
+
+int
+cmd_emmc_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, uint32_t seq)
+{
+	cmd_flash_block_t *cmd = (cmd_flash_block_t *)dev->req_cmd;
+	memset(cmd, 0, sizeof(*cmd));
+	cmd->size = data_len;
+	cmd->seq = seq;
+
+	uint8_t *req_data = (uint8_t *)dev->req_cmd + sizeof(*cmd);
+	memcpy(req_data, data, data_len);
+
+	int ret = check_command(dev, CMD_EMMC_DATA, sizeof(*cmd) + data_len,
+			checksum(data, data_len), NULL, TIMEOUT_FLASH_DATA);
+	if (ret == 0x0A) {
+		msleep(250);
+	}
+	return ret;
+}
+
+int
+cmd_emmc_finish(cskburn_serial_device_t *dev)
+{
+	cmd_flash_finish_t *cmd = (cmd_flash_finish_t *)dev->req_cmd;
+	memset(cmd, 0, sizeof(*cmd));
+	return check_command(dev, CMD_EMMC_END, sizeof(uint32_t), CHECKSUM_NONE, NULL, TIMEOUT_FLASH_END);
+}
+
+int
+cmd_emmc_erase_region(cskburn_serial_device_t *dev, uint32_t address, uint32_t size)
+{
+	cmd_flash_erase_t *cmd = (cmd_flash_erase_t *)dev->req_cmd;
+	memset(cmd, 0, sizeof(*cmd));
+	cmd->address = address;
+	cmd->size = size;
+	return check_command(dev, CMD_EMMC_ERASE_DATA, sizeof(*cmd), CHECKSUM_NONE, NULL,
+			calc_timeout(size, TIMEOUT_FLASH_ERASE_PER_MB));
+}
+
+int
+cmd_emmc_md5(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uint8_t *md5)
+{
+	uint8_t ret_buf[STATUS_BYTES_LEN + MD5_LEN];
+	uint16_t ret_len = 0;
+	cmd_flash_md5_t *cmd = (cmd_flash_md5_t *)dev->req_cmd;
+	memset(cmd, 0, sizeof(*cmd));
+	cmd->address = address;
+	cmd->size = size;
+
+	int ret = command(dev, CMD_EMMC_MD5, sizeof(*cmd), CHECKSUM_NONE, NULL, ret_buf, &ret_len,
+			sizeof(ret_buf), calc_timeout(size, TIMEOUT_FLASH_MD5SUM_PER_MB));
+	if (ret != 0) {
+		return ret;
+	}
+	if (ret_len < sizeof(ret_buf)) {
+		LOGD("DEBUG: Interrupted eMMC MD5 response");
+		return -EIO;
+	}
+	if (ret_buf[0] != 0) {
+		return ret_buf[1];
+	}
+
+	memcpy(md5, ret_buf + STATUS_BYTES_LEN, MD5_LEN);
+	return 0;
+}
+
+int
+cmd_read_emmc(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uint8_t *data,
+		uint32_t *data_len)
+{
+	uint8_t ret_buf[STATUS_BYTES_LEN + EMMC_READ_SIZE];
+	uint16_t ret_len = 0;
+	cmd_read_flash_t *cmd = (cmd_read_flash_t *)dev->req_cmd;
+	memset(cmd, 0, sizeof(*cmd));
+	cmd->address = address;
+	cmd->size = size;
+
+	int ret = command(dev, CMD_EMMC_READ_DATA, sizeof(*cmd), CHECKSUM_NONE, NULL, ret_buf, &ret_len,
+			sizeof(ret_buf), TIMEOUT_FLASH_DATA);
+	if (ret != 0) {
+		return ret;
+	}
+	if (ret_len < STATUS_BYTES_LEN) {
+		return -EIO;
+	}
+	if (ret_buf[0] != 0) {
+		return ret_buf[1];
+	}
+
+	*data_len = ret_len - STATUS_BYTES_LEN;
+	memcpy(data, ret_buf + STATUS_BYTES_LEN, *data_len);
+	return 0;
+}
+
+int
+cmd_set_flash_index(cskburn_serial_device_t *dev, uint32_t index)
+{
+	cmd_set_flash_index_t *cmd = (cmd_set_flash_index_t *)dev->req_cmd;
+	memset(cmd, 0, sizeof(*cmd));
+	cmd->index = index;
+	return check_command(
+			dev, CMD_SET_FLASH_INDEX, sizeof(*cmd), CHECKSUM_NONE, NULL, TIMEOUT_DEFAULT);
+}
+
+int
+cmd_set_sys_clk(cskburn_serial_device_t *dev, venusa_clk_config_t *config)
+{
+	memcpy(dev->req_cmd, config, sizeof(*config));
+	return check_command(dev, CMD_SET_SYS_CLK, sizeof(*config), CHECKSUM_NONE, NULL, 1000);
 }
 
 int

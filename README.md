@@ -63,7 +63,8 @@ Serial burning options:
     chip family (default: castor), acceptable values:
       castor: Castor (CSK3/CSK4)
       venus: Venus (CSK6)
-      arcs: Arcs (LS26)
+      arcs: Arcs single flash (LS26)
+      arcs_dual: Arcs dual flash (LS26)
       venusa: VenusA (CSK7)
   --chip-id
     read unique chip ID
@@ -71,6 +72,10 @@ Serial burning options:
     verify all partitions after burning
   -n, --nand
     burn to NAND flash (CSK6 only)
+  --emmc
+    burn to eMMC (Arcs only)
+  --flash-index <0|1>
+    select flash on arcs_dual (default: 0)
   --probe-timeout <ms>
     timeout for probing device (default: 10000 ms)
   --reset-attempts <n>
@@ -96,6 +101,8 @@ Advanced operations (serial only):
     erase specified flash region
   --erase-all
     erase the entire flash
+  --unlock / --lock
+    unlock flash before operations / lock flash after operations
   --verify <addr:size>
     verify specified flash region
 
