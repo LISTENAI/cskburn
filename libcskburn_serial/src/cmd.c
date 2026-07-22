@@ -49,6 +49,7 @@
 #define CMD_READ_FLASH_STREAM 0xD2
 #define CMD_FLASH_LOCK 0xD4
 #define CMD_FLASH_UNLOCK 0xD5
+#define CMD_GET_FLASH_PROTECTION 0xD6
 #define CMD_READ_FLASH_ID 0xF3
 #define CMD_READ_CHIP_ID 0xF4
 #define CMD_SET_FLASH_INDEX 0xF5
@@ -615,6 +616,13 @@ int
 cmd_flash_unlock(cskburn_serial_device_t *dev)
 {
 	return check_command(dev, CMD_FLASH_UNLOCK, 0, CHECKSUM_NONE, NULL, TIMEOUT_FLASH_DATA);
+}
+
+int
+cmd_get_flash_protection(cskburn_serial_device_t *dev, uint32_t *protection)
+{
+	return check_command(
+			dev, CMD_GET_FLASH_PROTECTION, 0, CHECKSUM_NONE, protection, TIMEOUT_DEFAULT);
 }
 
 int

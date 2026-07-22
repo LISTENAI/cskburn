@@ -143,6 +143,15 @@ int cskburn_serial_lock(cskburn_serial_device_t *dev, cskburn_serial_target_t ta
 
 int cskburn_serial_unlock(cskburn_serial_device_t *dev, cskburn_serial_target_t target);
 
+typedef enum {
+	CSKBURN_FLASH_PROTECTION_NONE = 0,
+	CSKBURN_FLASH_PROTECTION_ACTIVE = 1,
+	CSKBURN_FLASH_PROTECTION_UNKNOWN = 2,
+} cskburn_flash_protection_t;
+
+int cskburn_serial_get_flash_protection(cskburn_serial_device_t *dev,
+		cskburn_serial_target_t target, cskburn_flash_protection_t *protection);
+
 int cskburn_serial_verify(cskburn_serial_device_t *dev, cskburn_serial_target_t target,
 		uint32_t addr, uint32_t size, uint8_t *md5);
 

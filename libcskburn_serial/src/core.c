@@ -801,6 +801,26 @@ cskburn_serial_unlock(cskburn_serial_device_t *dev, cskburn_serial_target_t targ
 }
 
 int
+cskburn_serial_get_flash_protection(cskburn_serial_device_t *dev,
+		cskburn_serial_target_t target, cskburn_flash_protection_t *protection)
+{
+	if (target != TARGET_FLASH || !dev->burner_info->supports_flash_lock || protection == NULL) {
+		return -ENOTSUP;
+	}
+
+	uint32_t value = CSKBURN_FLASH_PROTECTION_UNKNOWN;
+	int ret = cmd_get_flash_protection(dev, &value);
+	if (ret != 0) {
+		return ret;
+	}
+	if (value > CSKBURN_FLASH_PROTECTION_UNKNOWN) {
+		return -EIO;
+	}
+	*protection = (cskburn_flash_protection_t)value;
+	return 0;
+}
+
+int
 cskburn_serial_verify(cskburn_serial_device_t *dev, cskburn_serial_target_t target, uint32_t addr,
 		uint32_t size, uint8_t *md5)
 {

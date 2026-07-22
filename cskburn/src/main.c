@@ -1371,6 +1371,23 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		writer->close(&writer);
 	}
 
+	bool modifies_flash = options.target == TARGET_FLASH &&
+			(options.erase_all || options.erase_count > 0 || parts_cnt > 0);
+	if (modifies_flash && !options.unlock) {
+		cskburn_flash_protection_t protection = CSKBURN_FLASH_PROTECTION_UNKNOWN;
+		if ((ret = cskburn_serial_get_flash_protection(dev, options.target, &protection)) != 0) {
+			ERR_RET(ret, "read flash protection state");
+			goto err_enter;
+		}
+		if (protection == CSKBURN_FLASH_PROTECTION_ACTIVE) {
+			LOGI("Flash is locked; unlocking automatically...");
+			if ((ret = cskburn_serial_unlock(dev, options.target)) != 0) {
+				ERR_RET_NO_CTX(ret);
+				goto err_enter;
+			}
+		}
+	}
+
 	if (options.erase_all) {
 		LOGI("Erasing entire flash...");
 		if ((ret = cskburn_serial_erase_all(dev, options.target, flash_size)) != 0) {

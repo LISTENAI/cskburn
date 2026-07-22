@@ -103,6 +103,7 @@ Advanced operations (serial only):
     erase the entire flash
   --unlock / --lock
     unlock flash before operations / lock flash after operations
+    supported locked flashes are also detected and unlocked automatically before erase/write
   --verify <addr:size>
     verify specified flash region
 

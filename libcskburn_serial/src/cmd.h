@@ -79,6 +79,7 @@ int cmd_flash_erase_chip(cskburn_serial_device_t *dev, uint32_t flash_size_mb);
 int cmd_flash_erase_region(cskburn_serial_device_t *dev, uint32_t address, uint32_t size);
 int cmd_flash_lock(cskburn_serial_device_t *dev);
 int cmd_flash_unlock(cskburn_serial_device_t *dev);
+int cmd_get_flash_protection(cskburn_serial_device_t *dev, uint32_t *protection);
 
 int cmd_flash_md5sum(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uint8_t *md5);
 
