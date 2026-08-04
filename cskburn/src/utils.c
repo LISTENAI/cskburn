@@ -41,39 +41,55 @@ scan_int(const char *str, uint32_t *out)
 bool
 scan_addr_size(const char *str, uint32_t *addr, uint32_t *size)
 {
-	char *split = strstr(str, ":");
-	if (split == NULL) {
+	if (str == NULL || addr == NULL || size == NULL)
 		return false;
-	}
 
-	const char *str_addr = str;
-	const char *str_size = split + 1;
+	char buf[64];
+	if (strlen(str) >= sizeof(buf))
+		return false;
 
-	return scan_int(str_addr, addr) && scan_int(str_size, size);
+	strcpy(buf, str);
+
+	char *addr_str = buf;
+	char *size_str = strchr(addr_str, ':');
+	if (size_str == NULL)
+		return false;
+	*size_str++ = '\0';
+
+	return scan_int(addr_str, addr) && scan_int(size_str, size);
 }
 
 bool
-scan_addr_size_name(const char *str, uint32_t *addr, uint32_t *size, const char **name)
+scan_addr_size_name(const char *str,
+					uint32_t *addr,
+					uint32_t *size,
+					const char **name)
 {
-	char *split;
-
-	if (name == NULL) {
+	if (str == NULL || addr == NULL || size == NULL || name == NULL)
 		return false;
-	}
 
-	if ((split = strstr(str, ":")) == NULL) {
+	char buf[512];
+	if (strlen(str) >= sizeof(buf))
 		return false;
-	}
 
-	const char *str_addr = str;
-	const char *str_size = split + 1;
+	strcpy(buf, str);
 
-	if ((split = strstr(str_size, ":")) == NULL) {
+	char *addr_str = buf;
+	char *size_str = strchr(addr_str, ':');
+	if (size_str == NULL)
 		return false;
-	}
+	*size_str++ = '\0';
 
-	*name = split + 1;
-	return scan_int(str_addr, addr) && scan_int(str_size, size);
+	char *name_str = strchr(size_str, ':');
+	if (name_str == NULL)
+		return false;
+	*name_str++ = '\0';
+
+	if (!scan_int(addr_str, addr) || !scan_int(size_str, size))
+		return false;
+
+	*name = str + (name_str - buf);
+	return true;
 }
 
 void
