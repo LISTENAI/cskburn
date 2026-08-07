@@ -1,5 +1,6 @@
 #include "utils.h"
 
+#include <ctype.h>
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -19,44 +20,75 @@ read_file(const char *path, uint8_t *buf, uint32_t limit)
 	return (uint32_t)len;
 }
 
-bool
-scan_int(const char *str, uint32_t *out)
+static bool
+scan_int_prefix(const char *str, uint32_t *out, const char **end)
 {
-	if (str == NULL || str[0] == '\0' || str[0] == '-') {
+	if (str == NULL || out == NULL || end == NULL) {
 		return false;
 	}
 
-	// base 0 自动识别 0x/0X 十六进制前缀，其余按十进制解析
-	char *end = NULL;
+	const char *first = str;
+	while (isspace((unsigned char)*first)) {
+		first++;
+	}
+	if (*first == '\0' || *first == '-') {
+		return false;
+	}
+
+	const char *digits = *first == '+' ? first + 1 : first;
+	int base = digits[0] == '0' && (digits[1] == 'x' || digits[1] == 'X') ? 16 : 10;
+
+	// 仅 0x/0X 前缀按十六进制解析，其余按十进制解析
+	char *parsed_end = NULL;
 	errno = 0;
-	unsigned long val = strtoul(str, &end, 0);
-	if (errno != 0 || end == str || *end != '\0' || val > UINT32_MAX) {
+	unsigned long val = strtoul(str, &parsed_end, base);
+	if (errno != 0 || parsed_end == str || val > UINT32_MAX) {
 		return false;
 	}
 
 	*out = (uint32_t)val;
+	*end = parsed_end;
+	return true;
+}
+
+bool
+scan_int(const char *str, uint32_t *out)
+{
+	if (out == NULL) {
+		return false;
+	}
+
+	uint32_t value;
+	const char *end;
+	if (!scan_int_prefix(str, &value, &end) || *end != '\0') {
+		return false;
+	}
+
+	*out = value;
 	return true;
 }
 
 bool
 scan_addr_size(const char *str, uint32_t *addr, uint32_t *size)
 {
-	if (str == NULL || addr == NULL || size == NULL)
+	if (str == NULL || addr == NULL || size == NULL) {
 		return false;
+	}
 
-	char buf[64];
-	if (strlen(str) >= sizeof(buf))
+	uint32_t parsed_addr;
+	uint32_t parsed_size;
+	const char *end;
+
+	if (!scan_int_prefix(str, &parsed_addr, &end) || *end != ':') {
 		return false;
-
-	strcpy(buf, str);
-
-	char *addr_str = buf;
-	char *size_str = strchr(addr_str, ':');
-	if (size_str == NULL)
+	}
+	if (!scan_int(end + 1, &parsed_size)) {
 		return false;
-	*size_str++ = '\0';
+	}
 
-	return scan_int(addr_str, addr) && scan_int(size_str, size);
+	*addr = parsed_addr;
+	*size = parsed_size;
+	return true;
 }
 
 bool
@@ -65,30 +97,24 @@ scan_addr_size_name(const char *str,
 					uint32_t *size,
 					const char **name)
 {
-	if (str == NULL || addr == NULL || size == NULL || name == NULL)
+	if (str == NULL || addr == NULL || size == NULL || name == NULL) {
 		return false;
+	}
 
-	char buf[512];
-	if (strlen(str) >= sizeof(buf))
+	uint32_t parsed_addr;
+	uint32_t parsed_size;
+	const char *end;
+
+	if (!scan_int_prefix(str, &parsed_addr, &end) || *end != ':') {
 		return false;
-
-	strcpy(buf, str);
-
-	char *addr_str = buf;
-	char *size_str = strchr(addr_str, ':');
-	if (size_str == NULL)
+	}
+	if (!scan_int_prefix(end + 1, &parsed_size, &end) || *end != ':' || end[1] == '\0') {
 		return false;
-	*size_str++ = '\0';
+	}
 
-	char *name_str = strchr(size_str, ':');
-	if (name_str == NULL)
-		return false;
-	*name_str++ = '\0';
-
-	if (!scan_int(addr_str, addr) || !scan_int(size_str, size))
-		return false;
-
-	*name = str + (name_str - buf);
+	*addr = parsed_addr;
+	*size = parsed_size;
+	*name = end + 1;
 	return true;
 }
 

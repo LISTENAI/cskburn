@@ -57,6 +57,21 @@ jobs:
               cmake --build build --config Release
             '
 
+      - name: Test
+        if: matrix.name == 'linux-x64'
+        uses: tj-actions/docker-run@v2
+        with:
+          image: cskburn-${{ matrix.name }}:latest
+          name: ${{ matrix.name }}-test
+          options: >-
+            --platform ${{ matrix.platform }}
+            --volume ${{ github.workspace }}:/cskburn
+            --workdir /cskburn
+          args: |
+            bash -c '
+              ctest --test-dir build --output-on-failure
+            '
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
