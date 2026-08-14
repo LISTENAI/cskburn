@@ -430,7 +430,7 @@ print_help(const char *progname)
 		 "--probe-timeout if needed");
 	LOGI("  --reset-strategy <name>");
 	LOGI("    reset strategy for entering burn mode (default: auto), acceptable values:");
-	LOGI("      auto:         auto-select by chip; for LS26 alternates dtr-boot and");
+	LOGI("      auto:         auto-select by chip; for LS26/VenusA alternates dtr-boot and");
 	LOGI("                    dual-npn across retries");
 	LOGI("      dtr-boot:     DTR -> BOOT, RTS -> RESET (BOOT active low)");
 	LOGI("                    typical: LS26 ARCS-MINI board");
@@ -1096,7 +1096,9 @@ serial_connect(cskburn_serial_device_t *dev, cskburn_reset_strategy_t *out_strat
 	cskburn_reset_strategy_t candidates[2];
 	uint32_t n_candidates;
 	if (options.reset_strategy_auto) {
-		if (options.chip->serial == CHIP_ARCS || options.chip->serial == CHIP_ARCS_DUAL) {
+		if (options.chip->serial == CHIP_ARCS || options.chip->serial == CHIP_ARCS_DUAL ||
+				options.chip->serial == CHIP_VENUSA) {
+			// VenusA 沿用 LS26 的接线（DTR->BOOT, RTS->RESET），因此复用同一组候选
 			candidates[0] = CSKBURN_RESET_DTR_BOOT;
 			candidates[1] = CSKBURN_RESET_DUAL_NPN;
 			n_candidates = 2;
@@ -1375,11 +1377,14 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 			(options.erase_all || options.erase_count > 0 || parts_cnt > 0);
 	if (modifies_flash && !options.unlock) {
 		cskburn_flash_protection_t protection = CSKBURN_FLASH_PROTECTION_UNKNOWN;
-		if ((ret = cskburn_serial_get_flash_protection(dev, options.target, &protection)) != 0) {
+		ret = cskburn_serial_get_flash_protection(dev, options.target, &protection);
+		if (ret == -ENOTSUP) {
+			// burner 不支持读保护状态（如 VenusA/CSK4/CSK6），跳过自动解锁
+			LOGD("Flash protection state is not supported, skipping auto-unlock");
+		} else if (ret != 0) {
 			ERR_RET(ret, "read flash protection state");
 			goto err_enter;
-		}
-		if (protection == CSKBURN_FLASH_PROTECTION_ACTIVE) {
+		} else if (protection == CSKBURN_FLASH_PROTECTION_ACTIVE) {
 			LOGI("Flash is locked; unlocking automatically...");
 			if ((ret = cskburn_serial_unlock(dev, options.target)) != 0) {
 				ERR_RET_NO_CTX(ret);
