@@ -621,6 +621,9 @@ cskburn_serial_erase_all(
 		uint64_t t1 = time_monotonic();
 
 		uint32_t flash_size_mb = (uint32_t)(flash_size >> 20);
+		if (flash_size % (1ULL << 20) != 0) {
+			flash_size_mb++;
+		}
 		if ((ret = cmd_flash_erase_chip(dev, flash_size_mb)) != 0) {
 			LOGD_RET(ret, "DEBUG: flash_erase_chip failed");
 			return ret > 0 ? ret : -CSKBURN_ERR_FLASH_ERASE_FAILED;

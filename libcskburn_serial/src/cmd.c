@@ -280,6 +280,9 @@ static uint32_t
 calc_timeout(uint32_t size, uint32_t per_mb)
 {
 	uint32_t mb = size / (1024 * 1024);
+	if (size % (1024 * 1024) != 0) {
+		mb++;
+	}
 	return per_mb * (mb == 0 ? 1 : mb);
 }
 
