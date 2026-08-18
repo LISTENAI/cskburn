@@ -17,6 +17,7 @@ typedef enum {
 	CHIP_VENUS,
 	CHIP_ARCS,
 	CHIP_VENUSA,
+	CHIP_ARCS_DUAL,
 } cskburn_serial_chip_t;
 
 typedef enum {
@@ -47,10 +48,31 @@ typedef struct {
 } nand_config_t;
 #pragma pack()
 
+#pragma pack(1)
+typedef struct {
+	uint32_t sector_count;
+	uint32_t sector_size;
+	uint32_t erase_size;
+	uint32_t card_type;
+} emmc_info_t;
+#pragma pack()
+
+typedef struct {
+	uint8_t cpu_cfg_para;
+	uint8_t flash_clk_div;
+	uint8_t peri_pclk_div;
+	uint8_t aon_cfg_pclk_div;
+	uint8_t cmn_peri_pclk_div;
+	uint8_t reserved;
+	uint8_t hclk_div;
+	uint8_t pll_enable_flag;
+} venusa_clk_config_t;
+
 typedef enum {
 	TARGET_FLASH = 0,
 	TARGET_NAND = 1,
 	TARGET_RAM = 2,
+	TARGET_EMMC = 3,
 } cskburn_serial_target_t;
 
 /**
@@ -117,6 +139,19 @@ int cskburn_serial_erase_all(
 int cskburn_serial_erase(
 		cskburn_serial_device_t *dev, cskburn_serial_target_t target, uint32_t addr, uint32_t size);
 
+int cskburn_serial_lock(cskburn_serial_device_t *dev, cskburn_serial_target_t target);
+
+int cskburn_serial_unlock(cskburn_serial_device_t *dev, cskburn_serial_target_t target);
+
+typedef enum {
+	CSKBURN_FLASH_PROTECTION_NONE = 0,
+	CSKBURN_FLASH_PROTECTION_ACTIVE = 1,
+	CSKBURN_FLASH_PROTECTION_UNKNOWN = 2,
+} cskburn_flash_protection_t;
+
+int cskburn_serial_get_flash_protection(cskburn_serial_device_t *dev,
+		cskburn_serial_target_t target, cskburn_flash_protection_t *protection);
+
 int cskburn_serial_verify(cskburn_serial_device_t *dev, cskburn_serial_target_t target,
 		uint32_t addr, uint32_t size, uint8_t *md5);
 
@@ -127,6 +162,10 @@ int cskburn_serial_get_flash_info(
 
 int cskburn_serial_init_nand(
 		cskburn_serial_device_t *dev, nand_config_t *config, uint64_t *nand_size);
+
+int cskburn_serial_get_emmc_info(cskburn_serial_device_t *dev, emmc_info_t *info);
+
+int cskburn_serial_set_flash_index(cskburn_serial_device_t *dev, uint32_t index);
 
 int cskburn_serial_reset(
 		cskburn_serial_device_t *dev, uint32_t reset_delay, cskburn_reset_strategy_t strategy);

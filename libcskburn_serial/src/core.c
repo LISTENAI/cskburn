@@ -15,8 +15,10 @@
 #include "time_monotonic.h"
 
 #define BAUD_RATE_INIT 115200
+#define ROM_BAUD_RATE_MAX 3000000
 
 #define FLASH_BLOCK_TRIES 3
+#define LOADER_BLOCK_TRIES 3
 
 extern const uint8_t burner_serial_castor[];
 extern const uint32_t burner_serial_castor_len;
@@ -26,6 +28,9 @@ extern const uint32_t burner_serial_venus_len;
 
 extern const uint8_t burner_serial_arcs[];
 extern const uint32_t burner_serial_arcs_len;
+
+extern const uint8_t burner_serial_arcs_dual[];
+extern const uint32_t burner_serial_arcs_dual_len;
 
 extern const uint8_t burner_serial_venusa[];
 extern const uint32_t burner_serial_venusa_len;
@@ -51,7 +56,24 @@ static const struct {
 				{
 						.burner = burner_serial_arcs,
 						.len_ptr = &burner_serial_arcs_len,
-						.info = {.load_addr = 0x20040000},
+						.info =
+								{
+										.load_addr = 0x20040000,
+										.supports_emmc = true,
+										.supports_flash_lock = true,
+								},
+				},
+		[CHIP_ARCS_DUAL] =
+				{
+						.burner = burner_serial_arcs_dual,
+						.len_ptr = &burner_serial_arcs_dual_len,
+						.info =
+								{
+										.load_addr = 0x20040000,
+										.supports_emmc = true,
+										.supports_flash_lock = true,
+										.supports_flash_index = true,
+								},
 				},
 		[CHIP_VENUSA] =
 				{
@@ -60,7 +82,8 @@ static const struct {
 						.info =
 								{
 										.load_addr = 0x20050000,
-										.supports_read_flash_stream = true,
+										.requires_sys_clk = true,
+										.retry_loader_blocks = true,
 								},
 				},
 };
@@ -177,6 +200,9 @@ cskburn_serial_open(cskburn_serial_device_t **dev, const char *path, cskburn_ser
 		int32_t timeout)
 {
 	int ret;
+	if (dev == NULL || (int)chip < 0 || chip >= BURNERS_COUNT || burners[chip].burner == NULL) {
+		return -EINVAL;
+	}
 
 	serial_dev_t *serial = NULL;
 	ret = serial_open(path, &serial);
@@ -210,11 +236,9 @@ cskburn_serial_open(cskburn_serial_device_t **dev, const char *path, cskburn_ser
 	(*dev)->req_cmd = (*dev)->req_buf + sizeof(csk_command_t);
 	(*dev)->chip = chip;
 
-	if (chip < BURNERS_COUNT) {
-		(*dev)->burner_img = burners[chip].burner;
-		(*dev)->burner_len = *burners[chip].len_ptr;
-		(*dev)->burner_info = &burners[chip].info;
-	}
+	(*dev)->burner_img = burners[chip].burner;
+	(*dev)->burner_len = *burners[chip].len_ptr;
+	(*dev)->burner_info = &burners[chip].info;
 
 	(*dev)->timeout = timeout;
 
@@ -270,6 +294,23 @@ try_sync(cskburn_serial_device_t *dev, int timeout)
 	return -ETIMEDOUT;
 }
 
+static int
+try_loader_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, uint32_t seq)
+{
+	int ret = -ETIMEDOUT;
+	uint32_t attempts = dev->burner_info->retry_loader_blocks ? LOADER_BLOCK_TRIES : 1;
+
+	for (uint32_t i = 0; i < attempts; i++) {
+		ret = cmd_mem_block(dev, data, data_len, seq);
+		if (ret == 0) {
+			return ret;
+		} else if (ret < 0 && ret != -ETIMEDOUT) {
+			return ret;
+		}
+	}
+	return ret;
+}
+
 int
 cskburn_serial_connect(cskburn_serial_device_t *dev, uint32_t reset_delay, uint32_t probe_timeout,
 		cskburn_reset_strategy_t strategy)
@@ -296,6 +337,7 @@ cskburn_serial_enter(
 		cskburn_serial_device_t *dev, uint32_t baud_rate, uint8_t *burner, uint32_t len)
 {
 	int ret;
+	bool custom_burner = burner != NULL && len > 0;
 
 	if ((burner == NULL || len == 0) && dev->burner_img != NULL && dev->burner_len > 0) {
 		burner = (uint8_t *)dev->burner_img;
@@ -307,11 +349,13 @@ cskburn_serial_enter(
 
 		// For CSK6 and ARCS CMD_CHANGE_BAUD is supported by the ROM, so take advantage
 		// of it to speed up the process.
-		bool load_speedup =
-				(dev->chip == CHIP_VENUS || dev->chip == CHIP_ARCS) && baud_rate != BAUD_RATE_INIT;
+		bool load_speedup = (dev->chip == CHIP_VENUS || dev->chip == CHIP_ARCS ||
+								 dev->chip == CHIP_ARCS_DUAL || dev->chip == CHIP_VENUSA) &&
+				baud_rate != BAUD_RATE_INIT;
+		uint32_t loader_baud = baud_rate > ROM_BAUD_RATE_MAX ? ROM_BAUD_RATE_MAX : baud_rate;
 
 		if (load_speedup) {
-			if ((ret = cmd_change_baud(dev, baud_rate, BAUD_RATE_INIT)) != 0) {
+			if ((ret = cmd_change_baud(dev, loader_baud, BAUD_RATE_INIT)) != 0) {
 				LOGD_RET(ret, "DEBUG: ROM baud change failed");
 				if (ret < 0) {
 					return -CSKBURN_ERR_SERIAL_BAUD_UNSUPPORTED;
@@ -333,6 +377,9 @@ cskburn_serial_enter(
 			LOGD_RET(ret, "DEBUG: mem_begin failed while loading burner");
 			return -CSKBURN_ERR_BURNER_LOAD_FAILED;
 		}
+		if (dev->burner_info->retry_loader_blocks) {
+			msleep(50);
+		}
 
 		for (uint32_t i = 0; i < blocks; i++) {
 			offset = RAM_BLOCK_SIZE * i;
@@ -342,9 +389,12 @@ cskburn_serial_enter(
 				length = len - offset;
 			}
 
-			if ((ret = cmd_mem_block(dev, burner + offset, length, i)) != 0) {
+			if ((ret = try_loader_block(dev, burner + offset, length, i)) != 0) {
 				LOGD_RET(ret, "DEBUG: mem_block %u failed while loading burner", i);
 				return -CSKBURN_ERR_BURNER_LOAD_FAILED;
+			}
+			if (dev->burner_info->retry_loader_blocks) {
+				msleep(5);
 			}
 		}
 
@@ -367,6 +417,15 @@ cskburn_serial_enter(
 	if ((ret = try_sync(dev, 2000)) != 0) {
 		LOGD_RET(ret, "DEBUG: Burner did not respond");
 		return -CSKBURN_ERR_BURNER_NO_RESPONSE;
+	}
+
+	if (!custom_burner && dev->burner_info->requires_sys_clk) {
+		venusa_clk_config_t config;
+		memset(&config, 0xFF, sizeof(config));
+		if ((ret = cmd_set_sys_clk(dev, &config)) != 0) {
+			LOGD_RET(ret, "DEBUG: setting VenusA system clock failed");
+			return ret > 0 ? ret : -CSKBURN_ERR_BURNER_NO_RESPONSE;
+		}
 	}
 
 	if ((ret = cmd_change_baud(dev, baud_rate, BAUD_RATE_INIT)) != 0) {
@@ -425,6 +484,21 @@ try_nand_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, u
 	return ret;
 }
 
+static int
+try_emmc_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, uint32_t seq)
+{
+	int ret = -ETIMEDOUT;
+	for (int i = 0; i < FLASH_BLOCK_TRIES; i++) {
+		ret = cmd_emmc_block(dev, data, data_len, seq);
+		if (ret == 0) {
+			return 0;
+		} else if (ret != -ETIMEDOUT && ret != 0x0A) {
+			return ret;
+		}
+	}
+	return ret;
+}
+
 int
 cskburn_serial_write(cskburn_serial_device_t *dev, cskburn_serial_target_t target, uint32_t addr,
 		reader_t *reader, uint32_t jump,
@@ -453,6 +527,12 @@ cskburn_serial_write(cskburn_serial_device_t *dev, cskburn_serial_target_t targe
 		err_code = CSKBURN_ERR_RAM_WRITE_FAILED;
 		if ((ret = cmd_mem_begin(dev, reader->size, blocks, FLASH_BLOCK_SIZE, addr)) != 0) {
 			LOGD_RET(ret, "DEBUG: mem_begin failed");
+			return ret > 0 ? ret : -err_code;
+		}
+	} else if (target == TARGET_EMMC && dev->burner_info->supports_emmc) {
+		err_code = CSKBURN_ERR_EMMC_WRITE_FAILED;
+		if ((ret = cmd_emmc_begin(dev, reader->size, blocks, FLASH_BLOCK_SIZE, addr)) != 0) {
+			LOGD_RET(ret, "DEBUG: emmc_begin failed");
 			return ret > 0 ? ret : -err_code;
 		}
 	} else {
@@ -489,6 +569,11 @@ cskburn_serial_write(cskburn_serial_device_t *dev, cskburn_serial_target_t targe
 				LOGD_RET(ret, "DEBUG: mem_block %u failed", i);
 				return ret > 0 ? ret : -err_code;
 			}
+		} else if (target == TARGET_EMMC) {
+			if ((ret = try_emmc_block(dev, buffer, length, i)) != 0) {
+				LOGD_RET(ret, "DEBUG: emmc_block %u failed", i);
+				return ret > 0 ? ret : -err_code;
+			}
 		}
 
 		i++;
@@ -513,6 +598,11 @@ cskburn_serial_write(cskburn_serial_device_t *dev, cskburn_serial_target_t targe
 			LOGD_RET(ret, "DEBUG: mem_finish failed");
 			return ret > 0 ? ret : -err_code;
 		}
+	} else if (target == TARGET_EMMC) {
+		if ((ret = cmd_emmc_finish(dev)) != 0) {
+			LOGD_RET(ret, "DEBUG: emmc_finish failed");
+			return ret > 0 ? ret : -err_code;
+		}
 	}
 
 	uint64_t t2 = time_monotonic();
@@ -530,22 +620,32 @@ cskburn_serial_read_legacy(cskburn_serial_device_t *dev, cskburn_serial_target_t
 
 	uint64_t t1 = time_monotonic();
 
-	uint8_t buffer[FLASH_READ_SIZE];
+	uint8_t buffer[EMMC_READ_SIZE];
 	uint32_t offset = 0, read_size;
 	while (offset < size) {
-		// 最后一块可能不足 FLASH_READ_SIZE，只请求剩余字节，避免越过请求范围多读多写
+		uint32_t block_size = target == TARGET_EMMC ? EMMC_READ_SIZE : FLASH_READ_SIZE;
 		uint32_t want = size - offset;
-		if (want > FLASH_READ_SIZE) {
-			want = FLASH_READ_SIZE;
+		if (want > block_size) {
+			want = block_size;
 		}
 
-		if ((ret = cmd_read_flash(dev, addr + offset, want, buffer, &read_size)) != 0) {
-			LOGD_RET(ret, "DEBUG: read_flash at 0x%08X failed", addr + offset);
-			return ret > 0 ? ret : -CSKBURN_ERR_FLASH_READ_FAILED;
+		if (target == TARGET_FLASH) {
+			ret = cmd_read_flash(dev, addr + offset, want, buffer, &read_size);
+		} else if (target == TARGET_EMMC && dev->burner_info->supports_emmc) {
+			ret = cmd_read_emmc(dev, addr + offset, want, buffer, &read_size);
+		} else {
+			return -EINVAL;
+		}
+		if (ret != 0) {
+			LOGD_RET(ret, "DEBUG: read target at 0x%08X failed", addr + offset);
+			int err = target == TARGET_EMMC ? CSKBURN_ERR_EMMC_READ_FAILED :
+															 CSKBURN_ERR_FLASH_READ_FAILED;
+			return ret > 0 ? ret : -err;
 		}
 
 		if (read_size == 0) {
-			return -CSKBURN_ERR_FLASH_READ_FAILED;
+			return target == TARGET_EMMC ? -CSKBURN_ERR_EMMC_READ_FAILED :
+															 -CSKBURN_ERR_FLASH_READ_FAILED;
 		}
 
 		uint32_t to_write = read_size < want ? read_size : want;
@@ -566,8 +666,13 @@ cskburn_serial_read_legacy(cskburn_serial_device_t *dev, cskburn_serial_target_t
 	if (md5 != NULL) {
 		uint64_t t1 = time_monotonic();
 
-		if ((ret = cmd_flash_md5sum(dev, addr, size, md5)) != 0) {
-			LOGD_RET(ret, "DEBUG: flash_md5sum 0x%08X+%u failed", addr, size);
+		if (target == TARGET_FLASH) {
+			ret = cmd_flash_md5sum(dev, addr, size, md5);
+		} else {
+			ret = cmd_emmc_md5(dev, addr, size, md5);
+		}
+		if (ret != 0) {
+			LOGD_RET(ret, "DEBUG: target MD5 0x%08X+%u failed", addr, size);
 			return ret > 0 ? ret : -CSKBURN_ERR_VERIFY_READ_FAILED;
 		}
 
@@ -604,7 +709,7 @@ cskburn_serial_read(cskburn_serial_device_t *dev, cskburn_serial_target_t target
 		uint32_t size, writer_t *writer, uint8_t *md5,
 		void (*on_progress)(int32_t read_bytes, uint32_t total_bytes))
 {
-	if (dev->burner_info->supports_read_flash_stream) {
+	if (target == TARGET_FLASH && dev->burner_info->supports_read_flash_stream) {
 		return cskburn_serial_read_stream(dev, target, addr, size, writer, md5, on_progress);
 	} else {
 		return cskburn_serial_read_legacy(dev, target, addr, size, writer, md5, on_progress);
@@ -635,6 +740,8 @@ cskburn_serial_erase_all(
 		return 0;
 	} else if (target == TARGET_NAND) {
 		return -ENOTSUP;
+	} else if (target == TARGET_EMMC) {
+		return -ENOTSUP;
 	}
 
 	return -EINVAL;
@@ -660,9 +767,57 @@ cskburn_serial_erase(
 		return 0;
 	} else if (target == TARGET_NAND) {
 		return -ENOTSUP;
+	} else if (target == TARGET_EMMC && dev->burner_info->supports_emmc) {
+		uint64_t t1 = time_monotonic();
+		if ((ret = cmd_emmc_erase_region(dev, addr, size)) != 0) {
+			LOGD_RET(ret, "DEBUG: emmc_erase_region 0x%08X+%u failed", addr, size);
+			return ret > 0 ? ret : -CSKBURN_ERR_EMMC_ERASE_FAILED;
+		}
+		print_time_spent_with_speed("Erasing", t1, time_monotonic(), size);
+		return 0;
 	}
 
 	return -EINVAL;
+}
+
+int
+cskburn_serial_lock(cskburn_serial_device_t *dev, cskburn_serial_target_t target)
+{
+	if (target != TARGET_FLASH || !dev->burner_info->supports_flash_lock) {
+		return -ENOTSUP;
+	}
+	int ret = cmd_flash_lock(dev);
+	return ret > 0 ? ret : ret == 0 ? 0 : -CSKBURN_ERR_FLASH_LOCK_FAILED;
+}
+
+int
+cskburn_serial_unlock(cskburn_serial_device_t *dev, cskburn_serial_target_t target)
+{
+	if (target != TARGET_FLASH || !dev->burner_info->supports_flash_lock) {
+		return -ENOTSUP;
+	}
+	int ret = cmd_flash_unlock(dev);
+	return ret > 0 ? ret : ret == 0 ? 0 : -CSKBURN_ERR_FLASH_UNLOCK_FAILED;
+}
+
+int
+cskburn_serial_get_flash_protection(cskburn_serial_device_t *dev,
+		cskburn_serial_target_t target, cskburn_flash_protection_t *protection)
+{
+	if (target != TARGET_FLASH || !dev->burner_info->supports_flash_lock || protection == NULL) {
+		return -ENOTSUP;
+	}
+
+	uint32_t value = CSKBURN_FLASH_PROTECTION_UNKNOWN;
+	int ret = cmd_get_flash_protection(dev, &value);
+	if (ret != 0) {
+		return ret;
+	}
+	if (value > CSKBURN_FLASH_PROTECTION_UNKNOWN) {
+		return -EIO;
+	}
+	*protection = (cskburn_flash_protection_t)value;
+	return 0;
 }
 
 int
@@ -694,6 +849,14 @@ cskburn_serial_verify(cskburn_serial_device_t *dev, cskburn_serial_target_t targ
 		uint64_t t2 = time_monotonic();
 		print_time_spent_with_speed("Verifying", t1, t2, size);
 
+		return 0;
+	} else if (target == TARGET_EMMC && dev->burner_info->supports_emmc) {
+		uint64_t t1 = time_monotonic();
+		if ((ret = cmd_emmc_md5(dev, addr, size, md5)) != 0) {
+			LOGD_RET(ret, "DEBUG: emmc_md5 0x%08X+%u failed", addr, size);
+			return ret > 0 ? ret : -CSKBURN_ERR_VERIFY_READ_FAILED;
+		}
+		print_time_spent_with_speed("Verifying", t1, time_monotonic(), size);
 		return 0;
 	}
 
@@ -744,6 +907,28 @@ cskburn_serial_init_nand(cskburn_serial_device_t *dev, nand_config_t *config, ui
 		return ret > 0 ? ret : -CSKBURN_ERR_NAND_INIT_FAILED;
 	}
 	return 0;
+}
+
+int
+cskburn_serial_get_emmc_info(cskburn_serial_device_t *dev, emmc_info_t *info)
+{
+	if (!dev->burner_info->supports_emmc) {
+		return -ENOTSUP;
+	}
+	int ret = cmd_emmc_get_info(dev, info);
+	if (ret != 0) {
+		return ret > 0 ? ret : -CSKBURN_ERR_EMMC_INIT_FAILED;
+	}
+	return 0;
+}
+
+int
+cskburn_serial_set_flash_index(cskburn_serial_device_t *dev, uint32_t index)
+{
+	if (!dev->burner_info->supports_flash_index) {
+		return -ENOTSUP;
+	}
+	return cmd_set_flash_index(dev, index);
 }
 
 int
