@@ -55,6 +55,7 @@ static const struct {
 								{
 										.load_addr = 0x20040000,
 										.supports_emmc = true,
+										.supports_flash_lock = true,
 								},
 				},
 		[CHIP_VENUSA] =
@@ -723,6 +724,26 @@ cskburn_serial_erase(
 	}
 
 	return -EINVAL;
+}
+
+int
+cskburn_serial_lock(cskburn_serial_device_t *dev, cskburn_serial_target_t target)
+{
+	if (target != TARGET_FLASH || !dev->burner_info->supports_flash_lock) {
+		return -ENOTSUP;
+	}
+	int ret = cmd_flash_lock(dev);
+	return ret > 0 ? ret : ret == 0 ? 0 : -CSKBURN_ERR_FLASH_LOCK_FAILED;
+}
+
+int
+cskburn_serial_unlock(cskburn_serial_device_t *dev, cskburn_serial_target_t target)
+{
+	if (target != TARGET_FLASH || !dev->burner_info->supports_flash_lock) {
+		return -ENOTSUP;
+	}
+	int ret = cmd_flash_unlock(dev);
+	return ret > 0 ? ret : ret == 0 ? 0 : -CSKBURN_ERR_FLASH_UNLOCK_FAILED;
 }
 
 int

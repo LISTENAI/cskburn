@@ -100,6 +100,10 @@ cskburn_strerror(int err)
 			return "Failed to erase eMMC";
 		case CSKBURN_ERR_EMMC_WRITE_FAILED:
 			return "Failed to write eMMC";
+		case CSKBURN_ERR_FLASH_LOCK_FAILED:
+			return "Failed to lock flash";
+		case CSKBURN_ERR_FLASH_UNLOCK_FAILED:
+			return "Failed to unlock flash";
 
 		/* 8xxx — verification */
 		case CSKBURN_ERR_VERIFY_READ_FAILED:

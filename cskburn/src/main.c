@@ -96,6 +96,8 @@ static struct option long_options[] = {
 		{"read", required_argument, NULL, 0},
 		{"erase", required_argument, NULL, 0},
 		{"erase-all", no_argument, NULL, 0},
+		{"lock", no_argument, NULL, 0},
+		{"unlock", no_argument, NULL, 0},
 		{"verify", required_argument, NULL, 0},
 		{"verify-all", no_argument, NULL, 0},
 		{"probe-timeout", required_argument, NULL, 0},
@@ -163,6 +165,7 @@ typedef struct {
 	cskburn_serial_chip_t serial;
 	bool nand;
 	bool emmc;
+	bool flash_lock;
 	const cskburn_chip_mem_region_t *mem_regions;
 	size_t mem_region_count;
 	bool flash_auto_erase;
@@ -212,6 +215,7 @@ static const chip_features_t chip_features[] = {
 						.serial = CHIP_ARCS,
 						.nand = false,
 						.emmc = true,
+						.flash_lock = true,
 						.flash_auto_erase = false,
 						MEM_REGIONS({.base = 0x00000000, .size = MEM_SIZE_M(16)},  // raw offset
 								{.base = 0x28000000, .size = MEM_SIZE_M(16)},  // PSRAM
@@ -261,6 +265,8 @@ static struct {
 		uint32_t size;
 	} erase_parts[MAX_ERASE_PARTS];
 	bool erase_all;
+	bool lock;
+	bool unlock;
 	uint16_t verify_count;
 	struct {
 		uint32_t addr;
@@ -298,6 +304,8 @@ static struct {
 		.read_count = 0,
 		.erase_count = 0,
 		.erase_all = false,
+		.lock = false,
+		.unlock = false,
 		.verify_count = 0,
 		.verify_all = false,
 		.probe_timeout = DEFAULT_PROBE_TIMEOUT,
@@ -414,6 +422,8 @@ print_help(const char *progname)
 	LOGI("    erase specified flash region");
 	LOGI("  --erase-all");
 	LOGI("    erase the entire flash");
+	LOGI("  --unlock / --lock");
+	LOGI("    unlock flash before operations / lock flash after operations");
 	LOGI("  --verify <addr:size>");
 	LOGI("    verify specified flash region");
 	LOGI("");
@@ -558,6 +568,12 @@ main(int argc, char **argv)
 					break;
 				} else if (strcmp(name, "emmc") == 0) {
 					options.target = TARGET_EMMC;
+					break;
+				} else if (strcmp(name, "lock") == 0) {
+					options.lock = true;
+					break;
+				} else if (strcmp(name, "unlock") == 0) {
+					options.unlock = true;
 					break;
 				} else if (strcmp(name, "verify") == 0) {
 					if (options.verify_count >= MAX_VERIFY_PARTS) {
@@ -836,6 +852,13 @@ main(int argc, char **argv)
 		}
 	}
 
+	if ((options.lock || options.unlock) &&
+			(options.target != TARGET_FLASH || !options.chip->flash_lock)) {
+		ERR_CTX(CSKBURN_ERR_ARG_UNSUPPORTED_OP, "flash lock/unlock is not supported by %s",
+				options.chip->name);
+		return CSKBURN_ERR_ARG_UNSUPPORTED_OP;
+	}
+
 	if (options.action == ACTION_CHECK) {
 #ifndef WITHOUT_USB
 		if (options.protocol == PROTO_USB) {
@@ -1101,7 +1124,9 @@ serial_connect(cskburn_serial_device_t *dev, cskburn_reset_strategy_t *out_strat
 static int
 serial_burn(cskburn_partition_t *parts, int parts_cnt)
 {
-	int ret;
+	int ret = 0;
+	bool burner_ready = false;
+	bool flash_locked = false;
 
 	cskburn_reset_strategy_t effective_strategy = CSKBURN_RESET_RTS_BOOT;
 
@@ -1132,6 +1157,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	if ((ret = serial_connect(dev, &effective_strategy)) != 0) {
 		goto err_enter;
 	}
+	burner_ready = true;
 
 	if (options.read_chip_id) {
 		uint8_t id[CHIP_ID_LEN] = {0};
@@ -1184,6 +1210,13 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		LOGD("eMMC: sectors=%u, sector-size=%u, erase-size=%u, card-type=%u",
 				info.sector_count, info.sector_size, info.erase_size, info.card_type);
 		LOGI("Detected eMMC size: %" PRIu64 " MB", flash_size >> 20);
+	}
+
+	if (options.unlock) {
+		if ((ret = cskburn_serial_unlock(dev, options.target)) != 0) {
+			ERR_RET_NO_CTX(ret);
+			goto err_enter;
+		}
 	}
 
 	for (int i = 0; i < options.read_count; i++) {
@@ -1371,6 +1404,14 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		}
 	}
 
+	if (options.lock) {
+		if ((ret = cskburn_serial_lock(dev, options.target)) != 0) {
+			ERR_RET_NO_CTX(ret);
+			goto err_write;
+		}
+		flash_locked = true;
+	}
+
 	if (jump_addr) {
 		LOGI("Jumping to 0x%08X...", jump_addr);
 	} else if (!options.no_reset) {
@@ -1388,6 +1429,13 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 
 err_write:
 err_enter:
+	if (burner_ready && options.lock && !flash_locked) {
+		int cleanup_ret = cskburn_serial_lock(dev, options.target);
+		if (cleanup_ret != 0) {
+			ERR_RET(cleanup_ret, "lock flash during cleanup");
+			if (ret == 0) ret = cleanup_ret;
+		}
+	}
 	if (ret != 0) {
 		cskburn_serial_reset(dev, options.reset_delay, effective_strategy);
 	}

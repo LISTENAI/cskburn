@@ -98,6 +98,8 @@ Advanced operations (serial only):
     erase specified flash region
   --erase-all
     erase the entire flash
+  --unlock / --lock
+    unlock flash before operations / lock flash after operations
   --verify <addr:size>
     verify specified flash region
 

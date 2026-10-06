@@ -10,6 +10,7 @@ struct cskburn_serial_burner_info {
 	uint32_t load_addr;
 	bool supports_read_flash_stream;
 	bool supports_emmc;
+	bool supports_flash_lock;
 };
 
 struct _cskburn_serial_device_t {
