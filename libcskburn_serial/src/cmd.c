@@ -36,6 +36,7 @@
 #define CMD_NAND_DATA 0x22
 #define CMD_NAND_END 0x23
 #define CMD_NAND_MD5 0x24
+#define CMD_SET_SYS_CLK 0x31
 #define CMD_EMMC_READ_CARD_INFO 0x41
 #define CMD_EMMC_BEGIN 0x42
 #define CMD_EMMC_DATA 0x43
@@ -861,6 +862,13 @@ cmd_set_flash_index(cskburn_serial_device_t *dev, uint32_t index)
 	cmd->index = index;
 	return check_command(
 			dev, CMD_SET_FLASH_INDEX, sizeof(*cmd), CHECKSUM_NONE, NULL, TIMEOUT_DEFAULT);
+}
+
+int
+cmd_set_sys_clk(cskburn_serial_device_t *dev, venusa_clk_config_t *config)
+{
+	memcpy(dev->req_cmd, config, sizeof(*config));
+	return check_command(dev, CMD_SET_SYS_CLK, sizeof(*config), CHECKSUM_NONE, NULL, 1000);
 }
 
 int

@@ -71,6 +71,17 @@ typedef struct {
 } cskburn_flash_layout_t;
 #pragma pack()
 
+typedef struct {
+	uint8_t cpu_cfg_para;
+	uint8_t flash_clk_div;
+	uint8_t peri_pclk_div;
+	uint8_t aon_cfg_pclk_div;
+	uint8_t cmn_peri_pclk_div;
+	uint8_t reserved;
+	uint8_t hclk_div;
+	uint8_t pll_enable_flag;
+} venusa_clk_config_t;
+
 typedef enum {
 	TARGET_FLASH = 0,
 	TARGET_NAND = 1,

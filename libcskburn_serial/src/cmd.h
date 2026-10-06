@@ -104,5 +104,6 @@ int cmd_read_emmc(cskburn_serial_device_t *dev, uint32_t address, uint32_t size,
 		uint32_t *data_len);
 
 int cmd_set_flash_index(cskburn_serial_device_t *dev, uint32_t index);
+int cmd_set_sys_clk(cskburn_serial_device_t *dev, venusa_clk_config_t *config);
 
 #endif  // __LIB_CSKBURN_SERIAL_CMD__

@@ -15,8 +15,10 @@
 #include "time_monotonic.h"
 
 #define BAUD_RATE_INIT 115200
+#define ROM_BAUD_RATE_MAX 3000000
 
 #define FLASH_BLOCK_TRIES 3
+#define LOADER_BLOCK_TRIES 3
 
 extern const uint8_t burner_serial_castor[];
 extern const uint32_t burner_serial_castor_len;
@@ -67,7 +69,9 @@ static const struct {
 						.info =
 								{
 										.load_addr = 0x20050000,
-										.supports_read_flash_stream = true,
+										.supports_flash_lock = true,
+										.requires_sys_clk = true,
+										.retry_loader_blocks = true,
 								},
 				},
 };
@@ -278,6 +282,23 @@ try_sync(cskburn_serial_device_t *dev, int timeout)
 	return -ETIMEDOUT;
 }
 
+static int
+try_loader_block(cskburn_serial_device_t *dev, uint8_t *data, uint32_t data_len, uint32_t seq)
+{
+	int ret = -ETIMEDOUT;
+	uint32_t attempts = dev->burner_info->retry_loader_blocks ? LOADER_BLOCK_TRIES : 1;
+
+	for (uint32_t i = 0; i < attempts; i++) {
+		ret = cmd_mem_block(dev, data, data_len, seq);
+		if (ret == 0) {
+			return ret;
+		} else if (ret < 0 && ret != -ETIMEDOUT) {
+			return ret;
+		}
+	}
+	return ret;
+}
+
 int
 cskburn_serial_connect(cskburn_serial_device_t *dev, uint32_t reset_delay, uint32_t probe_timeout,
 		cskburn_reset_strategy_t strategy)
@@ -304,6 +325,7 @@ cskburn_serial_enter(
 		cskburn_serial_device_t *dev, uint32_t baud_rate, uint8_t *burner, uint32_t len)
 {
 	int ret;
+	bool custom_burner = burner != NULL && len > 0;
 
 	if ((burner == NULL || len == 0) && dev->burner_img != NULL && dev->burner_len > 0) {
 		burner = (uint8_t *)dev->burner_img;
@@ -315,11 +337,13 @@ cskburn_serial_enter(
 
 		// For CSK6 and ARCS CMD_CHANGE_BAUD is supported by the ROM, so take advantage
 		// of it to speed up the process.
-		bool load_speedup =
-				(dev->chip == CHIP_VENUS || dev->chip == CHIP_ARCS) && baud_rate != BAUD_RATE_INIT;
+		bool load_speedup = (dev->chip == CHIP_VENUS || dev->chip == CHIP_ARCS ||
+								 dev->chip == CHIP_VENUSA) &&
+				baud_rate != BAUD_RATE_INIT;
+		uint32_t loader_baud = baud_rate > ROM_BAUD_RATE_MAX ? ROM_BAUD_RATE_MAX : baud_rate;
 
 		if (load_speedup) {
-			if ((ret = cmd_change_baud(dev, baud_rate, BAUD_RATE_INIT)) != 0) {
+			if ((ret = cmd_change_baud(dev, loader_baud, BAUD_RATE_INIT)) != 0) {
 				LOGD_RET(ret, "DEBUG: ROM baud change failed");
 				if (ret < 0) {
 					return -CSKBURN_ERR_SERIAL_BAUD_UNSUPPORTED;
@@ -341,6 +365,9 @@ cskburn_serial_enter(
 			LOGD_RET(ret, "DEBUG: mem_begin failed while loading burner");
 			return -CSKBURN_ERR_BURNER_LOAD_FAILED;
 		}
+		if (dev->burner_info->retry_loader_blocks) {
+			msleep(50);
+		}
 
 		for (uint32_t i = 0; i < blocks; i++) {
 			offset = RAM_BLOCK_SIZE * i;
@@ -350,9 +377,12 @@ cskburn_serial_enter(
 				length = len - offset;
 			}
 
-			if ((ret = cmd_mem_block(dev, burner + offset, length, i)) != 0) {
+			if ((ret = try_loader_block(dev, burner + offset, length, i)) != 0) {
 				LOGD_RET(ret, "DEBUG: mem_block %u failed while loading burner", i);
 				return -CSKBURN_ERR_BURNER_LOAD_FAILED;
+			}
+			if (dev->burner_info->retry_loader_blocks) {
+				msleep(5);
 			}
 		}
 
@@ -375,6 +405,15 @@ cskburn_serial_enter(
 	if ((ret = try_sync(dev, 2000)) != 0) {
 		LOGD_RET(ret, "DEBUG: Burner did not respond");
 		return -CSKBURN_ERR_BURNER_NO_RESPONSE;
+	}
+
+	if (!custom_burner && dev->burner_info->requires_sys_clk) {
+		venusa_clk_config_t config;
+		memset(&config, 0xFF, sizeof(config));
+		if ((ret = cmd_set_sys_clk(dev, &config)) != 0) {
+			LOGD_RET(ret, "DEBUG: setting VenusA system clock failed");
+			return ret > 0 ? ret : -CSKBURN_ERR_BURNER_NO_RESPONSE;
+		}
 	}
 
 	if ((ret = cmd_change_baud(dev, baud_rate, BAUD_RATE_INIT)) != 0) {
