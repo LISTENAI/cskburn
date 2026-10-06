@@ -242,13 +242,15 @@ command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_c
 		// 否则会把缓冲区里的陈旧字节当作应答数据拷出（如 MD5 与旧数据比对）
 		uint32_t payload = (uint32_t)ret - (uint32_t)sizeof(csk_response_t);
 		if (res_size > payload) {
-			res_size = payload;
+			ret = -EIO;
+			goto exit;
 		}
 		if (res_size > out_limit) {
 			res_size = out_limit;
 		}
 		memcpy(out_buf, res_data, res_size);
-		*out_len = res_size;
+		/* 保留完整载荷长度，避免最大块的超长回复被截断成合法短帧。 */
+		*out_len = res->size;
 	}
 
 	ret = 0;
@@ -258,32 +260,31 @@ exit:
 	return ret;
 }
 
+/* ARCS RAM Loader 为 error/status；ROM 和其他 Loader 为 status/error。 */
+static int
+response_status(cskburn_serial_device_t *dev, const uint8_t *data, uint16_t len)
+{
+	if (len < STATUS_BYTES_LEN) {
+		return -EIO;
+	}
+	bool error_first = dev->loader_running && dev->chip == CHIP_ARCS;
+	uint8_t error = data[error_first ? 0 : 1];
+	uint8_t status = data[error_first ? 1 : 0];
+	if (error_first ? error != 0 : status != 0) {
+		LOGD("DEBUG: Loader response error=0x%02X, status=0x%02X", error, status);
+		return error != 0 ? error : -EIO;
+	}
+	return 0;
+}
+
 static int
 check_command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_chk,
 		uint32_t *out_val, uint32_t timeout)
 {
-	struct {
-		uint8_t error;
-		uint8_t code;
-	} out = {0};
+	uint8_t out[STATUS_BYTES_LEN];
 	uint16_t out_len = 0;
-
-	int ret = command(dev, op, in_len, in_chk, out_val, &out, &out_len, sizeof(out), timeout);
-	if (ret < 0) {
-		return ret;
-	}
-
-	if (out_len < sizeof(out)) {
-		LOGD("DEBUG: Interrupted serial read of command %02X", op);
-		return -EIO;
-	}
-
-	if (out.error) {
-		LOGD("DEBUG: Unexpected device response of command %02X: 0x%02X", op, out.code);
-		return out.code;
-	} else {
-		return 0;
-	}
+	int ret = command(dev, op, in_len, in_chk, out_val, out, &out_len, sizeof(out), timeout);
+	return ret != 0 ? ret : response_status(dev, out, out_len);
 }
 
 static uint32_t
@@ -345,16 +346,16 @@ cmd_read_chip_id(cskburn_serial_device_t *dev, uint8_t *id)
 	if (ret != 0) {
 		return ret;
 	}
+	if ((ret = response_status(dev, ret_buf, ret_len)) != 0) {
+		return ret;
+	}
+
 
 	if (ret_len < STATUS_BYTES_LEN + CHIP_ID_LEN) {
 		LOGD("DEBUG: Interrupted serial read");
 		return -EIO;
 	}
 
-	if (ret_buf[0] != 0) {
-		LOGD("DEBUG: Unexpected device response: 0x%02X", ret_buf[1]);
-		return ret_buf[1];
-	}
 
 	memcpy(id, ret_buf + STATUS_BYTES_LEN, CHIP_ID_LEN);
 
@@ -372,13 +373,13 @@ cmd_get_flash_layout(cskburn_serial_device_t *dev, cskburn_flash_layout_t *layou
 	if (ret != 0) {
 		return ret;
 	}
+	if ((ret = response_status(dev, ret_buf, ret_len)) != 0) {
+		return ret;
+	}
+
 	if (ret_len < STATUS_BYTES_LEN) {
 		LOGD("DEBUG: Interrupted flash layout response");
 		return -EIO;
-	}
-	if (ret_buf[0] != 0) {
-		LOGD("DEBUG: Unexpected flash layout response: 0x%02X", ret_buf[1]);
-		return ret_buf[1];
 	}
 	if (ret_len != sizeof(ret_buf)) {
 		LOGD("DEBUG: Invalid flash layout response size: %u", ret_len);
@@ -416,9 +417,11 @@ cmd_nand_init(cskburn_serial_device_t *dev, nand_config_t *config, uint64_t *siz
 		return -EIO;
 	}
 
-	if (out.error) {
-		LOGD("DEBUG: Unexpected device response: 0x%02X", out.code);
-		return out.code;
+	if ((ret = response_status(dev, (const uint8_t *)&out, out_len)) != 0) {
+		return ret;
+	}
+	if (out_len != sizeof(out)) {
+		return -EIO;
 	}
 
 	LOGD("Inited NAND flash with block size: %u bytes, count: %u", out.blk_len, out.blk_num);
@@ -498,16 +501,16 @@ cmd_nand_md5(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uint
 	if (ret != 0) {
 		return ret;
 	}
+	if ((ret = response_status(dev, ret_buf, ret_len)) != 0) {
+		return ret;
+	}
+
 
 	if (ret_len < STATUS_BYTES_LEN + 16) {
 		LOGD("DEBUG: Interrupted serial read");
 		return -EIO;
 	}
 
-	if (ret_buf[0] != 0) {
-		LOGD("DEBUG: Unexpected device response: 0x%02X", ret_buf[1]);
-		return ret_buf[1];
-	}
 
 	memcpy(md5, ret_buf + 2, 16);
 
@@ -673,16 +676,16 @@ cmd_flash_md5sum(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, 
 	if (ret != 0) {
 		return ret;
 	}
+	if ((ret = response_status(dev, ret_buf, ret_len)) != 0) {
+		return ret;
+	}
+
 
 	if (ret_len < STATUS_BYTES_LEN + 16) {
 		LOGD("DEBUG: Interrupted serial read");
 		return -EIO;
 	}
 
-	if (ret_buf[0] != 0) {
-		LOGD("DEBUG: Unexpected device response: 0x%02X", ret_buf[1]);
-		return ret_buf[1];
-	}
 
 	memcpy(md5, ret_buf + 2, 16);
 
@@ -693,6 +696,9 @@ int
 cmd_read_flash(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uint8_t *data,
 		uint32_t *data_len)
 {
+	if (size == 0 || size > FLASH_READ_SIZE || data == NULL || data_len == NULL) {
+		return -EINVAL;
+	}
 	uint8_t ret_buf[STATUS_BYTES_LEN + 64];
 	uint16_t ret_len = 0;
 
@@ -706,17 +712,20 @@ cmd_read_flash(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, ui
 	if (ret != 0) {
 		return ret;
 	}
+	if ((ret = response_status(dev, ret_buf, ret_len)) != 0) {
+		return ret;
+	}
+
 
 	if (ret_len < STATUS_BYTES_LEN) {
 		LOGD("DEBUG: Interrupted serial read");
 		return -EIO;
 	}
 
-	if (ret_buf[0] != 0) {
-		LOGD("DEBUG: Unexpected device response: 0x%02X", ret_buf[1]);
-		return ret_buf[1];
-	}
 
+	if (ret_len != STATUS_BYTES_LEN + size) {
+		return -EIO;
+	}
 	*data_len = ret_len - STATUS_BYTES_LEN;
 	memcpy(data, ret_buf + STATUS_BYTES_LEN, *data_len);
 
@@ -734,12 +743,13 @@ cmd_emmc_get_info(cskburn_serial_device_t *dev, emmc_info_t *info)
 	if (ret != 0) {
 		return ret;
 	}
+	if ((ret = response_status(dev, ret_buf, ret_len)) != 0) {
+		return ret;
+	}
+
 	if (ret_len < sizeof(ret_buf)) {
 		LOGD("DEBUG: Interrupted eMMC info response");
 		return -EIO;
-	}
-	if (ret_buf[0] != 0) {
-		return ret_buf[1];
 	}
 
 	memcpy(info, ret_buf + STATUS_BYTES_LEN, sizeof(*info));
@@ -814,12 +824,13 @@ cmd_emmc_md5(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uint
 	if (ret != 0) {
 		return ret;
 	}
+	if ((ret = response_status(dev, ret_buf, ret_len)) != 0) {
+		return ret;
+	}
+
 	if (ret_len < sizeof(ret_buf)) {
 		LOGD("DEBUG: Interrupted eMMC MD5 response");
 		return -EIO;
-	}
-	if (ret_buf[0] != 0) {
-		return ret_buf[1];
 	}
 
 	memcpy(md5, ret_buf + STATUS_BYTES_LEN, MD5_LEN);
@@ -830,6 +841,9 @@ int
 cmd_read_emmc(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uint8_t *data,
 		uint32_t *data_len)
 {
+	if (size == 0 || size > EMMC_READ_SIZE || data == NULL || data_len == NULL) {
+		return -EINVAL;
+	}
 	uint8_t ret_buf[STATUS_BYTES_LEN + EMMC_READ_SIZE];
 	uint16_t ret_len = 0;
 	cmd_read_flash_t *cmd = (cmd_read_flash_t *)dev->req_cmd;
@@ -842,13 +856,17 @@ cmd_read_emmc(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uin
 	if (ret != 0) {
 		return ret;
 	}
+	if ((ret = response_status(dev, ret_buf, ret_len)) != 0) {
+		return ret;
+	}
+
 	if (ret_len < STATUS_BYTES_LEN) {
 		return -EIO;
 	}
-	if (ret_buf[0] != 0) {
-		return ret_buf[1];
-	}
 
+	if (ret_len != STATUS_BYTES_LEN + size) {
+		return -EIO;
+	}
 	*data_len = ret_len - STATUS_BYTES_LEN;
 	memcpy(data, ret_buf + STATUS_BYTES_LEN, *data_len);
 	return 0;
@@ -905,7 +923,7 @@ cmd_read_flash_stream(cskburn_serial_device_t *dev, uint32_t address, uint32_t s
 
 	// Phase 1 cont'd: receive ACK frame (csk_response_t + error byte + status byte)
 	bool got_ack = false;
-	uint8_t status_code = 0;
+	int status_code = 0;
 	uint64_t start = time_monotonic();
 	do {
 		ssize_t r = slip_read(dev->slip, dev->res_buf, MAX_RES_RAW_LEN, TIMEOUT_DEFAULT);
@@ -923,8 +941,11 @@ cmd_read_flash_stream(cskburn_serial_device_t *dev, uint32_t address, uint32_t s
 		}
 		uint8_t *status = dev->res_buf + sizeof(csk_response_t);
 		LOG_TRACE("< ack op=%02X err=%02X code=%02X", res->command, status[0], status[1]);
-		if (status[0] != 0) {
-			status_code = status[1];
+		if (res->size != STATUS_BYTES_LEN) {
+			return -EIO;
+		}
+		status_code = response_status(dev, status, STATUS_BYTES_LEN);
+		if (status_code != 0) {
 			break;
 		}
 		got_ack = true;
@@ -949,7 +970,7 @@ cmd_read_flash_stream(cskburn_serial_device_t *dev, uint32_t address, uint32_t s
 		if (r == 0) {
 			continue;
 		}
-		if (received + (uint32_t)r > size) {
+		if ((uint32_t)r > size - received) {
 			LOGD("DEBUG: read_flash_stream overflow: have %u, want %u, got %zd", received, size, r);
 			return -EIO;
 		}

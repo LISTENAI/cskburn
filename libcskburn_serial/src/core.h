@@ -29,6 +29,7 @@ struct _cskburn_serial_device_t {
 	uint32_t burner_len;
 	const struct cskburn_serial_burner_info *burner_info;
 	int32_t timeout;
+	bool loader_running;
 };
 
 #endif  // __LIB_CSKBURN_SERIAL_CORE__

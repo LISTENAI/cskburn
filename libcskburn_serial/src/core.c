@@ -326,6 +326,7 @@ cskburn_serial_enter(
 {
 	int ret;
 	bool custom_burner = burner != NULL && len > 0;
+	dev->loader_running = false;
 
 	if ((burner == NULL || len == 0) && dev->burner_img != NULL && dev->burner_len > 0) {
 		burner = (uint8_t *)dev->burner_img;
@@ -402,6 +403,7 @@ cskburn_serial_enter(
 		print_time_spent("Writing RAM loader", t1, t2);
 	}
 
+	dev->loader_running = true;
 	if ((ret = try_sync(dev, 2000)) != 0) {
 		LOGD_RET(ret, "DEBUG: Burner did not respond");
 		return -CSKBURN_ERR_BURNER_NO_RESPONSE;
