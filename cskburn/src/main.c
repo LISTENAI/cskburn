@@ -98,6 +98,7 @@ static struct option long_options[] = {
 		{"erase-all", no_argument, NULL, 0},
 		{"lock", no_argument, NULL, 0},
 		{"unlock", no_argument, NULL, 0},
+		{"flash-protection", no_argument, NULL, 0},
 		{"verify", required_argument, NULL, 0},
 		{"verify-all", no_argument, NULL, 0},
 		{"probe-timeout", required_argument, NULL, 0},
@@ -267,6 +268,7 @@ static struct {
 	bool erase_all;
 	bool lock;
 	bool unlock;
+	bool read_flash_protection;
 	uint16_t verify_count;
 	struct {
 		uint32_t addr;
@@ -306,6 +308,7 @@ static struct {
 		.erase_all = false,
 		.lock = false,
 		.unlock = false,
+		.read_flash_protection = false,
 		.verify_count = 0,
 		.verify_all = false,
 		.probe_timeout = DEFAULT_PROBE_TIMEOUT,
@@ -424,6 +427,8 @@ print_help(const char *progname)
 	LOGI("    erase the entire flash");
 	LOGI("  --unlock / --lock");
 	LOGI("    unlock flash before operations / lock flash after operations");
+	LOGI("  --flash-protection");
+	LOGI("    show whether flash write protection is active");
 	LOGI("  --verify <addr:size>");
 	LOGI("    verify specified flash region");
 	LOGI("");
@@ -598,6 +603,9 @@ main(int argc, char **argv)
 					break;
 				} else if (strcmp(name, "unlock") == 0) {
 					options.unlock = true;
+					break;
+				} else if (strcmp(name, "flash-protection") == 0) {
+					options.read_flash_protection = true;
 					break;
 				} else if (strcmp(name, "verify") == 0) {
 					if (options.verify_count >= MAX_VERIFY_PARTS) {
@@ -876,9 +884,9 @@ main(int argc, char **argv)
 		}
 	}
 
-	if ((options.lock || options.unlock) &&
+	if ((options.lock || options.unlock || options.read_flash_protection) &&
 			(options.target != TARGET_FLASH || !options.chip->flash_lock)) {
-		ERR_CTX(CSKBURN_ERR_ARG_UNSUPPORTED_OP, "flash lock/unlock is not supported by %s",
+		ERR_CTX(CSKBURN_ERR_ARG_UNSUPPORTED_OP, "flash protection is not supported by %s",
 				options.chip->name);
 		return CSKBURN_ERR_ARG_UNSUPPORTED_OP;
 	}
@@ -1292,6 +1300,18 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		}
 	}
 
+	if (options.read_flash_protection) {
+		cskburn_flash_protection_t protection = CSKBURN_FLASH_PROTECTION_UNKNOWN;
+		if ((ret = cskburn_serial_get_flash_protection(dev, options.target, &protection)) != 0) {
+			ERR_RET(ret, "read flash protection state");
+			goto err_enter;
+		}
+
+		const char *state = protection == CSKBURN_FLASH_PROTECTION_NONE ? "unlocked" :
+				protection == CSKBURN_FLASH_PROTECTION_ACTIVE ? "locked" : "unknown";
+		LOGI("Flash protection: %s", state);
+	}
+
 	for (int i = 0; i < options.read_count; i++) {
 		if ((ret = validate_flash_bounds(options.read_parts[i].addr, options.read_parts[i].size,
 					 flash_size, "read")) != 0) {
@@ -1415,6 +1435,26 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		}
 
 		writer->close(&writer);
+	}
+
+	bool modifies_flash = options.target == TARGET_FLASH &&
+			(options.erase_all || options.erase_count > 0 || parts_cnt > 0);
+	if (modifies_flash && !options.unlock) {
+		cskburn_flash_protection_t protection = CSKBURN_FLASH_PROTECTION_UNKNOWN;
+		ret = cskburn_serial_get_flash_protection(dev, options.target, &protection);
+		if (ret == -ENOTSUP) {
+			// burner 不支持读保护状态（如 VenusA/CSK4/CSK6），跳过自动解锁
+			LOGD("Flash protection state is not supported, skipping auto-unlock");
+		} else if (ret != 0) {
+			ERR_RET(ret, "read flash protection state");
+			goto err_enter;
+		} else if (protection == CSKBURN_FLASH_PROTECTION_ACTIVE) {
+			LOGI("Flash is locked; unlocking automatically...");
+			if ((ret = cskburn_serial_unlock(dev, options.target)) != 0) {
+				ERR_RET_NO_CTX(ret);
+				goto err_enter;
+			}
+		}
 	}
 
 	if (options.erase_all) {
