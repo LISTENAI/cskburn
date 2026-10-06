@@ -453,6 +453,14 @@ static int usb_burn(cskburn_partition_t *parts, int parts_cnt);
 static int
 validate_flash_bounds(uint32_t addr, uint32_t size, uint64_t flash_size, const char *op)
 {
+	if (size == 0) {
+		ERR_CTX(CSKBURN_ERR_ARG_INVALID, "%s size must be nonzero", op);
+		return -CSKBURN_ERR_ARG_INVALID;
+	}
+	if ((uint64_t)addr + size > (1ULL << 32)) {
+		ERR_CTX(CSKBURN_ERR_ARG_ADDR_OUT_OF_BOUNDS, "%s exceeds 32-bit protocol address range", op);
+		return -CSKBURN_ERR_ARG_ADDR_OUT_OF_BOUNDS;
+	}
 	if (addr >= flash_size) {
 		ERR_CTX(CSKBURN_ERR_ARG_ADDR_OUT_OF_BOUNDS,
 				"%s start 0x%08X beyond flash capacity %" PRIu64 " MB", op, addr, flash_size >> 20);
@@ -1334,12 +1342,14 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	}
 
 	for (int i = 0; i < options.erase_count; i++) {
-		if (!is_aligned(options.erase_parts[i].addr, FLASH_ALIGN)) {
+		if (options.target != TARGET_EMMC &&
+				!is_aligned(options.erase_parts[i].addr, FLASH_ALIGN)) {
 			ERR_CTX(CSKBURN_ERR_ARG_ADDR_UNALIGNED, "erase addr 0x%08X is not 4K-aligned",
 					options.erase_parts[i].addr);
 			ret = -CSKBURN_ERR_ARG_ADDR_UNALIGNED;
 			goto err_enter;
-		} else if (!is_aligned(options.erase_parts[i].size, FLASH_ALIGN)) {
+		} else if (options.target != TARGET_EMMC &&
+				!is_aligned(options.erase_parts[i].size, FLASH_ALIGN)) {
 			ERR_CTX(CSKBURN_ERR_ARG_ADDR_UNALIGNED, "erase size 0x%08X is not 4K-aligned",
 					options.erase_parts[i].size);
 			ret = -CSKBURN_ERR_ARG_ADDR_UNALIGNED;

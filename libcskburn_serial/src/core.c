@@ -753,6 +753,10 @@ int
 cskburn_serial_erase(
 		cskburn_serial_device_t *dev, cskburn_serial_target_t target, uint32_t addr, uint32_t size)
 {
+	/* eMMC 的 0:0 是整卡擦除指令，范围 API 不允许隐式触发。 */
+	if (size == 0 || (uint64_t)addr + size > (1ULL << 32)) {
+		return -EINVAL;
+	}
 	int ret;
 
 	if (target == TARGET_FLASH) {

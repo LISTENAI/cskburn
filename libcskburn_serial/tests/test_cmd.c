@@ -167,6 +167,9 @@ int main(void)
     assert(cskburn_serial_get_flash_protection(&dev, TARGET_FLASH, &protection) == -ENOTSUP);
     reset(); response(0xD6, 0xC4, 1, NULL, 0);
     assert(cskburn_serial_get_flash_protection(&dev, TARGET_FLASH, &protection) == 0xC4);
+    reset();
+    assert(cskburn_serial_erase(&dev, TARGET_EMMC, 0, 0) == -EINVAL && writes == 0);
+    assert(cskburn_serial_erase(&dev, TARGET_EMMC, 0xFFFFFFFE, 3) == -EINVAL && writes == 0);
     puts("PASS: Loader status order, short/error responses, read lengths, stream ACK and final MD5");
     return 0;
 }
