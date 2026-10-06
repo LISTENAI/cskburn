@@ -387,7 +387,7 @@ print_help(const char *progname)
 	LOGI("  --chip-id");
 	LOGI("    read unique chip ID");
 	LOGI("  --verify-all");
-	LOGI("    verify all partitions after burning");
+	LOGI("    verify written partitions and read-back files");
 	LOGI("  -n, --nand");
 	LOGI("    burn to NAND flash (CSK6 only)");
 	LOGI("  --emmc");
@@ -422,8 +422,12 @@ print_help(const char *progname)
 	LOGI("");
 
 	LOGI("Advanced operations (serial only):");
+	LOGI("  --read <addr:size:file>");
+	LOGI("    back up a Flash/eMMC region; add --verify-all to compare MD5");
+	LOGI("  --burner <file>");
+	LOGI("    use an external RAM loader for the selected chip");
 	LOGI("  --erase <addr:size>");
-	LOGI("    erase specified flash region");
+	LOGI("    erase specified Flash/eMMC region (Flash requires 4 KiB alignment)");
 	LOGI("  --erase-all");
 	LOGI("    erase the entire flash");
 	LOGI("  --unlock / --lock");
