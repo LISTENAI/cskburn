@@ -1218,8 +1218,15 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	if (options.target == TARGET_FLASH) {
 		uint32_t flash_id = 0;
 
-		if (options.chip->serial == CHIP_ARCS &&
-				cskburn_serial_get_flash_layout(dev, &flash_layout) == 0) {
+		int layout_ret = options.chip->serial == CHIP_ARCS ?
+				cskburn_serial_get_flash_layout(dev, &flash_layout) : -ENOTSUP;
+		if (layout_ret != 0 && layout_ret != 0xFF && layout_ret != -ENOTSUP &&
+				layout_ret != -ETIMEDOUT) {
+			ret = layout_ret;
+			ERR_RET(ret, "query flash layout");
+			goto err_enter;
+		}
+		if (layout_ret == 0) {
 			if (flash_layout.version != CSKBURN_FLASH_LAYOUT_VERSION ||
 					!(flash_layout.capabilities &
 							CSKBURN_FLASH_LAYOUT_CAP_LOGICAL_ADDRESSING) ||

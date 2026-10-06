@@ -11,6 +11,7 @@
 
 #define CSKBURN_FLASH_LAYOUT_VERSION                1U
 #define CSKBURN_FLASH_LAYOUT_CAP_LOGICAL_ADDRESSING (1U << 0)
+#define CSKBURN_FLASH_LAYOUT_CAP_READ_STREAM        (1U << 1)
 #define CSKBURN_FLASH_LAYOUT_MAX_DEVICES            2U
 
 struct _cskburn_serial_device_t;

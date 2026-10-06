@@ -30,6 +30,8 @@ struct _cskburn_serial_device_t {
 	const struct cskburn_serial_burner_info *burner_info;
 	int32_t timeout;
 	bool loader_running;
+	bool read_stream;
+	bool flash_layout_queried;
 };
 
 #endif  // __LIB_CSKBURN_SERIAL_CORE__

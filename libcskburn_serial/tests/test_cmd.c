@@ -36,6 +36,18 @@ ssize_t slip_read(slip_dev_t *dev, uint8_t *buf, size_t len, uint64_t timeout)
     next++;
     return n;
 }
+/* core.c 链接所需接口；本测试只调用已连接设备的 API。 */
+int serial_open(const char *path, serial_dev_t **dev) { (void)path; (void)dev; return -EIO; }
+void serial_close(serial_dev_t **dev) { (void)dev; }
+int serial_set_rts(serial_dev_t *dev, bool active) { (void)dev; (void)active; return 0; }
+int serial_set_dtr(serial_dev_t *dev, bool active) { (void)dev; (void)active; return 0; }
+ssize_t serial_read(serial_dev_t *dev, void *buf, size_t len, uint64_t timeout)
+{ (void)dev; (void)buf; (void)len; (void)timeout; return -EIO; }
+ssize_t serial_write(serial_dev_t *dev, const void *buf, size_t len, uint64_t timeout)
+{ (void)dev; (void)buf; (void)len; (void)timeout; return -EIO; }
+slip_dev_t *slip_init(serial_dev_t *dev, size_t tx, size_t rx)
+{ (void)dev; (void)tx; (void)rx; return NULL; }
+void slip_deinit(slip_dev_t **dev) { (void)dev; }
 static void reset(void) { count = next = writes = output_size = 0; }
 static void raw(const void *data, size_t len)
 {
@@ -74,8 +86,8 @@ int main(void)
     assert(cmd_emmc_get_info(&dev, &info) == 0x05);
     reset(); response(0x45, 0x06, 1, NULL, 0);
     assert(cmd_emmc_md5(&dev, 0, 1, md5) == 0x06);
-    reset(); response(0xF6, 0x05, 1, NULL, 0);
-    assert(cmd_get_flash_layout(&dev, &layout) == 0x05);
+    reset(); response(0xF6, 0xFF, 1, NULL, 0);
+    assert(cmd_get_flash_layout(&dev, &layout) == 0xFF);
     reset(); response(0xD2, 0x05, 1, NULL, 0);
     assert(cmd_read_flash_stream(&dev, 0, 1, &writer, md5, NULL) == 0x05);
     /* VenusA 与 ROM 保持 status/error 顺序。 */
@@ -125,6 +137,36 @@ int main(void)
     assert(cmd_read_flash_stream(&dev, 0, 1, &writer, md5, NULL) == -EIO);
     reset(); response(0xD2, 0, 0, NULL, 0); raw(data, 2);
     assert(cmd_read_flash_stream(&dev, 0, 1, &writer, md5, NULL) == -EIO);
+    /* 能力协商只影响当前设备；旧 Loader 保持普通读取。 */
+    const struct cskburn_serial_burner_info burner_info = {.supports_flash_layout=true,
+        .supports_flash_lock=true};
+    dev.burner_info = &burner_info;
+    cskburn_serial_device_t other = dev;
+    layout = (cskburn_flash_layout_t){.version=1, .capabilities=3, .flash_count=1,
+        .total_size=0x1000000, .flash_size={0x1000000,0}};
+    reset(); response(0xF6, 0, 0, &layout, sizeof(layout));
+    assert(cskburn_serial_get_flash_layout(&dev, &layout) == 0 && dev.read_stream);
+    assert(!other.read_stream && !other.flash_layout_queried);
+    reset(); response(0xD2, 0, 0, NULL, 0); raw(data, 1); raw(md5, 16);
+    assert(cskburn_serial_read(&dev, TARGET_FLASH, 0, 1, &writer, NULL, NULL) == 0);
+    assert(writes == 2 && next == count);
+    layout.capabilities = 1;
+    reset(); response(0xF6, 0, 0, &layout, sizeof(layout));
+    assert(cskburn_serial_get_flash_layout(&dev, &layout) == 0 && !dev.read_stream);
+    reset(); response(0x0E, 0, 0, data, 1);
+    assert(cskburn_serial_read(&dev, TARGET_FLASH, 0, 1, &writer, NULL, NULL) == 0);
+    assert(sent[1] == 0x0E);
+    dev.flash_layout_queried = false;
+    reset(); response(0xF6, 0xFF, 1, NULL, 0); response(0x0E, 0, 0, data, 1);
+    assert(cskburn_serial_read(&dev, TARGET_FLASH, 0, 1, &writer, NULL, NULL) == 0);
+    layout.total_size++;
+    reset(); response(0xF6, 0, 0, &layout, sizeof(layout));
+    assert(cskburn_serial_get_flash_layout(&dev, &layout) == -EIO && !dev.read_stream);
+    cskburn_flash_protection_t protection;
+    reset(); response(0xD6, 0xFF, 1, NULL, 0);
+    assert(cskburn_serial_get_flash_protection(&dev, TARGET_FLASH, &protection) == -ENOTSUP);
+    reset(); response(0xD6, 0xC4, 1, NULL, 0);
+    assert(cskburn_serial_get_flash_protection(&dev, TARGET_FLASH, &protection) == 0xC4);
     puts("PASS: Loader status order, short/error responses, read lengths, stream ACK and final MD5");
     return 0;
 }

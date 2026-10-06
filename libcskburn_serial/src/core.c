@@ -69,6 +69,7 @@ static const struct {
 						.info =
 								{
 										.load_addr = 0x20050000,
+										.supports_read_flash_stream = true,
 										.supports_flash_lock = true,
 										.requires_sys_clk = true,
 										.retry_loader_blocks = true,
@@ -327,6 +328,8 @@ cskburn_serial_enter(
 	int ret;
 	bool custom_burner = burner != NULL && len > 0;
 	dev->loader_running = false;
+	dev->flash_layout_queried = false;
+	dev->read_stream = !custom_burner && dev->burner_info->supports_read_flash_stream;
 
 	if ((burner == NULL || len == 0) && dev->burner_img != NULL && dev->burner_len > 0) {
 		burner = (uint8_t *)dev->burner_img;
@@ -699,7 +702,16 @@ cskburn_serial_read(cskburn_serial_device_t *dev, cskburn_serial_target_t target
 		uint32_t size, writer_t *writer, uint8_t *md5,
 		void (*on_progress)(int32_t read_bytes, uint32_t total_bytes))
 {
-	if (target == TARGET_FLASH && dev->burner_info->supports_read_flash_stream) {
+	if (target == TARGET_FLASH && dev->burner_info->supports_flash_layout &&
+			!dev->flash_layout_queried) {
+		cskburn_flash_layout_t layout;
+		int ret = cskburn_serial_get_flash_layout(dev, &layout);
+		/* 旧 Loader 未实现布局命令时继续使用普通读取。 */
+		if (ret != 0 && ret != 0xFF && ret != -ENOTSUP && ret != -ETIMEDOUT) {
+			return ret;
+		}
+	}
+	if (target == TARGET_FLASH && dev->read_stream) {
 		return cskburn_serial_read_stream(dev, target, addr, size, writer, md5, on_progress);
 	} else {
 		return cskburn_serial_read_legacy(dev, target, addr, size, writer, md5, on_progress);
@@ -800,6 +812,10 @@ cskburn_serial_get_flash_protection(cskburn_serial_device_t *dev,
 
 	uint32_t value = CSKBURN_FLASH_PROTECTION_UNKNOWN;
 	int ret = cmd_get_flash_protection(dev, &value);
+	/* 外部旧 Loader 未实现状态查询，自动解锁流程应跳过此能力。 */
+	if (ret == 0xFF) {
+		return -ENOTSUP;
+	}
 	if (ret != 0) {
 		return ret;
 	}
@@ -898,7 +914,26 @@ cskburn_serial_get_flash_layout(
 	if (!dev->burner_info->supports_flash_layout) {
 		return -ENOTSUP;
 	}
-	return cmd_get_flash_layout(dev, layout);
+	dev->flash_layout_queried = true;
+	dev->read_stream = false;
+	int ret = cmd_get_flash_layout(dev, layout);
+	if (ret != 0) {
+		return ret;
+	}
+	uint64_t total = 0;
+	if (layout->version != CSKBURN_FLASH_LAYOUT_VERSION ||
+			!(layout->capabilities & CSKBURN_FLASH_LAYOUT_CAP_LOGICAL_ADDRESSING) ||
+			layout->flash_count == 0 || layout->flash_count > CSKBURN_FLASH_LAYOUT_MAX_DEVICES) {
+		return -EIO;
+	}
+	for (uint32_t i = 0; i < layout->flash_count; i++) {
+		if (layout->flash_size[i] == 0) return -EIO;
+		total += layout->flash_size[i];
+	}
+	if (total != layout->total_size) return -EIO;
+	dev->read_stream = (layout->capabilities & CSKBURN_FLASH_LAYOUT_CAP_READ_STREAM) != 0;
+	LOGD("Flash read mode: %s", dev->read_stream ? "stream" : "legacy");
+	return 0;
 }
 
 int
