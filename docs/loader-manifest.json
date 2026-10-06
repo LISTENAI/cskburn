@@ -1,0 +1,20 @@
+{
+  "arcs": {
+    "repository": "burner_arcs",
+    "branch": "develop",
+    "commit": "288f7b66a16eef89a6c0aa21a6fb241c9f1844cd",
+    "baseline_commit": "09ccc9e9c3a0568c058de8392d72ee198aa97aa7",
+    "sha256": "2b55a9a276ab3242c990a1fcc1cdac66e9a31ab48c2232d8867353e00dcd87d3",
+    "bytes": 87488,
+    "toolchain": "Nuclei 25.02 / GCC 14.2.1"
+  },
+  "venusa": {
+    "repository": "burner_venusa",
+    "branch": "master",
+    "commit": "0b83ad134f82d219e467a8aea86167ea2c970de0",
+    "baseline_commit": "f75c4e25d495038a131c38e1307ba1173f5eb07d",
+    "sha256": "5236042964ede33789fe82909aeea1703a94f0ea4b1288d3ff6ba2076a09551c",
+    "bytes": 33576,
+    "toolchain": "Nuclei 25.02 / GCC 14.2.1"
+  }
+}

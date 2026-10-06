@@ -68,7 +68,7 @@ Serial burning options:
   --chip-id
     read unique chip ID
   --verify-all
-    verify all partitions after burning
+    verify written partitions and read-back files
   -n, --nand
     burn to NAND flash (CSK6 only)
   --emmc
@@ -81,7 +81,7 @@ Serial burning options:
     delay in milliseconds the reset line is held low (default: 500 ms)
   --reset-strategy <name>
     reset strategy for entering burn mode (default: auto), acceptable values:
-      auto: auto-select by chip; for LS26 alternates dtr-boot and dual-npn
+      auto: auto-select by chip; for LS26/VenusA alternates dtr-boot and dual-npn
       dtr-boot: DTR -> BOOT, RTS -> RESET (LS26 ARCS-MINI)
       rts-boot: RTS -> BOOT, DTR -> RESET (CSK4/CSK6 default)
       rts-boot-inv: rts-boot with BOOT active high (equivalent to --update-high)
@@ -94,8 +94,12 @@ Serial burning options:
     this option does not affect the timeout of probing device, use --probe-timeout if needed
 
 Advanced operations (serial only):
+  --read <addr:size:file>
+    back up a Flash/eMMC region; add --verify-all to compare MD5
+  --burner <file>
+    use an external RAM loader for the selected chip
   --erase <addr:size>
-    erase specified flash region
+    erase specified Flash/eMMC region (Flash requires 4 KiB alignment)
   --erase-all
     erase the entire flash
   --unlock / --lock
