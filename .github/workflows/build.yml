@@ -69,7 +69,7 @@ jobs:
             --workdir /cskburn
           args: |
             bash -c '
-              ctest --test-dir build --output-on-failure
+              cd build && ctest --output-on-failure
             '
 
       - name: Upload artifacts
