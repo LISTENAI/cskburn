@@ -210,14 +210,14 @@ static const chip_features_t chip_features[] = {
 		[ARCS] =
 				{
 						.code = "arcs",
-						.name = "Arcs (LS26)",
+						.name = "Arcs (LS26, single/dual flash)",
 						.usb = false,
 						.serial = CHIP_ARCS,
 						.nand = false,
 						.emmc = true,
 						.flash_lock = true,
 						.flash_auto_erase = false,
-						MEM_REGIONS({.base = 0x00000000, .size = MEM_SIZE_M(16)},  // raw offset
+						MEM_REGIONS({.base = 0x00000000, .size = MEM_SIZE_M(32)},  // raw offset
 								{.base = 0x28000000, .size = MEM_SIZE_M(16)},  // PSRAM
 								{.base = 0x30000000, .size = MEM_SIZE_M(128)},  // Flash XIP
 								),
@@ -458,6 +458,30 @@ validate_flash_bounds(uint32_t addr, uint32_t size, uint64_t flash_size, const c
 		return -CSKBURN_ERR_ARG_ADDR_OUT_OF_BOUNDS;
 	}
 	return 0;
+}
+
+static int
+validate_flash_layout_area(
+		const cskburn_flash_layout_t *layout, uint32_t addr, uint32_t size, const char *op)
+{
+	uint64_t start = 0;
+	uint64_t end = (uint64_t)addr + size;
+
+	if (layout == NULL || size == 0) {
+		return 0;
+	}
+	for (uint32_t i = 0; i < layout->flash_count; i++) {
+		uint64_t limit = start + layout->flash_size[i];
+		if (addr >= start && end <= limit) {
+			return 0;
+		}
+		start = limit;
+	}
+
+	ERR_CTX(CSKBURN_ERR_ARG_ADDR_OUT_OF_BOUNDS,
+			"%s region 0x%08X-0x%08" PRIX64 " crosses a physical flash boundary", op, addr,
+			end);
+	return -CSKBURN_ERR_ARG_ADDR_OUT_OF_BOUNDS;
 }
 
 static int serial_burn(cskburn_partition_t *parts, int parts_cnt);
@@ -1053,7 +1077,7 @@ err_init:
 static int
 serial_connect(cskburn_serial_device_t *dev, cskburn_reset_strategy_t *out_strategy)
 {
-	int ret;
+	int ret = -CSKBURN_ERR_PROBE_NO_SYNC;
 
 	cskburn_reset_strategy_t candidates[2];
 	uint32_t n_candidates;
@@ -1126,6 +1150,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 {
 	int ret = 0;
 	bool burner_ready = false;
+	bool flash_index_selected = false;
 	bool flash_locked = false;
 
 	cskburn_reset_strategy_t effective_strategy = CSKBURN_RESET_RTS_BOOT;
@@ -1176,18 +1201,66 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 	}
 
 	uint64_t flash_size = 0;
+	cskburn_flash_layout_t flash_layout = {0};
+	bool logical_flash_layout = false;
+	bool use_dual_flash = false;
 
 	if (options.target == TARGET_FLASH) {
 		uint32_t flash_id = 0;
 
-		if ((ret = cskburn_serial_get_flash_info(dev, &flash_id, &flash_size)) != 0) {
-			ERR_RET(ret, "flash-id=0x%06X", flash_id & 0xFFFFFF);
-			goto err_enter;
-		}
+		if (options.chip->serial == CHIP_ARCS &&
+				cskburn_serial_get_flash_layout(dev, &flash_layout) == 0) {
+			if (flash_layout.version != CSKBURN_FLASH_LAYOUT_VERSION ||
+					!(flash_layout.capabilities &
+							CSKBURN_FLASH_LAYOUT_CAP_LOGICAL_ADDRESSING) ||
+					flash_layout.flash_count == 0 ||
+					flash_layout.flash_count > CSKBURN_FLASH_LAYOUT_MAX_DEVICES ||
+					flash_layout.total_size == 0) {
+				ERR_CTX(CSKBURN_ERR_FLASH_NOT_DETECTED, "invalid flash layout reported by loader");
+				ret = -CSKBURN_ERR_FLASH_NOT_DETECTED;
+				goto err_enter;
+			}
 
-		LOGD("flash-id: %02X%02X%02X", (flash_id) & 0xFF, (flash_id >> 8) & 0xFF,
-				(flash_id >> 16) & 0xFF);
-		LOGI("Detected flash size: %" PRIu64 " MB", flash_size >> 20);
+			uint64_t detected_size = 0;
+			for (uint32_t i = 0; i < flash_layout.flash_count; i++) {
+				if (flash_layout.flash_size[i] == 0) {
+					ERR_CTX(CSKBURN_ERR_FLASH_NOT_DETECTED,
+							"loader reported zero capacity for flash%u", i);
+					ret = -CSKBURN_ERR_FLASH_NOT_DETECTED;
+					goto err_enter;
+				}
+				detected_size += flash_layout.flash_size[i];
+				LOGD("flash%u-id: %02X%02X%02X, size: %u MB", i,
+						flash_layout.flash_id[i] & 0xFF,
+						(flash_layout.flash_id[i] >> 8) & 0xFF,
+						(flash_layout.flash_id[i] >> 16) & 0xFF,
+						flash_layout.flash_size[i] >> 20);
+			}
+			if (detected_size != flash_layout.total_size) {
+				ERR_CTX(CSKBURN_ERR_FLASH_NOT_DETECTED,
+						"inconsistent total flash capacity reported by loader");
+				ret = -CSKBURN_ERR_FLASH_NOT_DETECTED;
+				goto err_enter;
+			}
+
+			flash_id = flash_layout.flash_id[0];
+			flash_size = flash_layout.total_size;
+			logical_flash_layout = true;
+			use_dual_flash = flash_layout.flash_count > 1;
+			flash_index_selected = use_dual_flash;
+			LOGI("Detected flash layout: %u device%s, %" PRIu64 " MB total",
+					flash_layout.flash_count, flash_layout.flash_count > 1 ? "s" : "",
+					flash_size >> 20);
+		} else {
+			if ((ret = cskburn_serial_get_flash_info(dev, &flash_id, &flash_size)) != 0) {
+				ERR_RET(ret, "flash-id=0x%06X", flash_id & 0xFFFFFF);
+				goto err_enter;
+			}
+
+			LOGD("flash-id: %02X%02X%02X", (flash_id) & 0xFF, (flash_id >> 8) & 0xFF,
+					(flash_id >> 16) & 0xFF);
+			LOGI("Detected flash size: %" PRIu64 " MB", flash_size >> 20);
+		}
 	} else if (options.target == TARGET_NAND) {
 		if ((ret = cskburn_serial_init_nand(dev, &nand_config, &flash_size)) != 0) {
 			ERR_RET_NO_CTX(ret);
@@ -1224,6 +1297,11 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 					 flash_size, "read")) != 0) {
 			goto err_enter;
 		}
+		if (options.target == TARGET_FLASH && logical_flash_layout &&
+				(ret = validate_flash_layout_area(&flash_layout, options.read_parts[i].addr,
+						 options.read_parts[i].size, "read")) != 0) {
+			goto err_enter;
+		}
 	}
 
 	for (int i = 0; i < options.erase_count; i++) {
@@ -1241,11 +1319,21 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 							options.erase_parts[i].size, flash_size, "erase")) != 0) {
 			goto err_enter;
 		}
+		if (options.target == TARGET_FLASH && logical_flash_layout &&
+				(ret = validate_flash_layout_area(&flash_layout, options.erase_parts[i].addr,
+						 options.erase_parts[i].size, "erase")) != 0) {
+			goto err_enter;
+		}
 	}
 
 	for (int i = 0; i < options.verify_count; i++) {
 		if ((ret = validate_flash_bounds(options.verify_parts[i].addr, options.verify_parts[i].size,
 					 flash_size, "verify")) != 0) {
+			goto err_enter;
+		}
+		if (options.target == TARGET_FLASH && logical_flash_layout &&
+				(ret = validate_flash_layout_area(&flash_layout, options.verify_parts[i].addr,
+						 options.verify_parts[i].size, "verify")) != 0) {
 			goto err_enter;
 		}
 	}
@@ -1273,6 +1361,11 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 					 parts[i].addr, parts[i].reader->size, flash_size, "partition")) != 0) {
 				goto err_enter;
 			}
+		}
+		if (options.target == TARGET_FLASH && logical_flash_layout &&
+				(ret = validate_flash_layout_area(&flash_layout, parts[i].addr,
+						 parts[i].reader->size, "partition")) != 0) {
+			goto err_enter;
 		}
 
 		if (options.verify_all) {
@@ -1326,9 +1419,22 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 
 	if (options.erase_all) {
 		LOGI("Erasing entire flash...");
-		if ((ret = cskburn_serial_erase_all(dev, options.target, flash_size)) != 0) {
-			ERR_RET_NO_CTX(ret);
-			goto err_enter;
+		if (options.target == TARGET_FLASH && logical_flash_layout && use_dual_flash) {
+			uint32_t base = 0;
+			for (uint32_t i = 0; i < flash_layout.flash_count; i++) {
+				uint32_t size = flash_layout.flash_size[i];
+				LOGI("Erasing flash%u region 0x%08X-0x%08X...", i, base, base + size);
+				if ((ret = cskburn_serial_erase(dev, options.target, base, size)) != 0) {
+					ERR_RET(ret, "flash%u", i);
+					goto err_enter;
+				}
+				base += size;
+			}
+		} else {
+			if ((ret = cskburn_serial_erase_all(dev, options.target, flash_size)) != 0) {
+				ERR_RET_NO_CTX(ret);
+				goto err_enter;
+			}
 		}
 	} else {
 		for (int i = 0; i < options.erase_count; i++) {
@@ -1412,6 +1518,14 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		flash_locked = true;
 	}
 
+	if (use_dual_flash) {
+		if ((ret = cskburn_serial_set_flash_index(dev, 0xFF)) != 0) {
+			ERR_RET(ret, "restore automatic flash selection");
+			goto err_write;
+		}
+		flash_index_selected = false;
+	}
+
 	if (jump_addr) {
 		LOGI("Jumping to 0x%08X...", jump_addr);
 	} else if (!options.no_reset) {
@@ -1433,6 +1547,13 @@ err_enter:
 		int cleanup_ret = cskburn_serial_lock(dev, options.target);
 		if (cleanup_ret != 0) {
 			ERR_RET(cleanup_ret, "lock flash during cleanup");
+			if (ret == 0) ret = cleanup_ret;
+		}
+	}
+	if (burner_ready && flash_index_selected) {
+		int cleanup_ret = cskburn_serial_set_flash_index(dev, 0xFF);
+		if (cleanup_ret != 0) {
+			ERR_RET(cleanup_ret, "restore automatic flash selection during cleanup");
 			if (ret == 0) ret = cleanup_ret;
 		}
 	}

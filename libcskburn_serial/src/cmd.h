@@ -55,6 +55,7 @@ int cmd_read_reg(cskburn_serial_device_t *dev, uint32_t address, uint32_t *value
 
 int cmd_read_flash_id(cskburn_serial_device_t *dev, uint32_t *id);
 int cmd_read_chip_id(cskburn_serial_device_t *dev, uint8_t *id);
+int cmd_get_flash_layout(cskburn_serial_device_t *dev, cskburn_flash_layout_t *layout);
 
 int cmd_nand_init(cskburn_serial_device_t *dev, nand_config_t *config, uint64_t *size);
 
@@ -100,5 +101,7 @@ int cmd_emmc_erase_region(cskburn_serial_device_t *dev, uint32_t address, uint32
 int cmd_emmc_md5(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uint8_t *md5);
 int cmd_read_emmc(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uint8_t *data,
 		uint32_t *data_len);
+
+int cmd_set_flash_index(cskburn_serial_device_t *dev, uint32_t index);
 
 #endif  // __LIB_CSKBURN_SERIAL_CMD__

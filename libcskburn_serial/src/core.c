@@ -56,6 +56,8 @@ static const struct {
 										.load_addr = 0x20040000,
 										.supports_emmc = true,
 										.supports_flash_lock = true,
+										.supports_flash_index = true,
+										.supports_flash_layout = true,
 								},
 				},
 		[CHIP_VENUSA] =
@@ -182,6 +184,9 @@ cskburn_serial_open(cskburn_serial_device_t **dev, const char *path, cskburn_ser
 		int32_t timeout)
 {
 	int ret;
+	if (dev == NULL || (int)chip < 0 || chip >= BURNERS_COUNT || burners[chip].burner == NULL) {
+		return -EINVAL;
+	}
 
 	serial_dev_t *serial = NULL;
 	ret = serial_open(path, &serial);
@@ -215,11 +220,9 @@ cskburn_serial_open(cskburn_serial_device_t **dev, const char *path, cskburn_ser
 	(*dev)->req_cmd = (*dev)->req_buf + sizeof(csk_command_t);
 	(*dev)->chip = chip;
 
-	if (chip < BURNERS_COUNT) {
-		(*dev)->burner_img = burners[chip].burner;
-		(*dev)->burner_len = *burners[chip].len_ptr;
-		(*dev)->burner_info = &burners[chip].info;
-	}
+	(*dev)->burner_img = burners[chip].burner;
+	(*dev)->burner_len = *burners[chip].len_ptr;
+	(*dev)->burner_info = &burners[chip].info;
 
 	(*dev)->timeout = timeout;
 
@@ -825,6 +828,19 @@ cskburn_serial_get_flash_info(
 }
 
 int
+cskburn_serial_get_flash_layout(
+		cskburn_serial_device_t *dev, cskburn_flash_layout_t *layout)
+{
+	if (dev == NULL || layout == NULL) {
+		return -EINVAL;
+	}
+	if (!dev->burner_info->supports_flash_layout) {
+		return -ENOTSUP;
+	}
+	return cmd_get_flash_layout(dev, layout);
+}
+
+int
 cskburn_serial_init_nand(cskburn_serial_device_t *dev, nand_config_t *config, uint64_t *nand_size)
 {
 	int ret = cmd_nand_init(dev, config, nand_size);
@@ -846,6 +862,15 @@ cskburn_serial_get_emmc_info(cskburn_serial_device_t *dev, emmc_info_t *info)
 		return ret > 0 ? ret : -CSKBURN_ERR_EMMC_INIT_FAILED;
 	}
 	return 0;
+}
+
+int
+cskburn_serial_set_flash_index(cskburn_serial_device_t *dev, uint32_t index)
+{
+	if (!dev->burner_info->supports_flash_index) {
+		return -ENOTSUP;
+	}
+	return cmd_set_flash_index(dev, index);
 }
 
 int

@@ -50,12 +50,17 @@
 #define CMD_FLASH_UNLOCK 0xD5
 #define CMD_READ_FLASH_ID 0xF3
 #define CMD_READ_CHIP_ID 0xF4
+#define CMD_SET_FLASH_INDEX 0xF5
+#define CMD_GET_FLASH_LAYOUT 0xF6
 
 #define CHECKSUM_MAGIC 0xef
 #define CHECKSUM_NONE 0
 
 // 默认指令超时时间
 #define TIMEOUT_DEFAULT 200
+
+/* Includes the loader's bounded Flash1 probe on single-flash boards. */
+#define TIMEOUT_FLASH_LAYOUT 500
 
 // Mem 写入指令超时时间
 #define TIMEOUT_MEM_DATA 500
@@ -126,6 +131,10 @@ typedef struct {
 	uint32_t address;
 	uint32_t size;
 } cmd_read_flash_t;
+
+typedef struct {
+	uint32_t index;
+} cmd_set_flash_index_t;
 
 typedef struct {
 	uint32_t address;
@@ -205,7 +214,7 @@ command(cskburn_serial_device_t *dev, uint8_t op, uint16_t in_len, uint32_t in_c
 		goto exit;
 	}
 
-	uint8_t *res_ptr;
+	uint8_t *res_ptr = NULL;
 	if ((ret = command_recv(dev, op, &res_ptr, timeout)) < 0) {
 		if (ret != -ETIMEDOUT) {
 			LOGD_RET(ret, "DEBUG: Failed to read command %02X", op);
@@ -347,6 +356,34 @@ cmd_read_chip_id(cskburn_serial_device_t *dev, uint8_t *id)
 
 	memcpy(id, ret_buf + STATUS_BYTES_LEN, CHIP_ID_LEN);
 
+	return 0;
+}
+
+int
+cmd_get_flash_layout(cskburn_serial_device_t *dev, cskburn_flash_layout_t *layout)
+{
+	uint8_t ret_buf[STATUS_BYTES_LEN + sizeof(cskburn_flash_layout_t)];
+	uint16_t ret_len = 0;
+
+	int ret = command(dev, CMD_GET_FLASH_LAYOUT, 0, CHECKSUM_NONE, NULL, ret_buf, &ret_len,
+			sizeof(ret_buf), TIMEOUT_FLASH_LAYOUT);
+	if (ret != 0) {
+		return ret;
+	}
+	if (ret_len < STATUS_BYTES_LEN) {
+		LOGD("DEBUG: Interrupted flash layout response");
+		return -EIO;
+	}
+	if (ret_buf[0] != 0) {
+		LOGD("DEBUG: Unexpected flash layout response: 0x%02X", ret_buf[1]);
+		return ret_buf[1];
+	}
+	if (ret_len != sizeof(ret_buf)) {
+		LOGD("DEBUG: Invalid flash layout response size: %u", ret_len);
+		return -EIO;
+	}
+
+	memcpy(layout, ret_buf + STATUS_BYTES_LEN, sizeof(*layout));
 	return 0;
 }
 
@@ -806,6 +843,16 @@ cmd_read_emmc(cskburn_serial_device_t *dev, uint32_t address, uint32_t size, uin
 	*data_len = ret_len - STATUS_BYTES_LEN;
 	memcpy(data, ret_buf + STATUS_BYTES_LEN, *data_len);
 	return 0;
+}
+
+int
+cmd_set_flash_index(cskburn_serial_device_t *dev, uint32_t index)
+{
+	cmd_set_flash_index_t *cmd = (cmd_set_flash_index_t *)dev->req_cmd;
+	memset(cmd, 0, sizeof(*cmd));
+	cmd->index = index;
+	return check_command(
+			dev, CMD_SET_FLASH_INDEX, sizeof(*cmd), CHECKSUM_NONE, NULL, TIMEOUT_DEFAULT);
 }
 
 int

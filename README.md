@@ -63,7 +63,7 @@ Serial burning options:
     chip family (default: castor), acceptable values:
       castor: Castor (CSK3/CSK4)
       venus: Venus (CSK6)
-      arcs: Arcs (LS26)
+      arcs: Arcs (LS26, single/dual flash)
       venusa: VenusA (CSK7)
   --chip-id
     read unique chip ID

@@ -9,6 +9,10 @@
 
 #define CHIP_ID_LEN 8
 
+#define CSKBURN_FLASH_LAYOUT_VERSION                1U
+#define CSKBURN_FLASH_LAYOUT_CAP_LOGICAL_ADDRESSING (1U << 0)
+#define CSKBURN_FLASH_LAYOUT_MAX_DEVICES            2U
+
 struct _cskburn_serial_device_t;
 typedef struct _cskburn_serial_device_t cskburn_serial_device_t;
 
@@ -54,6 +58,17 @@ typedef struct {
 	uint32_t erase_size;
 	uint32_t card_type;
 } emmc_info_t;
+#pragma pack()
+
+#pragma pack(1)
+typedef struct {
+	uint32_t version;
+	uint32_t capabilities;
+	uint32_t flash_count;
+	uint32_t total_size;
+	uint32_t flash_id[CSKBURN_FLASH_LAYOUT_MAX_DEVICES];
+	uint32_t flash_size[CSKBURN_FLASH_LAYOUT_MAX_DEVICES];
+} cskburn_flash_layout_t;
 #pragma pack()
 
 typedef enum {
@@ -139,10 +154,15 @@ int cskburn_serial_read_chip_id(cskburn_serial_device_t *dev, uint8_t *chip_id);
 int cskburn_serial_get_flash_info(
 		cskburn_serial_device_t *dev, uint32_t *flash_id, uint64_t *flash_size);
 
+int cskburn_serial_get_flash_layout(
+		cskburn_serial_device_t *dev, cskburn_flash_layout_t *layout);
+
 int cskburn_serial_init_nand(
 		cskburn_serial_device_t *dev, nand_config_t *config, uint64_t *nand_size);
 
 int cskburn_serial_get_emmc_info(cskburn_serial_device_t *dev, emmc_info_t *info);
+
+int cskburn_serial_set_flash_index(cskburn_serial_device_t *dev, uint32_t index);
 
 int cskburn_serial_reset(
 		cskburn_serial_device_t *dev, uint32_t reset_delay, cskburn_reset_strategy_t strategy);
