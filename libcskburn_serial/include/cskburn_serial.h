@@ -47,10 +47,20 @@ typedef struct {
 } nand_config_t;
 #pragma pack()
 
+#pragma pack(1)
+typedef struct {
+	uint32_t sector_count;
+	uint32_t sector_size;
+	uint32_t erase_size;
+	uint32_t card_type;
+} emmc_info_t;
+#pragma pack()
+
 typedef enum {
 	TARGET_FLASH = 0,
 	TARGET_NAND = 1,
 	TARGET_RAM = 2,
+	TARGET_EMMC = 3,
 } cskburn_serial_target_t;
 
 /**
@@ -127,6 +137,8 @@ int cskburn_serial_get_flash_info(
 
 int cskburn_serial_init_nand(
 		cskburn_serial_device_t *dev, nand_config_t *config, uint64_t *nand_size);
+
+int cskburn_serial_get_emmc_info(cskburn_serial_device_t *dev, emmc_info_t *info);
 
 int cskburn_serial_reset(
 		cskburn_serial_device_t *dev, uint32_t reset_delay, cskburn_reset_strategy_t strategy);

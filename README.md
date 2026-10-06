@@ -71,6 +71,8 @@ Serial burning options:
     verify all partitions after burning
   -n, --nand
     burn to NAND flash (CSK6 only)
+  --emmc
+    burn to eMMC (Arcs only)
   --probe-timeout <ms>
     timeout for probing device (default: 10000 ms)
   --reset-attempts <n>

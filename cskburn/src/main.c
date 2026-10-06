@@ -89,6 +89,7 @@ static struct option long_options[] = {
 		{"nand-dat1", required_argument, NULL, 0},
 		{"nand-dat2", required_argument, NULL, 0},
 		{"nand-dat3", required_argument, NULL, 0},
+		{"emmc", no_argument, NULL, 0},
 		{"ram", no_argument, NULL, 'r'},
 		{"jump", required_argument, NULL, 0},
 		{"chip-id", no_argument, NULL, 0},
@@ -161,6 +162,7 @@ typedef struct {
 	bool usb;
 	cskburn_serial_chip_t serial;
 	bool nand;
+	bool emmc;
 	const cskburn_chip_mem_region_t *mem_regions;
 	size_t mem_region_count;
 	bool flash_auto_erase;
@@ -209,6 +211,7 @@ static const chip_features_t chip_features[] = {
 						.usb = false,
 						.serial = CHIP_ARCS,
 						.nand = false,
+						.emmc = true,
 						.flash_auto_erase = false,
 						MEM_REGIONS({.base = 0x00000000, .size = MEM_SIZE_M(16)},  // raw offset
 								{.base = 0x28000000, .size = MEM_SIZE_M(16)},  // PSRAM
@@ -375,6 +378,8 @@ print_help(const char *progname)
 	LOGI("    verify all partitions after burning");
 	LOGI("  -n, --nand");
 	LOGI("    burn to NAND flash (CSK6 only)");
+	LOGI("  --emmc");
+	LOGI("    burn to eMMC (Arcs only)");
 	LOGI("  --probe-timeout <ms>");
 	LOGI("    timeout for probing device (default: %d ms)", DEFAULT_PROBE_TIMEOUT);
 	LOGI("  --reset-attempts <n>");
@@ -550,6 +555,9 @@ main(int argc, char **argv)
 					break;
 				} else if (strcmp(name, "erase-all") == 0) {
 					options.erase_all = true;
+					break;
+				} else if (strcmp(name, "emmc") == 0) {
+					options.target = TARGET_EMMC;
 					break;
 				} else if (strcmp(name, "verify") == 0) {
 					if (options.verify_count >= MAX_VERIFY_PARTS) {
@@ -793,6 +801,22 @@ main(int argc, char **argv)
 		}
 		if (options.erase_all || options.erase_count > 0) {
 			ERR_CTX(CSKBURN_ERR_ARG_UNSUPPORTED_OP, "erasing NAND is not implemented");
+			return CSKBURN_ERR_ARG_UNSUPPORTED_OP;
+		}
+	} else if (options.target == TARGET_EMMC) {
+#ifndef WITHOUT_USB
+		if (options.protocol != PROTO_SERIAL) {
+			ERR_CTX(CSKBURN_ERR_ARG_UNSUPPORTED_OP, "eMMC requires serial burning (-s)");
+			return CSKBURN_ERR_ARG_UNSUPPORTED_OP;
+		}
+#endif
+		if (!options.chip->emmc) {
+			ERR_CTX(CSKBURN_ERR_ARG_UNSUPPORTED_OP, "eMMC is not supported by %s",
+					options.chip->name);
+			return CSKBURN_ERR_ARG_UNSUPPORTED_OP;
+		}
+		if (options.erase_all) {
+			ERR_CTX(CSKBURN_ERR_ARG_UNSUPPORTED_OP, "--erase-all is not supported on eMMC");
 			return CSKBURN_ERR_ARG_UNSUPPORTED_OP;
 		}
 	} else if (options.target == TARGET_RAM) {
@@ -1145,6 +1169,21 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 		}
 
 		LOGI("Detected NAND size: %" PRIu64 " MB", flash_size >> 20);
+	} else if (options.target == TARGET_EMMC) {
+		emmc_info_t info = {0};
+		if ((ret = cskburn_serial_get_emmc_info(dev, &info)) != 0) {
+			ERR_RET_NO_CTX(ret);
+			goto err_enter;
+		}
+		flash_size = (uint64_t)info.sector_count * info.sector_size;
+		if (flash_size == 0) {
+			ret = -CSKBURN_ERR_EMMC_INIT_FAILED;
+			ERR_RET_NO_CTX(ret);
+			goto err_enter;
+		}
+		LOGD("eMMC: sectors=%u, sector-size=%u, erase-size=%u, card-type=%u",
+				info.sector_count, info.sector_size, info.erase_size, info.card_type);
+		LOGI("Detected eMMC size: %" PRIu64 " MB", flash_size >> 20);
 	}
 
 	for (int i = 0; i < options.read_count; i++) {
@@ -1195,18 +1234,10 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 			}
 		}
 
-		if (options.target == TARGET_FLASH || options.target == TARGET_NAND) {
-			if (parts[i].addr >= flash_size) {
-				ERR_CTX(CSKBURN_ERR_ARG_ADDR_OUT_OF_BOUNDS,
-						"partition %d start 0x%08X beyond target capacity %" PRIu64 " MB", i + 1,
-						parts[i].addr, flash_size >> 20);
-				ret = -CSKBURN_ERR_ARG_ADDR_OUT_OF_BOUNDS;
-				goto err_enter;
-			} else if (parts[i].addr + parts[i].reader->size > flash_size) {
-				ERR_CTX(CSKBURN_ERR_ARG_ADDR_OUT_OF_BOUNDS,
-						"partition %d end 0x%08X beyond target capacity %" PRIu64 " MB", i + 1,
-						parts[i].addr + parts[i].reader->size, flash_size >> 20);
-				ret = -CSKBURN_ERR_ARG_ADDR_OUT_OF_BOUNDS;
+		if (options.target == TARGET_FLASH || options.target == TARGET_NAND ||
+				options.target == TARGET_EMMC) {
+			if ((ret = validate_flash_bounds(
+					 parts[i].addr, parts[i].reader->size, flash_size, "partition")) != 0) {
 				goto err_enter;
 			}
 		}
