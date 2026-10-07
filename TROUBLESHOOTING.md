@@ -12,13 +12,14 @@
 
 - 确认 USB 线已接好，且为数据线而非充电线。
 - 按住 BOOT 按键（或下载键）的同时复位芯片，确保进入下载模式。
-- 检查 TX/RX 是否交叉、GND 是否接通、DTR/RTS 是否连接——DTR/RTS 用于自动复位和拉 BOOT，缺一不可。
+- 检查 TX/RX 是否交叉、GND 是否接通。自动复位需要 DTR/RTS 接线；手动进入下载模式时，可使用 `--reset-strategy none` 跳过全部复位序列。
 - 确认 `-C` 选择的芯片系列与实际芯片一致：CSK6 用 `-C venus`，LS26 用 `-C arcs`。芯片系列错误会导致握手协议不匹配。
 - 少数板子使用非常规的复位电路，可用 `--reset-strategy <name>` 显式指定：
   - `dtr-boot`：DTR→BOOT、RTS→RESET（LS26 ARCS-MINI）
   - `rts-boot`：RTS→BOOT、DTR→RESET（CSK4/CSK6 默认）
   - `rts-boot-inv`：同 `rts-boot` 但 BOOT 高电平有效（等价于旧的 `--update-high`）
   - `dual-npn`：差分驱动的 NPN 三极管对（LS26 ARCS-EVB）
+  - `none`：手动进入下载模式；连接重试、结束和出错均不自动复位。
   - 默认 `auto` 会按芯片自动选择，LS26 下会在 `dtr-boot` 和 `dual-npn` 之间交替重试。
 
 ### 烧录中途失败

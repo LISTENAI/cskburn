@@ -55,7 +55,7 @@ cskburn -C <chip> -s <serial_port> --chip-id
 
 ## 串口接线要求
 
-烧录除了 TXD/RXD 之外，还**必须**连接 DTR 和 RTS 线。它们负责自动拉低 BOOT 引脚并复位芯片，是进入烧录模式的必要条件。
+自动进入下载模式需要连接 DTR 和 RTS，用于拉低 BOOT 并复位芯片。若设备已手动进入下载模式，可使用 `--reset-strategy none`；该策略在连接、重试、成功结束和失败清理时均不执行 DTR/RTS 复位序列，结束后由用户自行复位。
 
 **DTR/RTS 引脚映射因芯片和板型而异：**
 
@@ -67,7 +67,7 @@ cskburn -C <chip> -s <serial_port> --chip-id
 
 ARCS-EVB 用交叉耦合的 NPN 三极管对（S8050），DTR/RTS 差分驱动 PRST 和 RXD，不是直接连到复位/BOOT 引脚。cskburn 默认的 `--reset-strategy auto` 会在 LS26 上自动在 ARCS-MINI 和 ARCS-EVB 两种电路之间切换重试，一般不需要手动指定。
 
-> **这是 probe 超时最常见的原因。** 遇到 probe 超时时，首先检查 DTR/RTS 是否正确连接，以及引脚映射是否与芯片系列匹配。接线确认无误后，可用 `--probe-timeout <ms>` 延长探测超时（默认 10000 ms）。
+> **这是自动复位时 probe 超时最常见的原因。** 使用 `none` 时先确认设备已手动进入下载模式；其余策略首先检查 DTR/RTS 是否正确连接，以及引脚映射是否与芯片系列匹配。接线确认无误后，可用 `--probe-timeout <ms>` 延长探测超时（默认 10000 ms）。
 
 ## 关键参数
 

@@ -408,7 +408,7 @@ print_help(const char *progname)
 	LOGI("    this option does not affect the timeout of probing device, use "
 		 "--probe-timeout if needed");
 	LOGI("  --reset-strategy <name>");
-	LOGI("    reset strategy for entering burn mode (default: auto), acceptable values:");
+	LOGI("    reset strategy for the serial session (default: auto), acceptable values:");
 	LOGI("      auto:         auto-select by chip; for LS26/VenusA alternates dtr-boot and");
 	LOGI("                    dual-npn across retries");
 	LOGI("      dtr-boot:     DTR -> BOOT, RTS -> RESET (BOOT active low)");
@@ -419,6 +419,10 @@ print_help(const char *progname)
 	LOGI("                    (equivalent to --update-high)");
 	LOGI("      dual-npn:     two NPN transistors (S8050) with crossed base/emitter");
 	LOGI("                    typical: LS26 ARCS-EVB board");
+	LOGI("      none:         no DTR/RTS reset during connect, retries, completion or errors");
+	LOGI("                    enter download mode manually before running cskburn");
+	LOGI("  --no-reset");
+	LOGI("    skip reset after success only; use --reset-strategy none to disable all resets");
 	LOGI("");
 
 	LOGI("Advanced operations (serial only):");
@@ -697,10 +701,13 @@ main(int argc, char **argv)
 					} else if (strcmp(optarg, "dual-npn") == 0) {
 						options.reset_strategy_auto = false;
 						options.reset_strategy_fixed = CSKBURN_RESET_DUAL_NPN;
+					} else if (strcmp(optarg, "none") == 0) {
+						options.reset_strategy_auto = false;
+						options.reset_strategy_fixed = CSKBURN_RESET_NONE;
 					} else {
 						LOGE("ERROR: Invalid value for --reset-strategy: %s, "
 							 "acceptable values: auto, dtr-boot, rts-boot, rts-boot-inv, "
-							 "dual-npn",
+							 "dual-npn, none",
 								optarg);
 						return EINVAL;
 					}
@@ -1118,11 +1125,17 @@ serial_connect(cskburn_serial_device_t *dev, cskburn_reset_strategy_t *out_strat
 	}
 
 	cskburn_reset_strategy_t effective = candidates[0];
+	if (out_strategy != NULL) {
+		*out_strategy = effective;
+	}
 
 	for (uint32_t i = 0; options.wait || i < options.reset_attempts + 1; i++) {
 		uint32_t reset_delay = i == 0 ? 0 : options.reset_delay;
 		uint32_t probe_timeout;
-		if (i == 0) {
+		if (candidates[0] == CSKBURN_RESET_NONE) {
+			// 手动进入下载模式时，首次握手也使用完整的探测预算。
+			probe_timeout = options.probe_timeout;
+		} else if (i == 0) {
 			probe_timeout = 100;
 		} else if (n_candidates > 1 && i <= n_candidates) {
 			// Give each candidate a quick first try so a wrong strategy fails
@@ -1133,6 +1146,10 @@ serial_connect(cskburn_serial_device_t *dev, cskburn_reset_strategy_t *out_strat
 			probe_timeout = options.probe_timeout;
 		}
 		effective = candidates[(i == 0 ? 0 : (i - 1)) % n_candidates];
+		// 失败清理也必须沿用本次策略，不能退回默认复位接线。
+		if (out_strategy != NULL) {
+			*out_strategy = effective;
+		}
 		if ((ret = cskburn_serial_connect(dev, reset_delay, probe_timeout, effective)) != 0) {
 			if (i == 0) {
 				LOGI("Waiting for device...");
@@ -1161,9 +1178,6 @@ serial_connect(cskburn_serial_device_t *dev, cskburn_reset_strategy_t *out_strat
 		break;
 	}
 
-	if (out_strategy != NULL) {
-		*out_strategy = effective;
-	}
 	return ret;
 }
 
@@ -1591,7 +1605,7 @@ serial_burn(cskburn_partition_t *parts, int parts_cnt)
 
 	if (jump_addr) {
 		LOGI("Jumping to 0x%08X...", jump_addr);
-	} else if (!options.no_reset) {
+	} else if (!options.no_reset && effective_strategy != CSKBURN_RESET_NONE) {
 		LOGI("Resetting...");
 		cskburn_serial_reset(dev, options.reset_delay, effective_strategy);
 	}
@@ -1620,7 +1634,7 @@ err_enter:
 			if (ret == 0) ret = cleanup_ret;
 		}
 	}
-	if (ret != 0) {
+	if (ret != 0 && effective_strategy != CSKBURN_RESET_NONE) {
 		cskburn_serial_reset(dev, options.reset_delay, effective_strategy);
 	}
 	cskburn_serial_close(&dev);

@@ -29,6 +29,7 @@ typedef enum {
 	CSKBURN_RESET_RTS_BOOT,  // RTS -> BOOT, DTR -> RESET (BOOT active low)
 	CSKBURN_RESET_RTS_BOOT_INV,  // RTS -> BOOT, DTR -> RESET (BOOT active high)
 	CSKBURN_RESET_DUAL_NPN,  // Cross-wired NPN pair (Q1/Q2 S8050)
+	CSKBURN_RESET_NONE,
 } cskburn_reset_strategy_t;
 
 #pragma pack(1)

@@ -99,6 +99,9 @@ do_reset(cskburn_serial_device_t *dev, cskburn_reset_strategy_t strategy, bool e
 		uint32_t reset_delay)
 {
 	switch (strategy) {
+		case CSKBURN_RESET_NONE:
+			return 0;
+
 		case CSKBURN_RESET_DTR_BOOT:
 			// DTR -> BOOT (active low), RTS -> RESET (active low)
 			// Hold RESET first, so toggling BOOT won't harm the chip

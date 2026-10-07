@@ -80,12 +80,15 @@ Serial burning options:
   --reset-delay <ms>
     delay in milliseconds the reset line is held low (default: 500 ms)
   --reset-strategy <name>
-    reset strategy for entering burn mode (default: auto), acceptable values:
+    reset strategy for the serial session (default: auto), acceptable values:
       auto: auto-select by chip; for LS26/VenusA alternates dtr-boot and dual-npn
       dtr-boot: DTR -> BOOT, RTS -> RESET (LS26 ARCS-MINI)
       rts-boot: RTS -> BOOT, DTR -> RESET (CSK4/CSK6 default)
       rts-boot-inv: rts-boot with BOOT active high (equivalent to --update-high)
       dual-npn: cross-wired NPN pair S8050 (LS26 ARCS-EVB)
+      none: no DTR/RTS reset during connect, retries, completion or errors
+  --no-reset
+    skip reset after success only; use --reset-strategy none to disable all resets
   --timeout <ms>
     override timeout for each operation (default: 0), acceptable values:
       -1: no timeout
@@ -113,6 +116,9 @@ Advanced operations (serial only):
 Example:
     cskburn -C venus -s /dev/cu.usbserial-0001 -b 1500000 --verify-all 0x0 app.bin 0x100000 res.bin
 ```
+
+使用 `--reset-strategy none` 时，需手动进入下载模式，并在操作结束后自行复位。
+连接重试不执行复位；原有 `--no-reset` 仍仅跳过成功结束后的复位。
 
 ## 编译
 
